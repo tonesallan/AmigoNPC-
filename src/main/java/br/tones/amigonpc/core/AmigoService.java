@@ -14,7 +14,7 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
  */
 public final class AmigoService {
 
-    private final AmigoNpcManager manager = new AmigoNpcManager();
+    private final AmigoNpcManager manager = AmigoNpcManager.getShared();
 
     public AmigoService() {
     }

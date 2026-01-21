@@ -14,7 +14,7 @@ import br.tones.amigonpc.core.HytaleBridge;
  */
 public final class AmigoUiActions {
 
-    private static final AmigoNpcManager MANAGER = new AmigoNpcManager();
+    private static final AmigoNpcManager MANAGER = AmigoNpcManager.getShared();
     private static volatile String LAST_ERROR;
 
     private AmigoUiActions() {}
