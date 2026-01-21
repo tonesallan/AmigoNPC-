@@ -8,12 +8,16 @@ import br.tones.amigonpc.core.AmigoService;
 
 import com.hypixel.hytale.server.core.command.system.CommandManager;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 
 public final class AmigoNPCPlugin extends JavaPlugin {
 
     private AmigoService service;
 
-    @Override
+    public AmigoNPCPlugin(JavaPluginInit init) {
+        super(init);
+    }
+
     public void onEnable() {
         this.service = new AmigoService();
 
@@ -31,6 +35,5 @@ public final class AmigoNPCPlugin extends JavaPlugin {
                 AmigoDebugCommand.createAsStandalone()
         );
 
-        getLogger().info("[AmigoNPC] Carregado!");
     }
 }
