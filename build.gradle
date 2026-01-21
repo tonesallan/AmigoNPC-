@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+}
+
+group = 'br.tones'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    compileOnly files("C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar")
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}
+
+jar {
+    archiveBaseName.set("AmigoNPC")
+    archiveVersion.set(version.toString())
+    manifest {
+        attributes(
+            "Implementation-Title": "AmigoNPC",
+            "Implementation-Version": version.toString()
+        )
+    }
+}
