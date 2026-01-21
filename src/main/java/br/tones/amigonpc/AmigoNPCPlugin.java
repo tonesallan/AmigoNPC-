@@ -1,8 +1,9 @@
 package br.tones.amigonpc;
 
 import br.tones.amigonpc.commands.AmigoCommand;
-import br.tones.amigonpc.commands.AmigoUi2Command;
 import br.tones.amigonpc.commands.AmigoDebugCommand;
+import br.tones.amigonpc.commands.AmigoUi2Command;
+import br.tones.amigonpc.commands.AmigoUiCommand;
 import br.tones.amigonpc.core.AmigoService;
 
 import com.hypixel.hytale.server.core.command.system.CommandManager;
@@ -18,6 +19,9 @@ public final class AmigoNPCPlugin extends JavaPlugin {
 
         // Comando principal: /amigo
         CommandManager.get().registerSystemCommand(new AmigoCommand(service));
+
+        // UI v1: /amigoui
+        CommandManager.get().registerSystemCommand(new AmigoUiCommand());
 
         // UI v2: /amigoui2
         CommandManager.get().registerSystemCommand(new AmigoUi2Command());

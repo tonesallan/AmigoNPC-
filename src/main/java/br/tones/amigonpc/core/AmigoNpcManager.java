@@ -16,6 +16,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class AmigoNpcManager {
 
+    private static final AmigoNpcManager SHARED = new AmigoNpcManager();
+
+    public static AmigoNpcManager getShared() {
+        return SHARED;
+    }
+
     private final Map<UUID, Object> npcRefPorPlayer = new ConcurrentHashMap<>();
     private static volatile String LAST_ERROR;
 
