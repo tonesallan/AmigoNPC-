@@ -1,97 +1,126 @@
 package br.tones.amigonpc.core;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Gerencia 1 NPC por player:
- * - Spawn -> guarda uma referência/handle retornada pelo EntityStore.addEntity(...)
- * - Despawn -> remove usando essa referência (ou tenta fallbacks)
+ * 1 NPC por player.
  *
- * Tudo por reflexão para não quebrar com variações de API.
+ * Spawn VISÍVEL: usa NPCPlugin.spawnNPC(Store,...), que já cria a entidade com setup/modelo correto.
+ * Despawn: remove pelo Store.removeEntity(ref, RemoveReason.*).
+ *
+ * Tudo por reflexão pra aguentar variação de build.
  */
 public final class AmigoNpcManager {
 
     private static final AmigoNpcManager SHARED = new AmigoNpcManager();
-
-    public static AmigoNpcManager getShared() {
-        return SHARED;
-    }
+    public static AmigoNpcManager getShared() { return SHARED; }
 
     private final Map<UUID, Object> npcRefPorPlayer = new ConcurrentHashMap<>();
     private static volatile String LAST_ERROR;
 
-    public String getLastError() {
-        return LAST_ERROR;
-    }
-
-    private static void setError(String msg) {
-        LAST_ERROR = msg;
-    }
+    public String getLastError() { return LAST_ERROR; }
+    private static void setError(String msg) { LAST_ERROR = msg; }
 
     public boolean hasNpc(UUID ownerId) {
         return ownerId != null && npcRefPorPlayer.containsKey(ownerId);
     }
 
-    /**
-     * Spawna e guarda o handle retornado pelo store.addEntity(...), se houver.
-     */
+    /** Compat com chamadas antigas (ex.: UI/Service). */
     public boolean spawn(Object worldObj, UUID ownerId) {
+        return spawn(worldObj, ownerId, null);
+    }
+
+    /**
+     * Spawn real via NPCPlugin.
+     * @param senderObj opcional (player/sender) pra ajudar a pegar posição; pode ser null.
+     */
+    public boolean spawn(Object worldObj, UUID ownerId, Object senderObj) {
         if (worldObj == null || ownerId == null) {
             setError("worldObj ou ownerId null.");
             return false;
         }
 
-        // Se já tem, tenta despawn primeiro (mantém 1 por player)
         if (hasNpc(ownerId)) {
             despawn(worldObj, ownerId);
         }
 
         final Object[] outRef = new Object[1];
+        final AtomicBoolean ok = new AtomicBoolean(false);
+        final CountDownLatch latch = new CountDownLatch(1);
 
         boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
             try {
-                Object store = invokeNoArg(worldObj, "getEntityStore", "entityStore");
-                if (store == null) {
-                    setError("World.getEntityStore() não encontrado.");
+                // 1) Store = world.getEntityStore().getStore()
+                Object componentStore = getComponentStoreFromWorld(worldObj);
+                if (componentStore == null) {
+                    setError("Não consegui obter Store via world.getEntityStore().getStore().");
                     return;
                 }
 
-                Object holder = createEntityHolder();
-                if (holder == null) {
-                    setError("Falha ao criar Holder (EntityStore.REGISTRY.newHolder).");
+                // 2) NPCPlugin.get()
+                Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
+                if (npcPlugin == null) {
+                    setError("NPCPlugin.get() não disponível nesta build.");
                     return;
                 }
 
-                // Componentes mínimos, se existirem na build
-                // (a mesma filosofia do HytaleBridge, mas aqui queremos capturar o retorno do addEntity)
-                tryAddTransform(holder);
-                tryAddUUIDComponent(holder, ownerId);
-                tryAddNetworkId(holder, store);
-
-                Object addReasonSpawn = getEnumConstant(
-                        "com.hypixel.hytale.server.core.universe.world.storage.EntityStore$AddReason",
-                        "SPAWN"
-                );
-
-                // Chama addEntity e tenta capturar retorno (se retornar algo)
-                Object ref = null;
-
-                if (addReasonSpawn != null) {
-                    ref = invokeAddEntityCaptureReturn(store, holder, addReasonSpawn);
+                // 3) npcType (preset ou role spawnável)
+                String npcType = firstStringFromArray(invokeNoArg(npcPlugin, "getPresetCoverageTestNPCs"));
+                if (npcType == null || npcType.isBlank()) {
+                    Object list = invokeOneArg(npcPlugin, "getRoleTemplateNames", boolean.class, true);
+                    npcType = firstStringFromList(list);
                 }
-                if (ref == null) {
-                    ref = invokeAddEntityCaptureReturn(store, holder);
+                if (npcType == null || npcType.isBlank()) {
+                    setError("Não encontrei npcType válido (sem presets e sem roles spawnáveis).");
+                    return;
                 }
 
-                outRef[0] = ref; // pode ser null em builds onde addEntity retorna void
+                // 4) posição: tenta pegar do próprio player pelo Store+TransformComponent
+                Object pos = tryGetOwnerPositionFromWorldStore(worldObj, componentStore, ownerId);
+                if (pos == null) {
+                    // fallback: tenta pelo sender (se veio)
+                    pos = tryGetSenderPosition(senderObj);
+                }
+
+                // garante Vector3d (se vier outra coisa, tentamos converter)
+                pos = coerceToVector3d(pos);
+                if (pos == null) {
+                    setError("Não consegui obter posição Vector3d do player.");
+                    return;
+                }
+
+                // spawn pertinho
+                pos = offsetVector3d(pos, 1.5, 0.0, 1.5);
+
+                // 5) rotação (usa NPCPlugin.NULL_ROTATION se existir)
+                Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
+                if (rot == null) rot = newVector3f(0f, 0f, 0f);
+
+                // 6) spawnNPC(Store store, String npcType, String groupType, Vector3d pos, Vector3f rot)
+                Object pair = invokeSpawnNPC(npcPlugin, componentStore, npcType, null, pos, rot);
+                if (pair == null) {
+                    setError("spawnNPC retornou null (assinatura incompatível ou tipos errados). npcType=" + npcType);
+                    return;
+                }
+
+                // Pair normalmente tem a Ref no "left/first/key"
+                Object ref = extractRefFromPair(pair);
+                outRef[0] = (ref != null ? ref : pair);
+
+                ok.set(true);
 
             } catch (Throwable t) {
                 setError("spawn() falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
+            } finally {
+                latch.countDown();
             }
         });
 
@@ -100,65 +129,80 @@ public final class AmigoNpcManager {
             return false;
         }
 
-        // Se tivemos retorno, guardamos para despawn preciso.
-        if (outRef[0] != null) {
-            npcRefPorPlayer.put(ownerId, outRef[0]);
-        } else {
-            // Ainda assim consideramos spawn solicitado, mas despawn pode precisar fallback.
-            npcRefPorPlayer.put(ownerId, new FallbackMarker(ownerId));
+        // espera a task rodar (sem travar o servidor por muito tempo)
+        try {
+            boolean finished = latch.await(1200, TimeUnit.MILLISECONDS);
+            if (!finished) {
+                setError("Spawn enfileirado, mas não confirmou execução (timeout).");
+                return false;
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            setError("Spawn interrompido.");
+            return false;
         }
 
+        if (!ok.get()) {
+            // LAST_ERROR já foi setado lá dentro
+            return false;
+        }
+
+        npcRefPorPlayer.put(ownerId, outRef[0] != null ? outRef[0] : new FallbackMarker(ownerId));
         return true;
     }
 
-    /**
-     * Despawna o NPC do player.
-     */
     public boolean despawn(Object worldObj, UUID ownerId) {
         if (worldObj == null || ownerId == null) {
             setError("worldObj ou ownerId null.");
             return false;
         }
 
-        Object ref = npcRefPorPlayer.remove(ownerId);
-        if (ref == null) {
+        Object saved = npcRefPorPlayer.remove(ownerId);
+        if (saved == null) {
             setError("Nenhum NPC registrado para este player.");
             return false;
         }
 
+        final AtomicBoolean ok = new AtomicBoolean(false);
+        final CountDownLatch latch = new CountDownLatch(1);
+
         boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
             try {
-                Object store = invokeNoArg(worldObj, "getEntityStore", "entityStore");
-                if (store == null) {
-                    setError("World.getEntityStore() não encontrado.");
+                Object componentStore = getComponentStoreFromWorld(worldObj);
+                if (componentStore == null) {
+                    setError("Não consegui obter Store via world.getEntityStore().getStore().");
                     return;
                 }
 
-                // Se for marker, não temos ref real; tenta fallbacks (limitado sem API garantida)
-                if (ref instanceof FallbackMarker) {
-                    // fallback leve: tenta "removeByOwnerUuid" se existir (raro), senão só avisa
-                    boolean ok = tryRemoveByOwnerUuidIfExists(store, ownerId);
-                    if (!ok) {
-                        setError("Não há ref real para despawn nesta build (addEntity retornou void). " +
-                                "Vamos ajustar no próximo passo se seu EntityStore expuser um método de busca.");
+                Object ref = saved;
+                if (!(ref instanceof FallbackMarker)) {
+                    if (!looksLikeRef(ref)) {
+                        Object extracted = extractRefFromPair(ref);
+                        if (extracted != null) ref = extracted;
                     }
+                } else {
+                    setError("Sem ref real para despawn (fallback marker).");
                     return;
                 }
 
-                // 1) store.removeEntity(ref)
-                if (tryInvokeRemoveEntity(store, ref)) return;
+                // Store.removeEntity(ref, RemoveReason.*)
+                Object removeReason = getRemoveReasonBestEffort();
+                if (removeReason == null) {
+                    setError("Não encontrei RemoveReason nesta build.");
+                    return;
+                }
 
-                // 2) store.removeEntity(ref, reason) se houver
-                Object removeReason = getEnumConstant(
-                        "com.hypixel.hytale.server.core.universe.world.storage.EntityStore$RemoveReason",
-                        "DESPAWN"
-                );
-                if (removeReason != null && tryInvokeRemoveEntity(store, ref, removeReason)) return;
+                if (!tryInvokeRemoveEntity(componentStore, ref, removeReason)) {
+                    setError("Não achei Store.removeEntity(ref, reason) compatível nesta build.");
+                    return;
+                }
 
-                setError("Não achei um método removeEntity compatível para esse ref nesta build.");
+                ok.set(true);
 
             } catch (Throwable t) {
                 setError("despawn() falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
+            } finally {
+                latch.countDown();
             }
         });
 
@@ -167,89 +211,152 @@ public final class AmigoNpcManager {
             return false;
         }
 
-        return true;
-    }
-
-    // =========================
-    // Reflection helpers (local)
-    // =========================
-
-    private static Object invokeNoArg(Object target, String... methodNames) {
-        for (String name : methodNames) {
-            try {
-                Method m = target.getClass().getMethod(name);
-                return m.invoke(target);
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static Object createEntityHolder() {
         try {
-            Class<?> entityStoreClass = Class.forName("com.hypixel.hytale.server.core.universe.world.storage.EntityStore");
-            Field registryField = entityStoreClass.getField("REGISTRY");
-            Object registry = registryField.get(null);
-            if (registry == null) return null;
+            boolean finished = latch.await(1200, TimeUnit.MILLISECONDS);
+            if (!finished) {
+                setError("Despawn enfileirado, mas não confirmou execução (timeout).");
+                return false;
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            setError("Despawn interrompido.");
+            return false;
+        }
 
-            Method newHolder = registry.getClass().getMethod("newHolder");
-            return newHolder.invoke(registry);
+        return ok.get();
+    }
 
+    // =========================================================
+    // Store / World helpers
+    // =========================================================
+
+    private static Object getComponentStoreFromWorld(Object worldObj) {
+        Object entityStore = invokeNoArg(worldObj, "getEntityStore", "entityStore");
+        if (entityStore == null) return null;
+        Object store = invokeNoArg(entityStore, "getStore", "store");
+        return store;
+    }
+
+    /**
+     * Pega a posição do dono via:
+     * world.getEntityRef(UUID) -> Store.getComponent(ref, TransformComponent.getComponentType()).getPosition()
+     */
+    private static Object tryGetOwnerPositionFromWorldStore(Object worldObj, Object componentStore, UUID ownerId) {
+        try {
+            Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+            if (ref == null) return null;
+
+            // TransformComponent (pelo docs que você enviou)
+            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+            Method getCt = tcClass.getMethod("getComponentType");
+            Object componentType = getCt.invoke(null);
+            if (componentType == null) return null;
+
+            // Store.getComponent(Ref, ComponentType)
+            Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
+            if (tc == null) return null;
+
+            return invokeNoArg(tc, "getPosition", "position");
         } catch (Throwable ignored) {
             return null;
         }
     }
 
-    private static Object getEnumConstant(String enumClassName, String constantName) {
+    private static Object invokeStoreGetComponent(Object store, Object ref, Object componentType) {
         try {
-            Class<?> enumClass = Class.forName(enumClassName);
-            if (!enumClass.isEnum()) return null;
-            @SuppressWarnings("unchecked")
-            Object constant = Enum.valueOf((Class<? extends Enum>) enumClass, constantName);
-            return constant;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static Object invokeAddEntityCaptureReturn(Object store, Object holder) {
-        try {
-            // tenta métodos addEntity com 1 parâmetro
             for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("addEntity")) continue;
-                if (m.getParameterCount() != 1) continue;
-                Object r = m.invoke(store, holder);
-                return r; // pode ser null/void
+                if (!m.getName().equals("getComponent")) continue;
+                if (m.getParameterCount() != 2) continue;
+                return m.invoke(store, ref, componentType);
             }
         } catch (Throwable ignored) {}
         return null;
     }
 
-    private static Object invokeAddEntityCaptureReturn(Object store, Object holder, Object reason) {
-        try {
-            for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("addEntity")) continue;
-                if (m.getParameterCount() != 2) continue;
+    // =========================================================
+    // spawnNPC + Pair/ref extraction
+    // =========================================================
 
-                Class<?>[] p = m.getParameterTypes();
-                if (p[1].isInstance(reason)) {
-                    Object r = m.invoke(store, holder, reason);
-                    return r; // pode ser null/void
+    private static Object invokeSpawnNPC(Object npcPlugin, Object store, String npcType, String groupType, Object pos, Object rot) {
+        try {
+            for (Method m : npcPlugin.getClass().getMethods()) {
+                if (!m.getName().equals("spawnNPC")) continue;
+                if (m.getParameterCount() != 5) continue;
+                try {
+                    return m.invoke(npcPlugin, store, npcType, groupType, pos, rot);
+                } catch (IllegalArgumentException ignoredTryOtherOverload) {
+                    // continua tentando caso tenha overloads/bridge
                 }
             }
         } catch (Throwable ignored) {}
         return null;
     }
 
-    private static boolean tryInvokeRemoveEntity(Object store, Object ref) {
+    private static boolean looksLikeRef(Object o) {
+        if (o == null) return false;
+        String n = o.getClass().getName();
+        return n.endsWith(".Ref") || n.endsWith("Ref") || n.contains(".Ref");
+    }
+
+    private static Object extractRefFromPair(Object pair) {
+        if (pair == null) return null;
+        String[] methods = { "getLeft", "getFirst", "getKey", "left", "first", "key" };
+        for (String mname : methods) {
+            try {
+                Method m = pair.getClass().getMethod(mname);
+                Object v = m.invoke(pair);
+                if (v != null) return v;
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    // =========================================================
+    // RemoveEntity helpers (Store.removeEntity(ref, reason))
+    // =========================================================
+
+    private static Object getRemoveReasonBestEffort() {
+        // a API docs cita RemoveReason, mas não trouxe o arquivo MD.
+        // então tentamos nomes comuns, e se não achar, pegamos o primeiro enum value.
+        String[] enumCandidates = {
+                "com.hypixel.hytale.component.RemoveReason",
+                "com.hypixel.hytale.component.Store$RemoveReason"
+        };
+        for (String cn : enumCandidates) {
+            Object r =
+                    getEnumConstantAny(cn, "DESPAWN", "COMMAND", "PLUGIN", "CUSTOM", "REMOVE");
+            if (r != null) return r;
+
+            Object first = getFirstEnumValue(cn);
+            if (first != null) return first;
+        }
+        return null;
+    }
+
+    private static Object getEnumConstantAny(String enumClassName, String... names) {
         try {
-            for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("removeEntity")) continue;
-                if (m.getParameterCount() != 1) continue;
-                m.invoke(store, ref);
-                return true;
+            Class<?> enumClass = Class.forName(enumClassName);
+            if (!enumClass.isEnum()) return null;
+            @SuppressWarnings("unchecked")
+            Class<? extends Enum> e = (Class<? extends Enum>) enumClass;
+
+            for (String n : names) {
+                try {
+                    return Enum.valueOf(e, n);
+                } catch (IllegalArgumentException ignored) {}
             }
         } catch (Throwable ignored) {}
-        return false;
+        return null;
+    }
+
+    private static Object getFirstEnumValue(String enumClassName) {
+        try {
+            Class<?> enumClass = Class.forName(enumClassName);
+            if (!enumClass.isEnum()) return null;
+            Object[] vals = enumClass.getEnumConstants();
+            return (vals != null && vals.length > 0) ? vals[0] : null;
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     private static boolean tryInvokeRemoveEntity(Object store, Object ref, Object reason) {
@@ -257,7 +364,6 @@ public final class AmigoNpcManager {
             for (Method m : store.getClass().getMethods()) {
                 if (!m.getName().equals("removeEntity")) continue;
                 if (m.getParameterCount() != 2) continue;
-
                 Class<?>[] p = m.getParameterTypes();
                 if (p[1].isInstance(reason)) {
                     m.invoke(store, ref, reason);
@@ -268,110 +374,156 @@ public final class AmigoNpcManager {
         return false;
     }
 
-    private static boolean tryRemoveByOwnerUuidIfExists(Object store, UUID ownerId) {
-        String[] names = { "removeByOwnerUuid", "removeEntitiesByOwnerUuid", "removeByUuid" };
-        for (String name : names) {
-            try {
-                Method m = store.getClass().getMethod(name, UUID.class);
-                m.invoke(store, ownerId);
-                return true;
-            } catch (Throwable ignored) {}
+    // =========================================================
+    // Position helpers
+    // =========================================================
+
+    private static Object tryGetSenderPosition(Object senderObj) {
+        if (senderObj == null) return null;
+
+        Object p = invokeNoArg(senderObj, "getPosition", "position");
+        if (p != null) return p;
+
+        Object transform = invokeNoArg(senderObj, "getTransform", "transform");
+        if (transform != null) {
+            Object p2 = invokeNoArg(transform, "getPosition", "position");
+            if (p2 != null) return p2;
         }
-        return false;
-    }
 
-    // =========================
-    // Components (optional)
-    // =========================
-
-    private static void tryAddTransform(Object holder) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"
-        };
-        Object comp = tryInstantiateNoArg(classNames);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
-
-    private static void tryAddUUIDComponent(Object holder, UUID ownerId) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.UUIDComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"
-        };
-        Object comp = tryInstantiateUUID(classNames, ownerId);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
-
-    private static void tryAddNetworkId(Object holder, Object store) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.NetworkIdComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.NetworkIdComponent"
-        };
-
-        Object externalData = invokeNoArg(store, "getExternalData", "externalData");
-        if (externalData == null) return;
-
-        Object networkId = invokeNoArg(externalData, "takeNextNetworkId", "nextNetworkId", "getNextNetworkId");
-        if (networkId == null) return;
-
-        Object comp = tryInstantiateSingleArg(classNames, networkId);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
-
-    private static Object tryInstantiateNoArg(String[] classNames) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-                Constructor<?> ctor = c.getDeclaredConstructor();
-                ctor.setAccessible(true);
-                return ctor.newInstance();
-            } catch (Throwable ignored) {}
-        }
         return null;
     }
 
-    private static Object tryInstantiateUUID(String[] classNames, UUID ownerId) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-                try {
-                    Constructor<?> ctor = c.getDeclaredConstructor(UUID.class);
-                    ctor.setAccessible(true);
-                    return ctor.newInstance(ownerId);
-                } catch (Throwable ignoredCtor) {}
-            } catch (Throwable ignored) {}
-        }
+    /** tenta transformar qualquer coisa em Vector3d (se já for, retorna; se for Transform, pega getPosition; etc). */
+    private static Object coerceToVector3d(Object maybe) {
+        if (maybe == null) return null;
+
+        // já tem getX/getY/getZ? então tratamos como “vetor”
+        if (hasXYZGetters(maybe)) return maybe;
+
+        // se for um Transform/Component com getPosition()
+        Object pos = invokeNoArg(maybe, "getPosition", "position");
+        if (pos != null && hasXYZGetters(pos)) return pos;
+
         return null;
     }
 
-    private static Object tryInstantiateSingleArg(String[] classNames, Object arg) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-                for (Constructor<?> ctor : c.getDeclaredConstructors()) {
-                    if (ctor.getParameterCount() != 1) continue;
-                    ctor.setAccessible(true);
-                    try {
-                        return ctor.newInstance(arg);
-                    } catch (Throwable ignored) {}
-                }
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static void invokeHolderAdd(Object holder, Object component) {
+    private static boolean hasXYZGetters(Object v) {
         try {
-            for (Method m : holder.getClass().getMethods()) {
-                if (!m.getName().equals("add")) continue;
-                if (m.getParameterCount() != 1) continue;
-                m.invoke(holder, component);
-                return;
+            v.getClass().getMethod("getX");
+            v.getClass().getMethod("getY");
+            v.getClass().getMethod("getZ");
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static Object offsetVector3d(Object vec, double ox, double oy, double oz) {
+        try {
+            double x = (double) vec.getClass().getMethod("getX").invoke(vec);
+            double y = (double) vec.getClass().getMethod("getY").invoke(vec);
+            double z = (double) vec.getClass().getMethod("getZ").invoke(vec);
+
+            // tenta construir um novo Vector3d da mesma classe do vec
+            try {
+                return vec.getClass().getConstructor(double.class, double.class, double.class)
+                        .newInstance(x + ox, y + oy, z + oz);
+            } catch (Throwable ignoredCtor) {
+                // fallback: tenta achar um Vector3d conhecido
+                Object v2 = newVector3d(x + ox, y + oy, z + oz);
+                return (v2 != null) ? v2 : vec;
             }
         } catch (Throwable ignored) {}
+        return vec;
     }
 
-    // Marker interno: usado quando addEntity não retorna handle/ref
+    private static Object newVector3d(double x, double y, double z) {
+        String[] candidates = {
+                "com.hypixel.hytale.math.Vector3d",
+                "com.hypixel.hytale.util.math.Vector3d",
+                "com.hypixel.hytale.protocol.util.Vector3d",
+                "com.hypixel.hytale.server.core.math.Vector3d"
+        };
+        for (String cn : candidates) {
+            try {
+                Class<?> c = Class.forName(cn);
+                return c.getConstructor(double.class, double.class, double.class).newInstance(x, y, z);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private static Object newVector3f(float a, float b, float c0) {
+        String[] candidates = {
+                "com.hypixel.hytale.math.Vector3f",
+                "com.hypixel.hytale.util.math.Vector3f",
+                "com.hypixel.hytale.protocol.util.Vector3f",
+                "com.hypixel.hytale.server.core.math.Vector3f"
+        };
+        for (String cn : candidates) {
+            try {
+                Class<?> c = Class.forName(cn);
+                return c.getConstructor(float.class, float.class, float.class).newInstance(a, b, c0);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    // =========================================================
+    // Generic reflection helpers
+    // =========================================================
+
+    private static Object invokeNoArg(Object target, String... methodNames) {
+        if (target == null) return null;
+        for (String name : methodNames) {
+            try {
+                Method m = target.getClass().getMethod(name);
+                return m.invoke(target);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private static Object invokeOneArg(Object target, String methodName, Class<?> argType, Object arg) {
+        if (target == null) return null;
+        try {
+            Method m = target.getClass().getMethod(methodName, argType);
+            return m.invoke(target, arg);
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static Object invokeStaticNoArg(String className, String methodName) {
+        try {
+            Class<?> c = Class.forName(className);
+            Method m = c.getMethod(methodName);
+            return m.invoke(null);
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static Object getStaticFieldIfExists(String className, String fieldName) {
+        try {
+            Class<?> c = Class.forName(className);
+            Field f = c.getField(fieldName);
+            return f.get(null);
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static String firstStringFromArray(Object arr) {
+        if (arr instanceof String[] a && a.length > 0) return a[0];
+        return null;
+    }
+
+    private static String firstStringFromList(Object listObj) {
+        if (listObj instanceof List<?> list && !list.isEmpty()) {
+            Object v = list.get(0);
+            return v != null ? String.valueOf(v) : null;
+        }
+        return null;
+    }
+
     private static final class FallbackMarker {
         final UUID ownerId;
         FallbackMarker(UUID ownerId) { this.ownerId = ownerId; }

@@ -5,23 +5,12 @@ import java.util.UUID;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 
-/**
- * Serviço principal do AmigoNPC (versão final com persistência + despawn).
- *
- * Usa:
- * - HytaleBridge: para obter World e executar com compatibilidade
- * - AmigoNpcManager: para manter 1 NPC por player e remover depois
- */
 public final class AmigoService {
 
     private final AmigoNpcManager manager = AmigoNpcManager.getShared();
 
-    public AmigoService() {
-    }
+    public AmigoService() {}
 
-    /**
-     * /amigo spawn
-     */
     public void spawn(CommandContext ctx) {
         if (!ctx.isPlayer()) {
             ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por jogadores."));
@@ -38,7 +27,8 @@ public final class AmigoService {
             return;
         }
 
-        boolean ok = manager.spawn(world, ownerId);
+        // ✅ passa o sender para pegarmos posição do player
+        boolean ok = manager.spawn(world, ownerId, ctx.sender());
         if (!ok) {
             ctx.sendMessage(Message.raw("§c[AmigoNPC] Falha ao spawnar o NPC."));
             String err = manager.getLastError();
@@ -49,9 +39,6 @@ public final class AmigoService {
         ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC criado! Use §f/amigo despawn §apara remover."));
     }
 
-    /**
-     * /amigo despawn
-     */
     public void despawn(CommandContext ctx) {
         if (!ctx.isPlayer()) {
             ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por jogadores."));

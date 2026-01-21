@@ -205,7 +205,6 @@ public final class HytaleBridge {
     // ----------------------------
 
     private static void tryAddTransform(Object holder) {
-        // Possíveis nomes (dependendo da build)
         String[] classNames = {
                 "com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent",
                 "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"
@@ -221,11 +220,8 @@ public final class HytaleBridge {
                 "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"
         };
 
-        // tenta construtor UUIDComponent(UUID)
         Object comp = tryInstantiateUUIDComponent(classNames, ownerId);
-        if (comp != null) {
-            invokeHolderAdd(holder, comp);
-        }
+        if (comp != null) invokeHolderAdd(holder, comp);
     }
 
     private static void tryAddNetworkId(Object holder, Object store) {
@@ -251,7 +247,6 @@ public final class HytaleBridge {
 
     private static void invokeHolderAdd(Object holder, Object component) {
         try {
-            // holder.add(component)
             for (Method m : holder.getClass().getMethods()) {
                 if (!m.getName().equals("add")) continue;
                 Class<?>[] p = m.getParameterTypes();
@@ -319,7 +314,6 @@ public final class HytaleBridge {
                     ctor.setAccessible(true);
                     Object obj = ctor.newInstance();
 
-                    // tenta método setUuid(UUID) / setId(UUID) / setValue(UUID)
                     String[] setters = { "setUuid", "setId", "setValue" };
                     for (String s : setters) {
                         try {
@@ -329,7 +323,6 @@ public final class HytaleBridge {
                         } catch (Throwable ignoredSetter) {}
                     }
 
-                    // tenta field uuid/id/value
                     String[] fields = { "uuid", "id", "value" };
                     for (String f : fields) {
                         try {
@@ -351,7 +344,6 @@ public final class HytaleBridge {
             try {
                 Class<?> c = Class.forName(cn);
 
-                // tenta achar um ctor de 1 argumento compatível
                 for (Constructor<?> ctor : c.getDeclaredConstructors()) {
                     Class<?>[] p = ctor.getParameterTypes();
                     if (p.length == 1 && (arg == null || p[0].isInstance(arg) || isPrimitiveWrapperMatch(p[0], arg.getClass()))) {
@@ -365,7 +357,6 @@ public final class HytaleBridge {
     }
 
     private static boolean isPrimitiveWrapperMatch(Class<?> paramType, Class<?> argType) {
-        // Ajuda em casos tipo param long / arg Long, etc.
         if (!paramType.isPrimitive()) return false;
         if (paramType == int.class && argType == Integer.class) return true;
         if (paramType == long.class && argType == Long.class) return true;

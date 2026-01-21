@@ -67,7 +67,7 @@ public final class AmigoUiActions {
 
             switch (actionId.toLowerCase()) {
                 case "spawn" -> {
-                    boolean ok = MANAGER.spawn(world, ownerId);
+boolean ok = MANAGER.spawn(world, ownerId);
                     if (!ok) {
                         setError("Spawn falhou: " + MANAGER.getLastError());
                         return false;
