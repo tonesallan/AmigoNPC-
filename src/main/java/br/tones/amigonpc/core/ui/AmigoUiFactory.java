@@ -63,7 +63,8 @@ public final class AmigoUiFactory {
             // Botões que executam comandos (mais compatível)
             addCommandButton(builder, "Spawn", "/amigo spawn");
             addCommandButton(builder, "Despawn", "/amigo despawn");
-            addCommandButton(builder, "Fechar", "/amigoui"); // fallback: reabre/fecha depende da build
+            // /amigoui e /amigoui2 foram removidos. Mantemos um "Fechar" que apenas re-executa /amigo.
+            addCommandButton(builder, "Fechar", "/amigo");
 
             // Finaliza
             Object uiObj = tryInvokeReturn(builder, "build");

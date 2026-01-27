@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'br.tones'
-version = '1.0.0'
+version = '1.0.1'
 
 repositories {
     mavenCentral()
@@ -16,8 +16,13 @@ java {
 }
 
 dependencies {
-    compileOnly files("C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar")
+    // Permite compilar em outras máquinas/ambientes sem precisar editar este arquivo:
+    // - Se a env HYTALE_SERVER_JAR existir, usamos ela.
+    // - Caso contrário, cai no caminho padrão do Windows (seu setup atual).
+    def serverJarPath = System.getenv("HYTALE_SERVER_JAR") ?: "C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar"
+    compileOnly files(serverJarPath)
 }
+
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
@@ -25,6 +30,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     archiveBaseName.set("AmigoNPC")
     archiveVersion.set(version.toString())
     manifest {

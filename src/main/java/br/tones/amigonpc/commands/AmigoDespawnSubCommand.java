@@ -1,13 +1,22 @@
 package br.tones.amigonpc.commands;
 
-import java.util.concurrent.CompletableFuture;
-
-import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import br.tones.amigonpc.core.AmigoService;
 
-public final class AmigoDespawnSubCommand extends AbstractCommand {
+public final class AmigoDespawnSubCommand extends AbstractPlayerCommand {
+
+    // ✅ subcomando público (sem permissão)
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
 
     private final AmigoService service;
 
@@ -20,8 +29,12 @@ public final class AmigoDespawnSubCommand extends AbstractCommand {
     }
 
     @Override
-    protected CompletableFuture<Void> execute(CommandContext ctx) {
-        service.despawn(ctx);
-        return CompletableFuture.completedFuture(null);
+    protected void execute(CommandContext ctx,
+                           Store<EntityStore> store,
+                           Ref<EntityStore> playerEntityRef,
+                           PlayerRef playerRef,
+                           World world) {
+        // Usa o Store entregue pela API para remover imediatamente e manter o registro consistente.
+        service.despawn(ctx, world, store, playerEntityRef, playerRef);
     }
 }

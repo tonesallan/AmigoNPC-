@@ -12,6 +12,12 @@ import br.tones.amigonpc.ui.UiBridge;
 
 public final class AmigoDebugCommand extends AbstractCommand {
 
+    // ✅ comando público (sem permissão)
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
+
     public AmigoDebugCommand() {
         super("amigo", "Debug do AmigoNPC");
         // ⚠️ Não usamos este construtor para substituir /amigo.
@@ -46,7 +52,7 @@ public final class AmigoDebugCommand extends AbstractCommand {
         String uf = AmigoUiFactory.getLastError();
         ctx.sendMessage(Message.raw("§7- AmigoUiFactory: " + (uf == null ? "OK/sem erro" : uf)));
 
-        ctx.sendMessage(Message.raw("§7Dica: teste §f/amigo spawn§7, §f/amigo despawn§7, §f/amigoui2§7."));
+        ctx.sendMessage(Message.raw("§7Dica: teste §f/amigo spawn§7, §f/amigo despawn§7, §f/amigo defender§7."));
         return CompletableFuture.completedFuture(null);
     }
 }

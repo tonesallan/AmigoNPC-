@@ -10,6 +10,12 @@ import br.tones.amigonpc.ui.AmigoUiFactory;
 
 public final class AmigoUi2Command extends AbstractCommand {
 
+    // ✅ comando público (sem permissão)
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
+
     public AmigoUi2Command() {
         super("amigoui2", "Abre a interface do AmigoNPC (v2)");
     }

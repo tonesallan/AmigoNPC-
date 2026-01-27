@@ -1,0 +1,85 @@
+{
+  "StartState": "Idle",
+  "DefaultSubState": "Default",
+  "Type": "Generic",
+  "Appearance": "Wraith",
+  "Invulnerable": false,
+  "MotionControllerList": [
+    {
+      "Type": "Walk",
+      "MaxWalkSpeed": 12,
+      "Gravity": 10,
+      "MaxFallSpeed": 8,
+      "Acceleration": 10,
+      "MaxClimbHeight": 2
+    }
+  ],
+  "MaxHealth": 100,
+  "Instructions": [
+    {
+      "Instructions": [
+        {
+          "Sensor": {
+            "Type": "State",
+            "State": "Idle"
+          },
+          "Instructions": [
+            {
+              "Sensor": {
+                "Type": "State",
+                "State": ".Default"
+              },
+              "Instructions": [
+                {
+                  "$Comment": "Combat: perseguir CombatTarget de perto (melee)",
+                  "Sensor": {
+                    "Type": "Target",
+                    "TargetSlot": "CombatTarget",
+                    "Range": 64
+                  },
+                  "BodyMotion": {
+                    "Type": "Seek",
+                    "SlowDownDistance": 6,
+                    "StopDistance": 2,
+                    "RelativeSpeed": 1.0,
+                    "RelaxedMoveConstraints": true
+                  }
+                },
+                {
+                  "$Comment": "Quando estiver dentro de 25 blocos, andar (walk) e manter distância",
+                  "Sensor": {
+                    "Type": "Target",
+                    "Range": 25,
+                    "TargetSlot": "LockedTarget"
+                  },
+                  "BodyMotion": {
+                    "Type": "Seek",
+                    "SlowDownDistance": 9,
+                    "StopDistance": 5,
+                    "RelativeSpeed": 0.6,
+                    "RelaxedMoveConstraints": true
+                  }
+                },
+                {
+                  "$Comment": "Sempre seguir o LockedTarget (run) quando estiver longe",
+                  "Sensor": {
+                    "Type": "Target",
+                    "TargetSlot": "LockedTarget"
+                  },
+                  "BodyMotion": {
+                    "Type": "Seek",
+                    "SlowDownDistance": 12,
+                    "StopDistance": 6,
+                    "RelativeSpeed": 1.0,
+                    "RelaxedMoveConstraints": true
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "NameTranslationKey": "server.npcRoles.Amigo_Follow.name"
+}

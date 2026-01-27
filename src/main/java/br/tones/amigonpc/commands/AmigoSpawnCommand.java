@@ -9,6 +9,12 @@ import br.tones.amigonpc.core.AmigoService;
 
 public final class AmigoSpawnCommand extends AbstractCommand {
 
+    // ✅ comando público (sem permissão)
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
+
     private final AmigoService service;
 
     public AmigoSpawnCommand(AmigoService service) {
