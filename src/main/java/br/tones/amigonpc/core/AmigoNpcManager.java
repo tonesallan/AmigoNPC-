@@ -1647,6 +1647,7 @@ public final class AmigoNpcManager {
       if (rec != null) {
          if (!rec.downed) {
             rec.downed = true;
+            rec.activityState = CompanionActivityState.DOWNED;
             long now = System.currentTimeMillis();
             rec.downedUntilMillis = now + DOWNED_AUTO_REVIVE_MILLIS;
 
@@ -2707,6 +2708,28 @@ public final class AmigoNpcManager {
                         AmigoNpcManager::endCombatTaggedLooting
                      );
                      boolean inCombatOrAssist = inCombatOrAssistNow;
+
+                     if (rec.downed) {
+                        rec.activityState = CompanionActivityState.DOWNED;
+                     } else if (inCombatOrAssist) {
+                        rec.activityState = CompanionActivityState.COMBAT;
+                        rec.gatherTargetX = Integer.MIN_VALUE;
+                        rec.gatherTargetY = Integer.MIN_VALUE;
+                        rec.gatherTargetZ = Integer.MIN_VALUE;
+                     } else if (worldObj instanceof World world) {
+                        NpcGatheringSupport.Result gatheringResult = NpcGatheringSupport.tick(
+                           world, owner, rec, np, nowx, false, this::maybeNotifyBackpackFull
+                        );
+                        rec.activityState = switch (gatheringResult) {
+                           case GATHERED -> CompanionActivityState.GATHERING;
+                           case FULL, FOLLOWING -> CompanionActivityState.FOLLOWING;
+                           case COMBAT -> CompanionActivityState.COMBAT;
+                           case IDLE -> CompanionActivityState.IDLE;
+                        };
+                     } else {
+                        rec.activityState = CompanionActivityState.FOLLOWING;
+                     }
+
                      NpcFollowRescueSupport.tryRescue(
                         store,
                         owner,
@@ -2786,6 +2809,7 @@ public final class AmigoNpcManager {
       rec.downedUntilMillis = 0L;
       rec.deathDespawnAtMillis = 0L;
       rec.nextDownedMessageMillis = 0L;
+      rec.activityState = CompanionActivityState.FOLLOWING;
       HytaleBridge.worldExecute(rec.worldObj, () -> {
          try {
             if (!(getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> rawStore) || !(rec.refObj instanceof Ref<?> rawRef)) {
@@ -4950,6 +4974,11 @@ public final class AmigoNpcManager {
       volatile boolean autoWeaponSwitchEnabled = true;
       volatile boolean interruptAttacksEnabled = true;
       volatile boolean autoLootEnabled = true;
+      volatile CompanionActivityState activityState = CompanionActivityState.FOLLOWING;
+      volatile long nextGatherScanMillis;
+      volatile int gatherTargetX = Integer.MIN_VALUE;
+      volatile int gatherTargetY = Integer.MIN_VALUE;
+      volatile int gatherTargetZ = Integer.MIN_VALUE;
       volatile boolean debugLogEnabled;
       volatile boolean godMode;
       volatile long deathDespawnAtMillis;
