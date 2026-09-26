@@ -40,11 +40,6 @@ final class NpcGatheringSupport {
          return Result.COMBAT;
       }
 
-      if (!rec.autoLootEnabled) {
-         clearTarget(rec);
-         return Result.FOLLOWING;
-      }
-
       if (rec.lootingActive) {
          return Result.GATHERING;
       }
