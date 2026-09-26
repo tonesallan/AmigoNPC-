@@ -2,7 +2,7 @@ package br.tones.amigonpc.core.zones;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Field;
@@ -82,8 +82,8 @@ public final class ZoneResolver {
             }
 
             Method m = cacheClass.getMethod("getZoneBiomeResult", int.class, int.class, int.class);
-            int xBlock = (int)Math.floor(pos.getX());
-            int zBlock = (int)Math.floor(pos.getZ());
+            int xBlock = (int)Math.floor(pos.x());
+            int zBlock = (int)Math.floor(pos.z());
             int[][] coords = new int[][]{{xBlock, zBlock}, {xBlock >> 4, zBlock >> 4}, {xBlock >> 5, zBlock >> 5}};
 
             for (int[] cz : coords) {
@@ -227,7 +227,7 @@ public final class ZoneResolver {
       }
 
       try {
-         if (invoke(worldObj, "getZoneIdAt", new Class[]{double.class, double.class, double.class}, new Object[]{pos.getX(), pos.getY(), pos.getZ()}) instanceof Integer i
+         if (invoke(worldObj, "getZoneIdAt", new Class[]{double.class, double.class, double.class}, new Object[]{pos.x(), pos.y(), pos.z()}) instanceof Integer i
             )
           {
             return i;

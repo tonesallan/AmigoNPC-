@@ -5,7 +5,7 @@ import com.hypixel.hytale.component.Archetype;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -297,9 +297,9 @@ final class NpcLootStateSupport {
 
    private static double dist2(Vector3d a, Vector3d b) {
       if (a != null && b != null) {
-         double dx = a.getX() - b.getX();
-         double dy = a.getY() - b.getY();
-         double dz = a.getZ() - b.getZ();
+         double dx = a.x() - b.x();
+         double dy = a.y() - b.y();
+         double dz = a.z() - b.z();
          return dx * dx + dy * dy + dz * dz;
       } else {
          return Double.POSITIVE_INFINITY;

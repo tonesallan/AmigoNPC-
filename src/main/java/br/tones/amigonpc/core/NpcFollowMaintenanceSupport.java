@@ -1,6 +1,6 @@
 package br.tones.amigonpc.core;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 
 final class NpcFollowMaintenanceSupport {
    private NpcFollowMaintenanceSupport() {

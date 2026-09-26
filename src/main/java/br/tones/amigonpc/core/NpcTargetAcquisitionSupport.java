@@ -2,7 +2,7 @@ package br.tones.amigonpc.core;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
@@ -85,7 +85,7 @@ final class NpcTargetAcquisitionSupport {
 
                      if (tc != null && tc.getPosition() != null) {
                         Vector3d p = tc.getPosition();
-                        double dy = Math.abs(p.getY() - ownerPos.getY());
+                        double dy = Math.abs(p.y() - ownerPos.y());
                         if (dy > maxDy) {
                            if (dy > rangedAirMaxDy) {
                               continue;
@@ -102,8 +102,8 @@ final class NpcTargetAcquisitionSupport {
                            }
                         }
 
-                        double dx = p.getX() - ownerPos.getX();
-                        double dz = p.getZ() - ownerPos.getZ();
+                        double dx = p.x() - ownerPos.x();
+                        double dz = p.z() - ownerPos.z();
                         double d2 = dx * dx + dz * dz;
                         if (!(d2 > r2)) {
                            try {
@@ -223,7 +223,7 @@ final class NpcTargetAcquisitionSupport {
 
                      if (tc != null && tc.getPosition() != null) {
                         Vector3d p = tc.getPosition();
-                        double dy = Math.abs(p.getY() - npcPos.getY());
+                        double dy = Math.abs(p.y() - npcPos.y());
                         if (dy > maxDy) {
                            if (dy > rangedAirMaxDy) {
                               continue;
@@ -240,8 +240,8 @@ final class NpcTargetAcquisitionSupport {
                            }
                         }
 
-                        double dx = p.getX() - npcPos.getX();
-                        double dz = p.getZ() - npcPos.getZ();
+                        double dx = p.x() - npcPos.x();
+                        double dz = p.z() - npcPos.z();
                         double d2 = dx * dx + dz * dz;
                         if (!(d2 > r2)) {
                            try {
@@ -362,7 +362,7 @@ final class NpcTargetAcquisitionSupport {
                               label91:
                               if (tc != null && tc.getPosition() != null) {
                                  Vector3d p = tc.getPosition();
-                                 double dy = Math.abs(p.getY() - npcPos.getY());
+                                 double dy = Math.abs(p.y() - npcPos.y());
                                  if (dy > maxDy) {
                                     if (dy > rangedAirMaxDy) {
                                        break label91;
@@ -379,8 +379,8 @@ final class NpcTargetAcquisitionSupport {
                                     }
                                  }
 
-                                 double dx = p.getX() - npcPos.getX();
-                                 double dz = p.getZ() - npcPos.getZ();
+                                 double dx = p.x() - npcPos.x();
+                                 double dz = p.z() - npcPos.z();
                                  double d2 = dx * dx + dz * dz;
                                  if (!(d2 > r2)) {
                                     try {

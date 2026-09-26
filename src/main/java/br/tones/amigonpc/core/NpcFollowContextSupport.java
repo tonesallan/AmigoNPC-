@@ -3,7 +3,7 @@ package br.tones.amigonpc.core;
 import br.tones.amigonpc.core.zones.ZoneMobService;
 import br.tones.amigonpc.core.zones.ZoneModel;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 final class NpcFollowContextSupport {
@@ -26,9 +26,9 @@ final class NpcFollowContextSupport {
    ) {
       if (store != null && rec != null && ownerPos != null && npcPos != null) {
          updateZoneSnapshot(worldObj, store, ownerRefObj, rec);
-         double dx = ownerPos.getX() - npcPos.getX();
-         double dz = ownerPos.getZ() - npcPos.getZ();
-         double dy = ownerPos.getY() - npcPos.getY();
+         double dx = ownerPos.x() - npcPos.x();
+         double dz = ownerPos.z() - npcPos.z();
+         double dy = ownerPos.y() - npcPos.y();
          double horizontal = Math.sqrt(dx * dx + dz * dz);
          updateChaseDistanceState(rec, horizontal, chaseReacquireDistance);
          long now = System.currentTimeMillis();
@@ -110,9 +110,9 @@ final class NpcFollowContextSupport {
       }
 
       if (now - rec.lastSampleMillis >= 400L) {
-         double mdx = npcPos.getX() - rec.lastNpcPos.getX();
-         double mdy = npcPos.getY() - rec.lastNpcPos.getY();
-         double mdz = npcPos.getZ() - rec.lastNpcPos.getZ();
+         double mdx = npcPos.x() - rec.lastNpcPos.x();
+         double mdy = npcPos.y() - rec.lastNpcPos.y();
+         double mdz = npcPos.z() - rec.lastNpcPos.z();
          double moved = Math.sqrt(mdx * mdx + mdy * mdy + mdz * mdz);
          if (moved > 0.25) {
             rec.lastNpcMovedMillis = now;
