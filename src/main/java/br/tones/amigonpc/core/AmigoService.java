@@ -16,7 +16,9 @@ public final class AmigoService {
    public void spawn(CommandContext ctx, World world, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef) {
       if (ctx != null && world != null && store != null && playerEntityRef != null && playerRef != null) {
          UUID ownerId = playerRef.getUuid();
-         boolean ok = this.manager.spawnWithStore(world, store, playerEntityRef, ownerId, playerRef);
+         boolean ok = this.manager.isDowned(ownerId)
+            ? this.manager.requestRespawn(world, ownerId, playerRef)
+            : this.manager.spawnWithStore(world, store, playerEntityRef, ownerId, playerRef);
          if (!ok) {
             ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
             String err = this.manager.getLastError();
@@ -66,7 +68,9 @@ public final class AmigoService {
                ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
             }
          } else {
-            boolean ok = this.manager.spawn(world, ownerId, ctx.sender());
+            boolean ok = this.manager.isDowned(ownerId)
+               ? this.manager.requestRespawn(world, ownerId, ctx.sender())
+               : this.manager.spawn(world, ownerId, ctx.sender());
             if (!ok) {
                ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
                String err = this.manager.getLastError();
@@ -110,7 +114,9 @@ public final class AmigoService {
    public void spawn(CommandContext ctx, World world, PlayerRef playerRef) {
       if (ctx != null && world != null && playerRef != null) {
          UUID ownerId = playerRef.getUuid();
-         boolean ok = this.manager.spawn(world, ownerId, playerRef);
+         boolean ok = this.manager.isDowned(ownerId)
+            ? this.manager.requestRespawn(world, ownerId, playerRef)
+            : this.manager.spawn(world, ownerId, playerRef);
          if (!ok) {
             ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
             String err = this.manager.getLastError();
