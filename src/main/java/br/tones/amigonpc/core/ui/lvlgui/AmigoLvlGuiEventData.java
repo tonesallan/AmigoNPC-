@@ -3,38 +3,34 @@ package br.tones.amigonpc.core.ui.lvlgui;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.builder.BuilderCodec.Builder;
 
 public final class AmigoLvlGuiEventData {
-   public static final BuilderCodec<AmigoLvlGuiEventData> CODEC = ((Builder)((Builder)((Builder)((Builder)((Builder)((Builder)((Builder)((Builder)((Builder)((Builder)BuilderCodec.builder(
-                                       AmigoLvlGuiEventData.class, AmigoLvlGuiEventData::new
-                                    )
-                                    .append(new KeyedCodec("StatName", Codec.STRING), AmigoLvlGuiEventData::setStatName, AmigoLvlGuiEventData::getStatName)
-                                    .add())
-                                 .append(new KeyedCodec("Action", Codec.STRING), AmigoLvlGuiEventData::setAction, AmigoLvlGuiEventData::getAction)
-                                 .add())
-                              .append(
-                                 new KeyedCodec("Amount", Codec.STRING), AmigoLvlGuiEventData::setAmountFromString, AmigoLvlGuiEventData::getAmountAsString
-                              )
-                              .add())
-                           .append(new KeyedCodec("NavBar", Codec.STRING), AmigoLvlGuiEventData::setNavBar, AmigoLvlGuiEventData::getNavBar)
-                           .add())
-                        .append(
-                           new KeyedCodec("ClaimLevel", Codec.STRING),
-                           AmigoLvlGuiEventData::setClaimLevelFromString,
-                           AmigoLvlGuiEventData::getClaimLevelAsString
-                        )
-                        .add())
-                     .append(new KeyedCodec("@ModelId", Codec.STRING), AmigoLvlGuiEventData::setModelId, AmigoLvlGuiEventData::getModelId)
-                     .add())
-                  .append(new KeyedCodec("@Scale", Codec.STRING), AmigoLvlGuiEventData::setScaleFromString, AmigoLvlGuiEventData::getScaleAsString)
-                  .add())
-               .append(new KeyedCodec("@NpcName", Codec.STRING), AmigoLvlGuiEventData::setNpcName, AmigoLvlGuiEventData::getNpcName)
-               .add())
-            .append(new KeyedCodec("@Language", Codec.STRING), AmigoLvlGuiEventData::setLanguage, AmigoLvlGuiEventData::getLanguage)
-            .add())
-         .append(new KeyedCodec("@LanguageText", Codec.STRING), AmigoLvlGuiEventData::setLanguageText, AmigoLvlGuiEventData::getLanguageText)
-         .add())
+   public static final BuilderCodec<AmigoLvlGuiEventData> CODEC = BuilderCodec
+      .builder(AmigoLvlGuiEventData.class, AmigoLvlGuiEventData::new)
+      .append(new KeyedCodec<>("StatName", Codec.STRING), AmigoLvlGuiEventData::setStatName, AmigoLvlGuiEventData::getStatName)
+      .add()
+      .append(new KeyedCodec<>("Action", Codec.STRING), AmigoLvlGuiEventData::setAction, AmigoLvlGuiEventData::getAction)
+      .add()
+      .append(new KeyedCodec<>("Amount", Codec.STRING), AmigoLvlGuiEventData::setAmountFromString, AmigoLvlGuiEventData::getAmountAsString)
+      .add()
+      .append(new KeyedCodec<>("NavBar", Codec.STRING), AmigoLvlGuiEventData::setNavBar, AmigoLvlGuiEventData::getNavBar)
+      .add()
+      .append(
+         new KeyedCodec<>("ClaimLevel", Codec.STRING),
+         AmigoLvlGuiEventData::setClaimLevelFromString,
+         AmigoLvlGuiEventData::getClaimLevelAsString
+      )
+      .add()
+      .append(new KeyedCodec<>("@ModelId", Codec.STRING), AmigoLvlGuiEventData::setModelId, AmigoLvlGuiEventData::getModelId)
+      .add()
+      .append(new KeyedCodec<>("@Scale", Codec.STRING), AmigoLvlGuiEventData::setScaleFromString, AmigoLvlGuiEventData::getScaleAsString)
+      .add()
+      .append(new KeyedCodec<>("@NpcName", Codec.STRING), AmigoLvlGuiEventData::setNpcName, AmigoLvlGuiEventData::getNpcName)
+      .add()
+      .append(new KeyedCodec<>("@Language", Codec.STRING), AmigoLvlGuiEventData::setLanguage, AmigoLvlGuiEventData::getLanguage)
+      .add()
+      .append(new KeyedCodec<>("@LanguageText", Codec.STRING), AmigoLvlGuiEventData::setLanguageText, AmigoLvlGuiEventData::getLanguageText)
+      .add()
       .build();
    public String statName;
    public String action;
