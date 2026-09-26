@@ -1685,6 +1685,30 @@ public final class AmigoNpcManager {
       return rec != null && rec.downed;
    }
 
+   public boolean hasRecentCombatParticipation(UUID ownerId, Object targetRefObj, long now) {
+      if (ownerId == null || targetRefObj == null) {
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null || rec.combatTags == null) {
+         return false;
+      }
+
+      synchronized (rec.combatTags) {
+         for (CombatTag tag : rec.combatTags) {
+            if (tag != null
+               && refEq(tag.targetRefObj, targetRefObj)
+               && tag.lastSeenMillis > 0L
+               && now - tag.lastSeenMillis <= 30000L) {
+               return true;
+            }
+         }
+      }
+
+      return false;
+   }
+
    public void markDowned(UUID ownerId) {
       AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
       if (rec != null) {

@@ -78,7 +78,7 @@ final class AmigoPlayerKillNpcXpAwardSupport {
    static void awardXp(UUID ownerId, long xpGain, NpcXpContext ctx) {
       if (ownerId != null && xpGain > 0L && ctx != null) {
          try {
-            AmigoNPCApi.addNpcXp(ownerId, xpGain, NpcXpSource.COMBAT_KILL, ctx);
+            AmigoNPCApi.addNpcXp(ownerId, xpGain, NpcXpSource.COMBAT_ASSIST, ctx);
          } catch (Throwable var5) {
          }
       }

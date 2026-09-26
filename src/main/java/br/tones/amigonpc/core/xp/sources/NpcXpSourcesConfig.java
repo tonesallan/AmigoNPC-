@@ -2,7 +2,7 @@ package br.tones.amigonpc.core.xp.sources;
 
 public final class NpcXpSourcesConfig {
    public boolean enableCommandXP = true;
-   public boolean enableCollectXP = true;
+   public boolean enableCollectXP = false;
    public int collectThrottleMs = 500;
    public int miningBaseXP = 1;
    public int woodBaseXP = 1;

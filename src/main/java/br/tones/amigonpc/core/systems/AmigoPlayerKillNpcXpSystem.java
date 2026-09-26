@@ -56,10 +56,14 @@ public final class AmigoPlayerKillNpcXpSystem extends DamageEventSystem {
                         UUID ownerId = AmigoPlayerKillNpcXpSupport.resolveOwnerId(store, attackerRef);
                         if (ownerId != null) {
                            if (AmigoPlayerKillNpcXpAwardSupport.isNpcActive(manager, ownerId)) {
+                              long now = System.currentTimeMillis();
+                              if (!manager.hasRecentCombatParticipation(ownerId, targetRef, now)) {
+                                 return;
+                              }
+
                               AmigoPlayerKillNpcXpSupport.scheduleSecondScan(manager, store, ownerId, targetRef, attackerRef);
                               String mobId = AmigoPlayerKillNpcXpSupport.resolveMobId(store, targetRef);
                               if (mobId != null) {
-                                 long now = System.currentTimeMillis();
                                  if (AmigoPlayerKillNpcXpSupport.shouldSkipRecentKill(RECENT_KILLS, mobId, now, 1500L, 5000)) {
                                     return;
                                  }

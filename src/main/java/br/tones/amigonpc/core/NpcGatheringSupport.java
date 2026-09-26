@@ -1,6 +1,5 @@
 package br.tones.amigonpc.core;
 
-import br.tones.amigonpc.core.xp.sources.NpcCollectXpSource;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockBreakingDropType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockGathering;
@@ -131,11 +130,6 @@ final class NpcGatheringSupport {
       rec.gatherTargetX = target.x;
       rec.gatherTargetY = target.y;
       rec.gatherTargetZ = target.z;
-
-      try {
-         NpcCollectXpSource.onPickup(ownerId, 1, world.getName());
-      } catch (Throwable ignored) {
-      }
 
       return Result.GATHERED;
    }

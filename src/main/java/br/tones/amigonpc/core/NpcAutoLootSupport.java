@@ -3,7 +3,6 @@ package br.tones.amigonpc.core;
 import br.tones.amigonpc.core.autoloot.AutoLootConfig;
 import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
 import br.tones.amigonpc.core.i18n.AmigoText;
-import br.tones.amigonpc.core.xp.sources.NpcCollectXpSource;
 import com.hypixel.hytale.component.Archetype;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.Ref;
@@ -366,21 +365,6 @@ final class NpcAutoLootSupport {
          }
 
          summaryFlusher.flush(rec, ownerId, worldObj, now);
-         if (pickedCount > 0) {
-            String wn = null;
-
-            try {
-               if (worldObj.getClass().getMethod("getName").invoke(worldObj) instanceof String s && !s.isBlank()) {
-                  wn = s;
-               }
-            } catch (Throwable var19) {
-            }
-
-            try {
-               NpcCollectXpSource.onPickup(ownerId, pickedCount, wn);
-            } catch (Throwable var18) {
-            }
-         }
       }
    }
 
