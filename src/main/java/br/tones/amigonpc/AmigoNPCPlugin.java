@@ -3,6 +3,7 @@ package br.tones.amigonpc;
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.AmigoService;
 import br.tones.amigonpc.core.debug.ServerErrorHook;
+import br.tones.amigonpc.core.cosmetics.SkinPackService;
 import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
 import br.tones.amigonpc.core.bootstrap.AmigoCommandRegistrar;
 import br.tones.amigonpc.core.bootstrap.AmigoRuntimeBootstrap;
@@ -21,6 +22,7 @@ import javax.annotation.Nonnull;
 public final class AmigoNPCPlugin extends JavaPlugin {
    public static final PluginManifest MANIFEST = PluginManifest.corePlugin(AmigoNPCPlugin.class).build();
    private AmigoService service;
+   private final SkinPackService skinPackService = new SkinPackService();
    private final AmigoTickerCoordinator tickerCoordinator = new AmigoTickerCoordinator();
    private final HudLifecycleCoordinator hudLifecycleCoordinator = new HudLifecycleCoordinator(this::getEventRegistry);
    private final ManualReviveCoordinator manualReviveCoordinator = new ManualReviveCoordinator(this::getEventRegistry);
@@ -35,6 +37,7 @@ public final class AmigoNPCPlugin extends JavaPlugin {
 
    protected void setup() {
       this.service = new AmigoService();
+      this.skinPackService.loadFromPluginFile(this.getFile());
       this.npcRefApiRegistrar.register();
       this.runtimeBootstrap.initialize();
       new AmigoCommandRegistrar(this.getCommandRegistry(), this.service).registerAll();
@@ -49,9 +52,8 @@ public final class AmigoNPCPlugin extends JavaPlugin {
    }
 
    protected void shutdown() {
-      this.manualReviveCoordinator.shutdown();
-      this.npcRefApiRegistrar.unregister();
       this.tickerCoordinator.shutdown();
+      this.manualReviveCoordinator.shutdown();
 
       try {
          LevelProgressHudService.getShared().shutdown();
@@ -62,6 +64,13 @@ public final class AmigoNPCPlugin extends JavaPlugin {
          AmigoNpcManager.getShared().shutdownForReload();
       } catch (Throwable ignored) {
       }
+
+      try {
+         this.skinPackService.shutdown();
+      } catch (Throwable ignored) {
+      }
+
+      this.npcRefApiRegistrar.unregister();
 
       try {
          ServerErrorHook.uninstall();
