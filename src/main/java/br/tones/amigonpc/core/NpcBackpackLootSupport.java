@@ -12,8 +12,16 @@ import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 final class NpcBackpackLootSupport {
+   private static final String[] BACKPACK_FULL_MESSAGES = new String[]{
+      "Hey amigo, estou com o inventário cheio.",
+      "Hey, que tal voltarmos? Estou com o inventário cheio.",
+      "Estou com o inventário cheio.",
+      "Não consigo carregar mais nada."
+   };
+
    private NpcBackpackLootSupport() {
    }
 
@@ -63,7 +71,7 @@ final class NpcBackpackLootSupport {
             rec.nextLootFullMsgMillis = now + cooldownMillis;
 
             try {
-               messenger.send(worldObj, ownerId, AmigoText.text("core.loot.backpack_full"));
+               messenger.send(worldObj, ownerId, BACKPACK_FULL_MESSAGES[ThreadLocalRandom.current().nextInt(BACKPACK_FULL_MESSAGES.length)]);
             } catch (Throwable var9) {
             }
          }
