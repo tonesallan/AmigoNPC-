@@ -3,11 +3,10 @@ package br.tones.amigonpc.core;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
-import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
 final class NpcWeaponSupport {
    private NpcWeaponSupport() {
@@ -15,17 +14,14 @@ final class NpcWeaponSupport {
 
    static String getHotbar0ItemId(Store<EntityStore> store, Ref<EntityStore> npcRef) {
       try {
-         NPCEntity npc = (NPCEntity)store.getComponent(npcRef, NPCEntity.getComponentType());
-         if (npc == null) {
+         InventoryComponent.Hotbar hotbarComponent = (InventoryComponent.Hotbar)store.getComponent(
+            npcRef, InventoryComponent.Hotbar.getComponentType()
+         );
+         if (hotbarComponent == null) {
             return null;
          }
 
-         Inventory inv = npc.getInventory();
-         if (inv == null) {
-            return null;
-         }
-
-         ItemContainer hotbar = inv.getHotbar();
+         ItemContainer hotbar = hotbarComponent.getInventory();
          if (hotbar == null) {
             return null;
          }
@@ -48,60 +44,38 @@ final class NpcWeaponSupport {
 
    static boolean equipWeaponInHotbar0(Store<EntityStore> store, Ref<EntityStore> npcRef, String itemId) {
       try {
-         NPCEntity npc = (NPCEntity)store.getComponent(npcRef, NPCEntity.getComponentType());
-         if (npc == null) {
-            return false;
+         InventoryComponent.Hotbar hotbarComponent = (InventoryComponent.Hotbar)store.getComponent(
+            npcRef, InventoryComponent.Hotbar.getComponentType()
+         );
+
+         if (hotbarComponent == null) {
+            hotbarComponent = new InventoryComponent.Hotbar();
+            store.putComponent(npcRef, InventoryComponent.Hotbar.getComponentType(), hotbarComponent);
          }
 
-         Inventory inv = npc.getInventory();
-         if (inv == null) {
-            inv = new Inventory();
+         InventoryComponent.Tool toolComponent = (InventoryComponent.Tool)store.getComponent(
+            npcRef, InventoryComponent.Tool.getComponentType()
+         );
+         if (toolComponent != null) {
+            toolComponent.setUsingToolsItem(false);
+            toolComponent.markDirty();
          }
 
-         try {
-            inv.setEntity(npc);
-         } catch (Throwable var10) {
-         }
-
-         try {
-            inv.setUsingToolsItem(false);
-         } catch (Throwable var9) {
-         }
-
-         ItemContainer hotbar = inv.getHotbar();
+         ItemContainer hotbar = hotbarComponent.getInventory();
          if (hotbar == null) {
-            inv = new Inventory();
-
-            try {
-               inv.setEntity(npc);
-            } catch (Throwable var8) {
-            }
-
-            try {
-               inv.setUsingToolsItem(false);
-            } catch (Throwable var7) {
-            }
-
-            hotbar = inv.getHotbar();
-            if (hotbar == null) {
-               return false;
-            }
+            return false;
          }
 
          hotbar.setItemStackForSlot((short)0, new ItemStack(itemId, 1));
 
-         try {
-            ItemStack st = hotbar.getItemStack((short)0);
-            if (st == null || st.isEmpty()) {
-               return false;
-            }
-         } catch (Throwable var11) {
+         ItemStack st = hotbar.getItemStack((short)0);
+         if (st == null || st.isEmpty()) {
+            return false;
          }
 
-         inv.setActiveHotbarSlot((byte)0);
-         inv.markChanged();
-         npc.setInventory(inv);
-         npc.invalidateEquipmentNetwork();
+         hotbarComponent.setActiveSlot((byte)0, npcRef, store);
+         hotbarComponent.markDirty();
+         hotbarComponent.setOutdatedEquipment(true);
          return true;
       } catch (Throwable ignored) {
          return false;
