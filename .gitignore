@@ -28,3 +28,4 @@ server/
 
 # Local binary/reference recovery material
 reference/
+build-audit/
