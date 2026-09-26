@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+
+# IDE / local build output
+bin/
+out/
+.idea/
+*.iml
+.vscode/
+
+# Java
+*.class
+*.jar
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Local Hytale dependencies / runtime artifacts
+HytaleServer.jar
+run/
+server/
