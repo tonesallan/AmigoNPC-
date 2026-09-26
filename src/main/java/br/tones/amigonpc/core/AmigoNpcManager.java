@@ -1738,6 +1738,44 @@ public final class AmigoNpcManager {
       return false;
    }
 
+   public void recordExternalCompanionKillXp(UUID ownerId, Object targetRefObj, long gain, long now) {
+      if (ownerId == null || targetRefObj == null) {
+         return;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null) {
+         return;
+      }
+
+      synchronized (rec) {
+         rec.externalCompanionKillXpTargetRefObj = targetRefObj;
+         rec.externalCompanionKillXpAtMillis = now > 0L ? now : System.currentTimeMillis();
+         rec.externalCompanionKillXpGain = Math.max(0L, gain);
+      }
+   }
+
+   private static long consumeExternalCompanionKillXp(AmigoNpcManager.NpcRecord rec, Object targetRefObj, long now) {
+      if (rec == null || targetRefObj == null) {
+         return -1L;
+      }
+
+      synchronized (rec) {
+         if (rec.externalCompanionKillXpTargetRefObj == null
+            || !refEq(rec.externalCompanionKillXpTargetRefObj, targetRefObj)
+            || rec.externalCompanionKillXpAtMillis <= 0L
+            || now - rec.externalCompanionKillXpAtMillis > 2000L) {
+            return -1L;
+         }
+
+         long gain = Math.max(0L, rec.externalCompanionKillXpGain);
+         rec.externalCompanionKillXpTargetRefObj = null;
+         rec.externalCompanionKillXpAtMillis = 0L;
+         rec.externalCompanionKillXpGain = 0L;
+         return gain;
+      }
+   }
+
    public void markDowned(UUID ownerId) {
       AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
       if (rec != null) {
@@ -3641,38 +3679,45 @@ public final class AmigoNpcManager {
 
          int mobLevelForCtx = rec.currentTargetMobLevel;
          long xpGain;
+         boolean xpAlreadyAwarded = false;
          if (killed) {
             int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
             int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
             mobLevelForCtx = mobLevel;
-            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
-            xpGain = coerceStage1XpGainToLong(rec, xpD);
+            long externalXpGain = consumeExternalCompanionKillXp(rec, targetRefObj, now);
+            if (externalXpGain >= 0L) {
+               xpGain = externalXpGain;
+               xpAlreadyAwarded = true;
+            } else {
+               double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+               xpGain = coerceStage1XpGainToLong(rec, xpD);
 
-            try {
-               if (AmigoZonesConfigService.get().debugLog) {
-                  double baseXp = RpgStage1Formulas.calculateBaseXPFromMonsterLevel(mobLevel, RPG_STAGE1_CFG);
-                  double diffMult = RpgStage1Formulas.calculateLevelDiffMultiplier(npcLevel, mobLevel, RPG_STAGE1_CFG);
-                  this.debugMobLevel(
-                     rec,
-                     rec.ownerId,
-                     AmigoText.format(
-                        "core.debug.moblevel.xp_kill",
-                        npcLevel,
-                        mobLevel,
-                        String.format(Locale.ROOT, "%.2f", baseXp),
-                        String.format(Locale.ROOT, "%.2f", diffMult),
-                        String.format(Locale.ROOT, "%.2f", RPG_STAGE1_CFG.getRateExp()),
-                        xpGain
-                     )
-                  );
+               try {
+                  if (AmigoZonesConfigService.get().debugLog) {
+                     double baseXp = RpgStage1Formulas.calculateBaseXPFromMonsterLevel(mobLevel, RPG_STAGE1_CFG);
+                     double diffMult = RpgStage1Formulas.calculateLevelDiffMultiplier(npcLevel, mobLevel, RPG_STAGE1_CFG);
+                     this.debugMobLevel(
+                        rec,
+                        rec.ownerId,
+                        AmigoText.format(
+                           "core.debug.moblevel.xp_kill",
+                           npcLevel,
+                           mobLevel,
+                           String.format(Locale.ROOT, "%.2f", baseXp),
+                           String.format(Locale.ROOT, "%.2f", diffMult),
+                           String.format(Locale.ROOT, "%.2f", RPG_STAGE1_CFG.getRateExp()),
+                           xpGain
+                        )
+                     );
+                  }
+               } catch (Throwable var50) {
                }
-            } catch (Throwable var50) {
             }
          } else {
             xpGain = 0L;
          }
 
-         if (xpGain > 0L) {
+         if (xpGain > 0L && !xpAlreadyAwarded) {
             NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
             String wn = null;
 
@@ -3890,17 +3935,24 @@ public final class AmigoNpcManager {
 
          int mobLevelForCtx = rec.currentTargetMobLevel;
          long xpGain;
+         boolean xpAlreadyAwarded = false;
          if (killed) {
             int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
             int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
             mobLevelForCtx = mobLevel;
-            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
-            xpGain = coerceStage1XpGainToLong(rec, xpD);
+            long externalXpGain = consumeExternalCompanionKillXp(rec, targetRefObj, now);
+            if (externalXpGain >= 0L) {
+               xpGain = externalXpGain;
+               xpAlreadyAwarded = true;
+            } else {
+               double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+               xpGain = coerceStage1XpGainToLong(rec, xpD);
+            }
          } else {
             xpGain = 0L;
          }
 
-         if (xpGain > 0L) {
+         if (xpGain > 0L && !xpAlreadyAwarded) {
             NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
             String wn = null;
 
@@ -5075,6 +5127,9 @@ public final class AmigoNpcManager {
       volatile long totalXp = 0L;
       volatile int npcLevelCached = 1;
       volatile double stage1XpRemainder = 0.0;
+      volatile Object externalCompanionKillXpTargetRefObj;
+      volatile long externalCompanionKillXpAtMillis;
+      volatile long externalCompanionKillXpGain;
       volatile long baseHp = -1L;
       volatile long baseDef = -1L;
       volatile String modelId;
