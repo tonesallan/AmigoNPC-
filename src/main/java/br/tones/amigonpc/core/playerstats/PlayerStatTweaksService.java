@@ -43,20 +43,12 @@ public final class PlayerStatTweaksService {
    }
 
    public void onPlayerLeave(Player player, PlayerRef pref) {
-      if (player != null) {
-         try {
-            UUID uuid = null;
-
-            try {
-               uuid = pref != null ? pref.getUuid() : null;
-            } catch (Throwable var5) {
-            }
-
-            if (uuid != null) {
-               this.applied.remove(uuid.toString());
-            }
-         } catch (Throwable var6) {
+      try {
+         UUID uuid = pref != null ? pref.getUuid() : null;
+         if (uuid != null) {
+            this.applied.remove(uuid.toString());
          }
+      } catch (Throwable ignored) {
       }
    }
 
