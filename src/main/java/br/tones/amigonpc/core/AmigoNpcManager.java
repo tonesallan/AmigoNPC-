@@ -65,6 +65,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntitySta
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier.ModifierTarget;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier.CalculationType;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -1863,12 +1864,12 @@ public final class AmigoNpcManager {
                   return;
                }
 
-               Player player = (Player)store.getComponent(ownerRef, Player.getComponentType());
-               if (player == null) {
+               PlayerRef playerRef = (PlayerRef)store.getComponent(ownerRef, PlayerRef.getComponentType());
+               if (playerRef == null) {
                   return;
                }
 
-               player.sendMessage(Message.raw(AmigoText.format("core.chat.prefix", text)));
+               playerRef.sendMessage(Message.raw(AmigoText.format("core.chat.prefix", text)));
             } catch (Throwable var7) {
             }
          });
