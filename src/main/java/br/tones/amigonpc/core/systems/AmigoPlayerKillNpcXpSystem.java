@@ -1,6 +1,7 @@
 package br.tones.amigonpc.core.systems;
 
 import br.tones.amigonpc.api.NpcXpContext;
+import br.tones.amigonpc.api.NpcXpSource;
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.rpgleveling.stage1.RpgLevelingStage1Config;
 import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1MobLevelCalculator;
@@ -53,12 +54,14 @@ public final class AmigoPlayerKillNpcXpSystem extends DamageEventSystem {
                   Ref<EntityStore> attackerRef = AmigoPlayerKillNpcXpSupport.extractAttackerRef(damage.getSource());
                   if (attackerRef != null) {
                      UUID ownerId = null;
+                     boolean companionKill = false;
                      if (AmigoPlayerKillNpcXpSupport.isPlayerRef(store, attackerRef)) {
                         ownerId = AmigoPlayerKillNpcXpSupport.resolveOwnerId(store, attackerRef);
                      } else {
                         try {
                            if (manager.isAmigoRef(attackerRef)) {
                               ownerId = manager.getOwnerFromRef(attackerRef);
+                              companionKill = ownerId != null;
                            }
                         } catch (Throwable ignored) {
                         }
@@ -80,9 +83,16 @@ public final class AmigoPlayerKillNpcXpSystem extends DamageEventSystem {
                         int mobLevel = AmigoPlayerKillNpcXpAwardSupport.resolveMobLevel(store, targetRef, STAGE1_MOB_CALC, STAGE1_CFG);
                         double xpD = AmigoPlayerKillNpcXpAwardSupport.resolveXpFromKill(npcLevel, mobLevel, STAGE1_CFG);
                         long xpGain = AmigoPlayerKillNpcXpSupport.coerceStage1XpGainToLong(STAGE1_REMAINDER, ownerId, xpD, 5000);
-                        if (xpGain > 0L) {
-                           NpcXpContext ctx = AmigoPlayerKillNpcXpAwardSupport.buildKillContext(store, mobId, mobLevel);
-                           AmigoPlayerKillNpcXpAwardSupport.awardXp(ownerId, xpGain, ctx);
+                        NpcXpContext ctx = AmigoPlayerKillNpcXpAwardSupport.buildKillContext(store, mobId, mobLevel);
+                        boolean awarded = xpGain > 0L
+                           && AmigoPlayerKillNpcXpAwardSupport.awardXp(
+                              ownerId,
+                              xpGain,
+                              companionKill ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST,
+                              ctx
+                           );
+                        if (companionKill && (xpGain == 0L || awarded)) {
+                           manager.recordExternalCompanionKillXp(ownerId, targetRef, xpGain, now);
                         }
                      }
                   }
