@@ -2155,6 +2155,35 @@ public final class AmigoNpcManager {
       NpcCombatStateSupport.startCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
    }
 
+   public void tryInterruptOwnerAttacker(Store<EntityStore> store, UUID ownerId, Object attackerRefObj) {
+      if (store == null || ownerId == null || attackerRefObj == null) {
+         return;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null || rec.downed || !rec.interruptAttacksEnabled || rec.refObj == null) {
+         return;
+      }
+
+      long now = System.currentTimeMillis();
+      if (now - rec.lastInterruptMillis < 1500L) {
+         return;
+      }
+
+      try {
+         Object attackerNpc = getComponentFromStore(store, attackerRefObj, NPCEntity.getComponentType());
+         if (attackerNpc == null) {
+            return;
+         }
+
+         setMarkedTargetOnNpcEntity(attackerNpc, "CombatTarget", rec.refObj);
+         setLockedTargetOnNpcEntity(attackerNpc, rec.refObj);
+         rec.lastInterruptMillis = now;
+         this.debugCombat(rec, ownerId, "interrupt: attacker redirected to companion");
+      } catch (Throwable ignored) {
+      }
+   }
+
    public void startNpcCombat(UUID ownerId, Object attackerRefObj) {
       NpcCombatStateSupport.startNpcCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
    }
@@ -4893,6 +4922,7 @@ public final class AmigoNpcManager {
       volatile long rangedBowReadyAtMillis;
       volatile long lastCombatNudgeMillis;
       volatile long lastAggroPulseMillis;
+      volatile long lastInterruptMillis;
       volatile String lastAttackAnimId;
       volatile long clearAttackAnimAtMillis;
       volatile long debugNextEquipMillis;

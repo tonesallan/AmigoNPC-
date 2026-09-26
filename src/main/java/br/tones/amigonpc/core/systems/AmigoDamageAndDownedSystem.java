@@ -74,6 +74,7 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                      Ref<EntityStore> attackerRef = DamageSourceRefSupport.extractAttackerRef(damage.getSource());
                      if (attackerRef != null) {
                         manager.startCombat(ownerId, attackerRef);
+                        manager.tryInterruptOwnerAttacker(store, ownerId, attackerRef);
                      } else {
                         try {
                            String srcName = damage.getSource() == null ? "null" : damage.getSource().getClass().getSimpleName();
