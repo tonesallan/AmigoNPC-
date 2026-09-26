@@ -5043,6 +5043,7 @@ public final class AmigoNpcManager {
       volatile AmigoNpcManager.State state;
       volatile boolean downed;
       volatile long downedUntilMillis;
+      volatile long nextDownedMessageMillis;
       volatile SimpleItemContainer backpack;
       volatile long nextAutoLootMillis;
       volatile boolean lootPausedInventoryFull;

@@ -41,7 +41,7 @@ final class NpcGatheringSupport {
       }
 
       if (rec.lootingActive) {
-         return Result.GATHERING;
+         return Result.GATHERED;
       }
 
       SimpleItemContainer bag = rec.backpack;
