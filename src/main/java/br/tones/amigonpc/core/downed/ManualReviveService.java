@@ -2,6 +2,7 @@ package br.tones.amigonpc.core.downed;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
 import com.hypixel.hytale.protocol.InteractionState;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChain;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.UUID;
@@ -53,20 +54,27 @@ public final class ManualReviveService {
       }
 
       Attempt attempt = this.attempts.get(helperId);
-      if (attempt == null) {
+      if (attempt == null || chain.interactionType != InteractionType.Use) {
          return;
       }
 
       long now = System.currentTimeMillis();
       InteractionState state = chain.state;
       if (state == InteractionState.NotFinished) {
+         if (attempt.chainId != Integer.MIN_VALUE && attempt.chainId != chain.chainId) {
+            return;
+         }
+
+         attempt.chainId = chain.chainId;
          attempt.lastSignalMillis = now;
          attempt.holdConfirmed = true;
       } else if (state == InteractionState.Finished
          || state == InteractionState.Failed
          || state == InteractionState.Skip
          || state == InteractionState.ItemChanged) {
-         this.attempts.remove(helperId, attempt);
+         if (attempt.chainId == Integer.MIN_VALUE || attempt.chainId == chain.chainId) {
+            this.attempts.remove(helperId, attempt);
+         }
       }
    }
 
@@ -113,6 +121,7 @@ public final class ManualReviveService {
       private final UUID npcOwnerId;
       private final long startedAtMillis;
       private volatile long lastSignalMillis;
+      private volatile int chainId = Integer.MIN_VALUE;
       private volatile boolean holdConfirmed;
 
       private Attempt(UUID npcOwnerId, long startedAtMillis, long lastSignalMillis) {
