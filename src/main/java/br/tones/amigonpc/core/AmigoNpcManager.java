@@ -118,6 +118,15 @@ public final class AmigoNpcManager {
    private static final long AUTOLOOT_INTERVAL_MS = 250L;
    private static final int AUTOLOOT_MAX_ITEMS_PER_SCAN = 8;
    private static final long AUTOLOOT_FULL_MSG_COOLDOWN_MS = 30000L;
+   private static final long DOWNED_AUTO_REVIVE_MILLIS = 40000L;
+   private static final double DOWNED_BODY_HIDE_DISTANCE = 25.0;
+   private static final long DOWNED_CHAT_MIN_INTERVAL_MILLIS = 8000L;
+   private static final long DOWNED_CHAT_MAX_INTERVAL_MILLIS = 14000L;
+   private static final String[] DOWNED_CHAT_MESSAGES = new String[]{
+      "Ainda estou morto :x",
+      "Desculpa, morto não fala…..",
+      "Mortinho da Silva :x"
+   };
    private static final Archetype<EntityStore> AUTOLOOT_QUERY = Archetype.of(
       new ComponentType[]{TransformComponent.getComponentType(), ItemComponent.getComponentType()}
    );
@@ -1251,27 +1260,93 @@ public final class AmigoNpcManager {
    }
 
    public boolean requestRespawn(Object worldObj, UUID ownerId, Object senderObj) {
-      if (worldObj != null && ownerId != null) {
-         long now = System.currentTimeMillis();
-         long delay = 1000L + ThreadLocalRandom.current().nextLong(1001L);
-         long at = now + delay;
-         String msg = AmigoText.text("core.chat.respawn.arriving");
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         if (rec == null) {
-            this.pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
-            return true;
-         } else {
-            rec.respawnRequested = true;
-            rec.respawnWorldObj = worldObj;
-            rec.respawnSenderObj = senderObj;
-            rec.respawnAtMillis = at;
-            rec.respawnMessage = msg;
-            return this.despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
-         }
-      } else {
+      if (worldObj == null || ownerId == null) {
          setError(AmigoText.text("core.error.respawn.invalid_args"));
          return false;
       }
+
+      long now = System.currentTimeMillis();
+      long delay = 1000L + ThreadLocalRandom.current().nextLong(1001L);
+      long at = now + delay;
+      String msg = AmigoText.text("core.chat.respawn.arriving");
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null) {
+         this.pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
+         return true;
+      }
+
+      if (rec.downed) {
+         long deadline = rec.downedUntilMillis;
+         Object oldWorld = rec.worldObj != null ? rec.worldObj : worldObj;
+         Object oldRef = rec.refObj;
+         if (oldRef != null && oldWorld != null) {
+            HytaleBridge.worldExecute(oldWorld, () -> {
+               try {
+                  Object oldStore = getComponentStoreFromWorld(oldWorld);
+                  if (oldStore != null) {
+                     doRemoveEntity(oldStore, oldRef);
+                  }
+               } catch (Throwable ignored) {
+               }
+               this.amigoRefs.remove(oldRef);
+               if (rec.refObj == oldRef) {
+                  rec.refObj = null;
+               }
+            });
+         }
+
+         rec.state = AmigoNpcManager.State.SPAWNING;
+         return HytaleBridge.worldExecute(worldObj, () -> {
+            try {
+               Object storeObj = getComponentStoreFromWorld(worldObj);
+               if (storeObj == null) {
+                  rec.state = AmigoNpcManager.State.ACTIVE;
+                  return;
+               }
+
+               this.spawnIntoExistingRecord(worldObj, storeObj, ownerId, senderObj, rec);
+               if (rec.refObj != null) {
+                  rec.downed = true;
+                  rec.downedUntilMillis = deadline;
+                  rec.deathDespawnAtMillis = 0L;
+                  rec.state = AmigoNpcManager.State.ACTIVE;
+                  if (rec.refObj instanceof Ref<?> rawRef && storeObj instanceof Store<?> rawStore) {
+                     @SuppressWarnings("unchecked")
+                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
+                     @SuppressWarnings("unchecked")
+                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
+                     MovementStatesComponent movement = store.getComponent(npcRef, MovementStatesComponent.getComponentType());
+                     if (movement != null) {
+                        MovementStates states = movement.getMovementStates();
+                        if (states == null) {
+                           states = new MovementStates();
+                        }
+
+                        states.sleeping = true;
+                        states.idle = true;
+                        states.horizontalIdle = true;
+                        states.walking = false;
+                        states.running = false;
+                        states.sprinting = false;
+                        states.onGround = true;
+                        movement.setMovementStates(states);
+                        movement.setSentMovementStates(new MovementStates(states));
+                        store.putComponent(npcRef, MovementStatesComponent.getComponentType(), movement);
+                     }
+                  }
+               }
+            } catch (Throwable ignored) {
+               rec.state = AmigoNpcManager.State.ACTIVE;
+            }
+         });
+      }
+
+      rec.respawnRequested = true;
+      rec.respawnWorldObj = worldObj;
+      rec.respawnSenderObj = senderObj;
+      rec.respawnAtMillis = at;
+      rec.respawnMessage = msg;
+      return this.despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
    }
 
    public boolean despawn(Object worldObj, UUID ownerId) {
@@ -1514,14 +1589,15 @@ public final class AmigoNpcManager {
          if (!rec.downed) {
             rec.downed = true;
             long now = System.currentTimeMillis();
-            rec.downedUntilMillis = now + 40000L;
+            rec.downedUntilMillis = now + DOWNED_AUTO_REVIVE_MILLIS;
 
             try {
                ActionTraceService.getShared().record(ownerId, "npc_state", "downed until=" + rec.downedUntilMillis);
             } catch (Throwable var12) {
             }
 
-            rec.deathDespawnAtMillis = now + 1200L;
+            rec.deathDespawnAtMillis = 0L;
+            rec.nextDownedMessageMillis = now;
             rec.regenStartAtMillis = 0L;
             rec.regenLastApplyMillis = 0L;
             rec.combatUntilMillis = 0L;
@@ -1567,6 +1643,7 @@ public final class AmigoNpcManager {
                               s.walking = false;
                               s.running = false;
                               s.sprinting = false;
+                              s.sleeping = true;
                               ms.setMovementStates(s);
                               ms.setSentMovementStates(new MovementStates(s));
                               store.putComponent(npcRef, MovementStatesComponent.getComponentType(), ms);
@@ -1578,15 +1655,6 @@ public final class AmigoNpcManager {
                   });
                }
             } catch (Throwable var11) {
-            }
-
-            try {
-               long before = rec.totalXp;
-               long after = XpProgression.applyDeathPenalty(before);
-               rec.totalXp = after;
-               rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
-               AmigoPersistence.saveTotalXp(ownerId, after);
-            } catch (Throwable var10) {
             }
 
             try {
@@ -2268,84 +2336,114 @@ public final class AmigoNpcManager {
       for (Entry<UUID, AmigoNpcManager.NpcRecord> e : this.npcRefPorPlayer.entrySet()) {
          UUID owner = e.getKey();
          AmigoNpcManager.NpcRecord rec = e.getValue();
-         if (rec != null && rec.downed && rec.downedUntilMillis > 0L) {
-            if (rec.deathDespawnAtMillis > 0L && now >= rec.deathDespawnAtMillis) {
-               rec.deathDespawnAtMillis = 0L;
-               if (rec.worldObj != null && rec.refObj != null) {
-                  Object worldObj = rec.worldObj;
-                  Object refToRemove = rec.refObj;
-                  HytaleBridge.worldExecute(worldObj, () -> {
-                     try {
-                        Object storeObj = getComponentStoreFromWorld(worldObj);
-                        if (storeObj == null) {
-                           return;
-                        }
+         if (rec == null || !rec.downed || rec.downedUntilMillis <= 0L) {
+            continue;
+         }
 
-                        if (rec.refObj != refToRemove) {
-                           return;
-                        }
+         if (rec.worldObj != null && now >= rec.nextDownedMessageMillis) {
+            String msg = DOWNED_CHAT_MESSAGES[ThreadLocalRandom.current().nextInt(DOWNED_CHAT_MESSAGES.length)];
+            this.sendToOwner(rec.worldObj, owner, msg);
+            rec.nextDownedMessageMillis = now + ThreadLocalRandom.current().nextLong(
+               DOWNED_CHAT_MIN_INTERVAL_MILLIS, DOWNED_CHAT_MAX_INTERVAL_MILLIS + 1L
+            );
+         }
 
-                        try {
-                           doRemoveEntity(storeObj, refToRemove);
-                        } catch (Throwable var7x) {
-                        }
-
-                        try {
-                           this.amigoRefs.remove(refToRemove);
-                        } catch (Throwable var6x) {
-                        }
-
-                        rec.refObj = null;
-                     } catch (Throwable var8x) {
-                     }
-                  });
-               }
-            }
-
-            if (now >= rec.downedUntilMillis && rec.state != AmigoNpcManager.State.SPAWNING && rec.worldObj != null) {
-               Object worldObj = rec.worldObj;
-               rec.state = AmigoNpcManager.State.SPAWNING;
-               boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
-                  try {
-                     Object storeObj = getComponentStoreFromWorld(worldObj);
-                     if (storeObj == null) {
-                        rec.state = AmigoNpcManager.State.ACTIVE;
-                        return;
-                     }
-
-                     Object ownerPos = tryGetOwnerPositionFromWorldStore(worldObj, storeObj, owner);
-                     if (ownerPos == null) {
-                        rec.state = AmigoNpcManager.State.ACTIVE;
-                        return;
-                     }
-
-                     if (rec.refObj != null) {
-                        Object oldRef = rec.refObj;
-
-                        try {
-                           doRemoveEntity(storeObj, oldRef);
-                        } catch (Throwable var9x) {
-                        }
-
-                        try {
-                           this.amigoRefs.remove(oldRef);
-                        } catch (Throwable var8x) {
-                        }
-
-                        rec.refObj = null;
-                     }
-
-                     this.spawnIntoExistingRecord(worldObj, storeObj, owner, null, rec);
-                     if (rec.refObj == null) {
-                        rec.state = AmigoNpcManager.State.ACTIVE;
-                     }
-                  } catch (Throwable ignored) {
-                     rec.state = AmigoNpcManager.State.ACTIVE;
+         if (rec.worldObj != null && rec.refObj != null) {
+            Object worldObj = rec.worldObj;
+            Object refAtSchedule = rec.refObj;
+            HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  if (rec.refObj != refAtSchedule || !rec.downed) {
+                     return;
                   }
-               });
-               if (!queued) {
+
+                  Object storeObj = getComponentStoreFromWorld(worldObj);
+                  if (!(storeObj instanceof Store<?> rawStore)) {
+                     return;
+                  }
+
+                  Store<EntityStore> store = (Store<EntityStore>)rawStore;
+                  Object ownerRefObj = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
+                  if (!(ownerRefObj instanceof Ref<?> ownerRefRaw) || !(refAtSchedule instanceof Ref<?> npcRefRaw)) {
+                     return;
+                  }
+
+                  @SuppressWarnings("unchecked")
+                  Ref<EntityStore> ownerRef = (Ref<EntityStore>)ownerRefRaw;
+                  @SuppressWarnings("unchecked")
+                  Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
+                  TransformComponent ownerTransform = store.getComponent(ownerRef, TransformComponent.getComponentType());
+                  TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
+                  if (ownerTransform == null || npcTransform == null || ownerTransform.getPosition() == null || npcTransform.getPosition() == null) {
+                     return;
+                  }
+
+                  if (distSq(ownerTransform.getPosition(), npcTransform.getPosition()) <= DOWNED_BODY_HIDE_DISTANCE * DOWNED_BODY_HIDE_DISTANCE) {
+                     return;
+                  }
+
+                  doRemoveEntity(store, refAtSchedule);
+                  this.amigoRefs.remove(refAtSchedule);
+                  if (rec.refObj == refAtSchedule) {
+                     rec.refObj = null;
+                  }
+               } catch (Throwable ignored) {
+               }
+            });
+         }
+
+         if (now >= rec.downedUntilMillis && rec.state != AmigoNpcManager.State.SPAWNING && rec.worldObj != null) {
+            Object worldObj = rec.worldObj;
+            rec.state = AmigoNpcManager.State.SPAWNING;
+            boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  Object storeObj = getComponentStoreFromWorld(worldObj);
+                  if (storeObj == null) {
+                     rec.state = AmigoNpcManager.State.ACTIVE;
+                     return;
+                  }
+
+                  Object ownerPos = tryGetOwnerPositionFromWorldStore(worldObj, storeObj, owner);
+                  if (ownerPos == null) {
+                     rec.state = AmigoNpcManager.State.ACTIVE;
+                     return;
+                  }
+
+                  if (rec.refObj != null) {
+                     Object oldRef = rec.refObj;
+                     try {
+                        doRemoveEntity(storeObj, oldRef);
+                     } catch (Throwable ignored) {
+                     }
+                     this.amigoRefs.remove(oldRef);
+                     rec.refObj = null;
+                  }
+
+                  this.spawnIntoExistingRecord(worldObj, storeObj, owner, null, rec);
+                  if (rec.refObj == null) {
+                     rec.state = AmigoNpcManager.State.ACTIVE;
+                     rec.downed = true;
+                     return;
+                  }
+
+                  this.applyRevivePenalty(rec, owner, false);
+                  rec.downed = false;
+                  rec.downedUntilMillis = 0L;
+                  rec.nextDownedMessageMillis = 0L;
+                  if (rec.refObj instanceof Ref<?> rawRef && storeObj instanceof Store<?> rawStore) {
+                     @SuppressWarnings("unchecked")
+                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
+                     @SuppressWarnings("unchecked")
+                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
+                     this.applyNpcScaling(store, npcRef, owner, rec, true);
+                     NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+                  }
+               } catch (Throwable ignored) {
                   rec.state = AmigoNpcManager.State.ACTIVE;
                }
+            });
+            if (!queued) {
+               rec.state = AmigoNpcManager.State.ACTIVE;
             }
          }
       }
@@ -2575,30 +2673,67 @@ public final class AmigoNpcManager {
 
    public void revive(UUID ownerId, boolean manual) {
       AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
-      if (rec != null) {
-         if (rec.refObj != null) {
-            if (rec.worldObj != null) {
-               rec.downed = false;
-               rec.downedUntilMillis = 0L;
-               HytaleBridge.worldExecute(rec.worldObj, () -> {
-                  try {
-                     if (!(getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> rawStore)) {
-                        return;
-                     }
+      if (rec == null || !rec.downed || rec.refObj == null || rec.worldObj == null) {
+         return;
+      }
 
-                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
-                     Ref<EntityStore> ref = (Ref<EntityStore>)rec.refObj;
-                     EntityStatMap stats = (EntityStatMap)store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
-                     stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
-                     this.applyNpcScaling(store, ref, ownerId, rec, true);
-                     store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
-                     store.ensureComponent(ref, MovementStatesComponent.getComponentType());
-                     store.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
-                  } catch (Throwable var8) {
-                  }
-               });
+      this.applyRevivePenalty(rec, ownerId, manual);
+      rec.downed = false;
+      rec.downedUntilMillis = 0L;
+      rec.deathDespawnAtMillis = 0L;
+      rec.nextDownedMessageMillis = 0L;
+      HytaleBridge.worldExecute(rec.worldObj, () -> {
+         try {
+            if (!(getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> rawStore) || !(rec.refObj instanceof Ref<?> rawRef)) {
+               return;
             }
+
+            @SuppressWarnings("unchecked")
+            Store<EntityStore> store = (Store<EntityStore>)rawStore;
+            @SuppressWarnings("unchecked")
+            Ref<EntityStore> ref = (Ref<EntityStore>)rawRef;
+            EntityStatMap stats = store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
+            this.applyNpcScaling(store, ref, ownerId, rec, true);
+            stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+            store.putComponent(ref, EntityStatMap.getComponentType(), stats);
+            store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
+            MovementStatesComponent movement = store.ensureAndGetComponent(ref, MovementStatesComponent.getComponentType());
+            if (movement != null) {
+               MovementStates states = movement.getMovementStates();
+               if (states == null) {
+                  states = new MovementStates();
+               }
+
+               states.sleeping = false;
+               states.idle = true;
+               states.horizontalIdle = true;
+               states.onGround = true;
+               movement.setMovementStates(states);
+               movement.setSentMovementStates(new MovementStates(states));
+               store.putComponent(ref, MovementStatesComponent.getComponentType(), movement);
+            }
+
+            store.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
+            NpcHudSyncSupport.updateNpcHud(store, ref, rec);
+         } catch (Throwable ignored) {
          }
+      });
+   }
+
+   private void applyRevivePenalty(AmigoNpcManager.NpcRecord rec, UUID ownerId, boolean manual) {
+      if (rec == null || ownerId == null) {
+         return;
+      }
+
+      try {
+         double rate = manual ? 0.10 : 0.40;
+         long after = XpProgression.applyCurrentLevelPenalty(rec.totalXp, rate);
+         rec.totalXp = after;
+         rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
+         rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
+         AmigoPersistence.saveTotalXp(ownerId, after);
+         AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+      } catch (Throwable ignored) {
       }
    }
 
