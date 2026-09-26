@@ -89,7 +89,7 @@ final class NpcTargetAcquisitionSupport {
                         continue;
                      }
 
-                     Attitude attitude = NPCPlugin.get().getAttitudeMap().getAttitude(companion.getRole(), ref, store);
+                     Attitude attitude = NPCPlugin.get().getAttitudeMap().getAttitude(npcRef, companion.getRoleIndex(), ref, store);
                      if (attitude != Attitude.HOSTILE) {
                         continue;
                      }
