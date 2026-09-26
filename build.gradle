@@ -17,7 +17,7 @@ def recoveredLangParts = (1..8).collect {
     file(String.format("recovery/resources/langzip.part%02d", it))
 }
 def recoveredLangZipOutput = layout.buildDirectory.file("recovery/AmigoNPC_LANG_ORIGINAL_2.0.1.zip")
-def recoveredLangZipSha256 = "2E6B76719EF21EB68C8B35D96ACA4EF85FC5E23F70750030199D85F11450D709"
+def recoveredLangZipSha256 = "C0203CF1B5C5413D4889B209D71A74B3DF0168E645D8EAEDB2B49C3E7D4B64CD"
 
 tasks.register("prepareRecoveredLangZip") {
     inputs.files(recoveredLangParts)
