@@ -24,16 +24,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoModeloSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final RequiredArg modelArg;
+private final RequiredArg modelArg;
     private final OptionalArg scaleArg;
 
     public AmigoModeloSubCommand() {
         super("modelo", "Define o modelo (aparência) do AmigoNPC");
+        this.requireNoPermission();
 
         this.modelArg = this.withRequiredArg(
                 "modelId",

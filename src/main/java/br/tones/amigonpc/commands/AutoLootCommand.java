@@ -18,18 +18,12 @@ public final class AutoLootCommand extends AbstractCommand {
 
     public AutoLootCommand() {
         super("autoloot", "Ativa/desativa o auto-loot do AmigoNPC.");
+        this.requireNoPermission();
         this.setAllowsExtraArguments(true);
         this.addSubCommand(new On());
         this.addSubCommand(new Off());
     }
-
-    @Override
-    public boolean canGeneratePermission() {
-        // Comando público
-        return false;
-    }
-
-    @Override
+@Override
     protected CompletableFuture<Void> execute(CommandContext ctx) {
         if (!ctx.isPlayer()) {
             ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));
@@ -45,14 +39,9 @@ public final class AutoLootCommand extends AbstractCommand {
     private static final class On extends AbstractCommand {
         On() {
             super("on", "Ativar auto-loot");
+            this.requireNoPermission();
         }
-
-        @Override
-        public boolean canGeneratePermission() {
-            return false;
-        }
-
-        @Override
+@Override
         protected CompletableFuture<Void> execute(CommandContext ctx) {
             if (!ctx.isPlayer()) {
                 ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));
@@ -69,14 +58,9 @@ public final class AutoLootCommand extends AbstractCommand {
     private static final class Off extends AbstractCommand {
         Off() {
             super("off", "Desativar auto-loot");
+            this.requireNoPermission();
         }
-
-        @Override
-        public boolean canGeneratePermission() {
-            return false;
-        }
-
-        @Override
+@Override
         protected CompletableFuture<Void> execute(CommandContext ctx) {
             if (!ctx.isPlayer()) {
                 ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));

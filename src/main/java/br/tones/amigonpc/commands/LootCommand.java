@@ -31,13 +31,9 @@ import br.tones.amigonpc.core.AmigoNpcManager;
 public final class LootCommand extends AbstractCommand {
 
     // ✅ comando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public LootCommand() {
+public LootCommand() {
         super("loot", "Abre a mochila do seu AmigoNPC");
+        this.requireNoPermission();
     }
 
     @Override

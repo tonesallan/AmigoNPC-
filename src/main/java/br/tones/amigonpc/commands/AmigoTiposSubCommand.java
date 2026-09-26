@@ -24,15 +24,11 @@ import java.util.List;
 public final class AmigoTiposSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final OptionalArg filtroArg;
+private final OptionalArg filtroArg;
 
     public AmigoTiposSubCommand() {
         super("tipos", "Lista os tipos (npcType) disponíveis");
+        this.requireNoPermission();
 
         this.filtroArg = this.withOptionalArg(
                 "filtro",

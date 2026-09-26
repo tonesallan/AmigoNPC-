@@ -22,15 +22,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoTipoSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final RequiredArg typeArg;
+private final RequiredArg typeArg;
 
     public AmigoTipoSubCommand() {
         super("tipo", "Define o tipo (npcType) do AmigoNPC");
+        this.requireNoPermission();
 
         this.typeArg = this.withRequiredArg(
                 "npcType",

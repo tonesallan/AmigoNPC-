@@ -11,13 +11,9 @@ import br.tones.amigonpc.ui.UiBridge;
 public final class AmigoUiCommand extends AbstractCommand {
 
     // ✅ comando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public AmigoUiCommand() {
+public AmigoUiCommand() {
         super("amigoui", "Abre a interface do AmigoNPC");
+        this.requireNoPermission();
     }
 
     @Override

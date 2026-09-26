@@ -13,15 +13,11 @@ import br.tones.amigonpc.core.AmigoService;
 public final class AmigoSpawnSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final AmigoService service;
+private final AmigoService service;
 
     public AmigoSpawnSubCommand(AmigoService service) {
         super("spawn", "Spawna o NPC do jogador");
+        this.requireNoPermission();
         this.service = service;
 
         // spawn não precisa aceitar args
