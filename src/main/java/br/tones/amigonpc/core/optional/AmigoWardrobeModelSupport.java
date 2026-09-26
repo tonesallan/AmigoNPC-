@@ -7,6 +7,7 @@ import com.hypixel.hytale.protocol.PlayerSkin;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.PersistentModel;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSettings;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -59,32 +60,37 @@ final class AmigoWardrobeModelSupport {
       }
    }
 
-   static void tryApplyWardrobeModelTo(Store<EntityStore> store, Ref<EntityStore> ownerRef, Ref<EntityStore> npcRef, Object wardrobe) {
-      if (store != null && ownerRef != null && npcRef != null && wardrobe != null) {
-         try {
-            Player ownerPlayer = (Player)store.getComponent(ownerRef, Player.getComponentType());
-            PlayerSettings settings = (PlayerSettings)store.getComponent(ownerRef, PlayerSettings.getComponentType());
-            PlayerSkinComponent skin = (PlayerSkinComponent)store.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
-            PlayerRef ownerPlayerRef = (PlayerRef)store.getComponent(ownerRef, PlayerRef.getComponentType());
-            if (ownerPlayer == null || settings == null || skin == null || ownerPlayerRef == null) {
-               return;
-            }
+   static boolean tryApplyWardrobeModelTo(Store<EntityStore> store, Ref<EntityStore> ownerRef, Ref<EntityStore> npcRef, Object wardrobe) {
+      if (store == null || ownerRef == null || npcRef == null || wardrobe == null) {
+         return false;
+      }
 
-            Class<?> tickSystemClass = Class.forName("dev.hardaway.wardrobe.impl.player.PlayerWardrobeSystems$Tick");
-            Class<?> playerWardrobeApiClass = Class.forName("dev.hardaway.wardrobe.api.player.PlayerWardrobe");
-            Method buildWardrobeModel = findBuildWardrobeModel(tickSystemClass, playerWardrobeApiClass);
-            if (buildWardrobeModel == null) {
-               return;
-            }
-
-            if (!(buildWardrobeModel.invoke(null, ownerPlayer, settings, skin.getPlayerSkin(), wardrobe, ownerPlayerRef) instanceof Model model)) {
-               return;
-            }
-
-            putOrSetComponent(store, npcRef, ModelComponent.getComponentType(), new ModelComponent(model));
-            tryApplyModelViaNpcPlugin(store, npcRef, model);
-         } catch (Throwable var13) {
+      try {
+         Player ownerPlayer = (Player)store.getComponent(ownerRef, Player.getComponentType());
+         PlayerSettings settings = (PlayerSettings)store.getComponent(ownerRef, PlayerSettings.getComponentType());
+         PlayerSkinComponent skin = (PlayerSkinComponent)store.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
+         PlayerRef ownerPlayerRef = (PlayerRef)store.getComponent(ownerRef, PlayerRef.getComponentType());
+         if (ownerPlayer == null || settings == null || skin == null || ownerPlayerRef == null) {
+            return false;
          }
+
+         Class<?> tickSystemClass = Class.forName("dev.hardaway.wardrobe.impl.player.PlayerWardrobeSystems$Tick");
+         Class<?> playerWardrobeApiClass = Class.forName("dev.hardaway.wardrobe.api.player.PlayerWardrobe");
+         Method buildWardrobeModel = findBuildWardrobeModel(tickSystemClass, playerWardrobeApiClass);
+         if (buildWardrobeModel == null) {
+            return false;
+         }
+
+         if (!(buildWardrobeModel.invoke(null, ownerPlayer, settings, skin.getPlayerSkin(), wardrobe, ownerPlayerRef) instanceof Model model)) {
+            return false;
+         }
+
+         store.putComponent(npcRef, ModelComponent.getComponentType(), new ModelComponent(model));
+         store.putComponent(npcRef, PersistentModel.getComponentType(), new PersistentModel(model.toReference()));
+         tryApplyModelViaNpcPlugin(store, npcRef, model);
+         return true;
+      } catch (Throwable ignored) {
+         return false;
       }
    }
 
@@ -93,15 +99,31 @@ final class AmigoWardrobeModelSupport {
       return m.invoke(store, ref, componentType);
    }
 
-   static void putOrSetComponent(Store<EntityStore> store, Ref<EntityStore> ref, Object componentType, Object component) {
-      for (String methodName : List.of("putComponent", "setComponent")) {
+   static boolean putOrSetComponent(Store<EntityStore> store, Ref<EntityStore> ref, Object componentType, Object component) {
+      if (store == null || ref == null || componentType == null || component == null) {
+         return false;
+      }
+
+      for (String methodName : List.of("putComponent", "replaceComponent", "addComponent", "setComponent")) {
          try {
-            Method m = Store.class.getMethod(methodName, Ref.class, ComponentType.class, Object.class);
-            m.invoke(store, ref, componentType, component);
-            return;
-         } catch (Throwable var7) {
+            for (Method m : Store.class.getMethods()) {
+               if (!m.getName().equals(methodName) || m.getParameterCount() != 3) {
+                  continue;
+               }
+
+               Class<?>[] p = m.getParameterTypes();
+               if (!p[0].isInstance(ref) || !p[1].isInstance(componentType) || !p[2].isInstance(component)) {
+                  continue;
+               }
+
+               m.invoke(store, ref, componentType, component);
+               return true;
+            }
+         } catch (Throwable ignored) {
          }
       }
+
+      return false;
    }
 
    private static Method findBuildWardrobeModel(Class<?> tickSystemClass, Class<?> playerWardrobeApiClass) {
