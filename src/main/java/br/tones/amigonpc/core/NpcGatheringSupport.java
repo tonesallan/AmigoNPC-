@@ -111,7 +111,7 @@ final class NpcGatheringSupport {
          return Result.FOLLOWING;
       }
 
-      if (!chunk.breakBlock(target.x, target.y, target.z)) {
+      if (!chunk.breakBlock(target.x, target.y, target.z, 0)) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
