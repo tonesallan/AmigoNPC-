@@ -156,6 +156,14 @@ public final class AmigoNpcManager {
    private static final long REGEN_DELAY_MS = 3000L;
    private static final float REGEN_RATE_PER_SECOND = 0.12F;
 
+   private AmigoNpcManager() {
+      try {
+         this.pvpEnabled = AmigoPersistence.loadPvpEnabledGlobal();
+      } catch (Throwable ignored) {
+         this.pvpEnabled = false;
+      }
+   }
+
    public static AmigoNpcManager getShared() {
       return SHARED;
    }
