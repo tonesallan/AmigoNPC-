@@ -10,7 +10,7 @@ public final class ServerErrorHook {
    private ServerErrorHook() {
    }
 
-   public static void install() {
+   public static synchronized void install() {
       if (!INSTALLED) {
          INSTALLED = true;
 
@@ -48,6 +48,20 @@ public final class ServerErrorHook {
             });
          } catch (Throwable var1) {
          }
+      }
+   }
+
+   public static synchronized void uninstall() {
+      if (!INSTALLED) {
+         return;
+      }
+
+      try {
+         Thread.setDefaultUncaughtExceptionHandler(PREV);
+      } catch (Throwable ignored) {
+      } finally {
+         PREV = null;
+         INSTALLED = false;
       }
    }
 }

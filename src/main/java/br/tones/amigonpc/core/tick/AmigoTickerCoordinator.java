@@ -16,15 +16,12 @@ public final class AmigoTickerCoordinator {
 
    public void startDownedTicker() {
       try {
-         if (this.scheduler != null) {
+         this.ensureScheduler();
+
+         if (this.downedTicker != null && !this.downedTicker.isDone()) {
             return;
          }
 
-         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "AmigoNPC-DownedTicker");
-            t.setDaemon(true);
-            return t;
-         });
          this.downedTicker = this.scheduler.scheduleAtFixedRate(() -> {
             try {
                AmigoNpcManager.getShared().tickDowned();
@@ -41,17 +38,21 @@ public final class AmigoTickerCoordinator {
       }
    }
 
+   private void ensureScheduler() {
+      if (this.scheduler == null || this.scheduler.isShutdown() || this.scheduler.isTerminated()) {
+         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "AmigoNPC-DownedTicker");
+            t.setDaemon(true);
+            return t;
+         });
+      }
+   }
+
    public void startFollowTicker() {
       try {
-         if (this.scheduler == null) {
-            this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-               Thread t = new Thread(r, "AmigoNPC-Ticker");
-               t.setDaemon(true);
-               return t;
-            });
-         }
+         this.ensureScheduler();
 
-         if (this.followTicker != null) {
+         if (this.followTicker != null && !this.followTicker.isDone()) {
             return;
          }
 
@@ -73,15 +74,9 @@ public final class AmigoTickerCoordinator {
 
    public void startHudTicker() {
       try {
-         if (this.scheduler == null) {
-            this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-               Thread t = new Thread(r, "AmigoNPC-Ticker");
-               t.setDaemon(true);
-               return t;
-            });
-         }
+         this.ensureScheduler();
 
-         if (this.hudTicker != null) {
+         if (this.hudTicker != null && !this.hudTicker.isDone()) {
             return;
          }
 
@@ -128,6 +123,11 @@ public final class AmigoTickerCoordinator {
             this.scheduler.shutdownNow();
          }
       } catch (Throwable var2) {
+      } finally {
+         this.downedTicker = null;
+         this.followTicker = null;
+         this.hudTicker = null;
+         this.scheduler = null;
       }
    }
 }

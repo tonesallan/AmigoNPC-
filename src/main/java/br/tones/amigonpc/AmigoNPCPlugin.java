@@ -1,6 +1,9 @@
 package br.tones.amigonpc;
 
+import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.AmigoService;
+import br.tones.amigonpc.core.debug.ServerErrorHook;
+import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
 import br.tones.amigonpc.core.bootstrap.AmigoCommandRegistrar;
 import br.tones.amigonpc.core.bootstrap.AmigoRuntimeBootstrap;
 import br.tones.amigonpc.core.bootstrap.AmigoSystemRegistrar;
@@ -45,5 +48,22 @@ public final class AmigoNPCPlugin extends JavaPlugin {
    protected void shutdown() {
       this.npcRefApiRegistrar.unregister();
       this.tickerCoordinator.shutdown();
+
+      try {
+         LevelProgressHudService.getShared().shutdown();
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         AmigoNpcManager.getShared().shutdownForReload();
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         ServerErrorHook.uninstall();
+      } catch (Throwable ignored) {
+      }
+
+      this.service = null;
    }
 }

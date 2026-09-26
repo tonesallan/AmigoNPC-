@@ -1420,6 +1420,65 @@ public final class AmigoNpcManager {
       }
    }
 
+   public void shutdownForReload() {
+      ArrayList<AmigoNpcManager.NpcRecord> records = new ArrayList<>(this.npcRefPorPlayer.values());
+
+      for (Entry<UUID, AmigoNpcManager.NpcRecord> entry : this.npcRefPorPlayer.entrySet()) {
+         UUID ownerId = entry.getKey();
+         AmigoNpcManager.NpcRecord rec = entry.getValue();
+         if (ownerId == null || rec == null) {
+            continue;
+         }
+
+         try {
+            if (rec.backpack != null) {
+               AmigoPersistence.saveBackpack(ownerId, rec.backpack);
+            }
+         } catch (Throwable ignored) {
+         }
+
+         try {
+            AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+         } catch (Throwable ignored) {
+         }
+
+         rec.respawnRequested = false;
+         rec.respawnWorldObj = null;
+         rec.respawnSenderObj = null;
+      }
+
+      this.pendingRespawns.clear();
+      this.debugLogByOwner.clear();
+      this.npcRefPorPlayer.clear();
+      this.amigoRefs.clear();
+      WEAPON_ATTACK_ANIM_CACHE.clear();
+      LAST_ERROR = null;
+
+      for (AmigoNpcManager.NpcRecord rec : records) {
+         if (rec == null || rec.worldObj == null || rec.refObj == null) {
+            continue;
+         }
+
+         Object worldObj = rec.worldObj;
+         Object refObj = rec.refObj;
+         try {
+            HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  Object storeObj = getComponentStoreFromWorld(worldObj);
+                  if (storeObj != null) {
+                     doRemoveEntity(storeObj, refObj);
+                  }
+               } catch (Throwable ignored) {
+               }
+            });
+         } catch (Throwable ignored) {
+         }
+
+         rec.refObj = null;
+         rec.worldObj = null;
+      }
+   }
+
    public SimpleItemContainer getOrLoadBackpack(UUID ownerId) {
       if (ownerId == null) {
          return new SimpleItemContainer((short)45);

@@ -134,6 +134,32 @@ public final class LevelProgressHudService {
       }
    }
 
+   public void shutdown() {
+      for (LevelProgressHudService.HudState st : this.statesByRef.values()) {
+         if (st == null) {
+            continue;
+         }
+
+         try {
+            st.hud.setRootVisible(false);
+         } catch (Throwable ignored) {
+         }
+
+         try {
+            if (st.player != null && st.playerRef != null) {
+               this.backend.hide(st.player, st.playerRef, HUD_ID);
+            } else if (st.playerRef != null) {
+               sendClearCustomHud(st.playerRef);
+            }
+         } catch (Throwable ignored) {
+         }
+      }
+
+      this.statesByRef.clear();
+      this.ownerToRef.clear();
+      this.enabledByOwner.clear();
+   }
+
    public void requestImmediate(UUID ownerId) {
       if (ownerId != null) {
          if (this.isEnabled(ownerId)) {
