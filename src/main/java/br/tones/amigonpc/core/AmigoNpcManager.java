@@ -51,7 +51,7 @@ import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.ItemAnimation;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.math.shape.Box;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 
 /**
  * 1 NPC por player.
@@ -1943,7 +1943,7 @@ public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore
      * - Nao mira no dono, no proprio NPC, nem em players quando amigopvp estiver OFF.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Object findNearestDefenderTarget(Store<EntityStore> store, NpcRecord rec, Object ownerRefObj, com.hypixel.hytale.math.vector.Vector3d ownerPos) {
+    private Object findNearestDefenderTarget(Store<EntityStore> store, NpcRecord rec, Object ownerRefObj, org.joml.Vector3d ownerPos) {
         if (store == null || rec == null || ownerRefObj == null || ownerPos == null) return null;
         if (!(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return null;
 
@@ -1991,11 +1991,11 @@ public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore
                     if (tc == null || tc.getPosition() == null) continue;
 
                     var p = tc.getPosition();
-                    double dy = Math.abs(p.getY() - ownerPos.getY());
+                    double dy = Math.abs(p.y() - ownerPos.y());
                     if (dy > maxDy) continue;
 
-                    double dx = p.getX() - ownerPos.getX();
-                    double dz = p.getZ() - ownerPos.getZ();
+                    double dx = p.x() - ownerPos.x();
+                    double dz = p.z() - ownerPos.z();
                     double d2 = dx * dx + dz * dz;
                     if (d2 > r2) continue;
 
@@ -2028,7 +2028,7 @@ public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore
     private Object findNearestTargetNearNpc(Store<EntityStore> store,
                                            NpcRecord rec,
                                            Object ownerRefObj,
-                                           com.hypixel.hytale.math.vector.Vector3d npcPos,
+                                           org.joml.Vector3d npcPos,
                                            Object excludeRefObj) {
         if (store == null || rec == null || ownerRefObj == null || npcPos == null) return null;
         if (!(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return null;
@@ -2072,11 +2072,11 @@ public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore
                     if (tc == null || tc.getPosition() == null) continue;
 
                     var p = tc.getPosition();
-                    double dy = Math.abs(p.getY() - npcPos.getY());
+                    double dy = Math.abs(p.y() - npcPos.y());
                     if (dy > maxDy) continue;
 
-                    double dx = p.getX() - npcPos.getX();
-                    double dz = p.getZ() - npcPos.getZ();
+                    double dx = p.x() - npcPos.x();
+                    double dz = p.z() - npcPos.z();
                     double d2 = dx * dx + dz * dz;
                     if (d2 > r2) continue;
 
@@ -2153,11 +2153,11 @@ private static boolean isAnyEnemyNearNpc(Store<EntityStore> store,
                 if (tc == null || tc.getPosition() == null) continue;
 
                 var p = tc.getPosition();
-                double dy = Math.abs(p.getY() - npcPos.getY());
+                double dy = Math.abs(p.y() - npcPos.y());
                 if (dy > maxDy) continue;
 
-                double dx = p.getX() - npcPos.getX();
-                double dz = p.getZ() - npcPos.getZ();
+                double dx = p.x() - npcPos.x();
+                double dz = p.z() - npcPos.z();
                 double d2 = dx * dx + dz * dz;
                 if (d2 > r2) continue;
 
@@ -2182,9 +2182,9 @@ private static boolean isAnyEnemyNearNpc(Store<EntityStore> store,
 
 private static double dist2(Vector3d a, Vector3d b) {
     if (a == null || b == null) return Double.POSITIVE_INFINITY;
-    double dx = a.getX() - b.getX();
-    double dy = a.getY() - b.getY();
-    double dz = a.getZ() - b.getZ();
+    double dx = a.x() - b.x();
+    double dy = a.y() - b.y();
+    double dz = a.z() - b.z();
     return dx*dx + dy*dy + dz*dz;
 }
 
@@ -2572,10 +2572,10 @@ private void tickCombatTaggedLooting(Store<EntityStore> store,
         if (itc == null || itc.getPosition() == null) return;
 
         Vector3d ip = itc.getPosition();
-        double dx = ip.getX() - npcPos.getX();
-        double dz = ip.getZ() - npcPos.getZ();
+        double dx = ip.x() - npcPos.x();
+        double dz = ip.z() - npcPos.z();
         double h2 = dx*dx + dz*dz;
-        double dy = Math.abs(ip.getY() - npcPos.getY());
+        double dy = Math.abs(ip.y() - npcPos.y());
         if (h2 <= (LOOT_PICKUP_DISTANCE * LOOT_PICKUP_DISTANCE) && dy <= 3.25) {
             boolean inserted = tryPickupGroundItemIntoBackpack(store, ownerId, rec, bag, itemRef);
 
@@ -2852,9 +2852,9 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
     }
 
     private static double distSq(Vector3d a, Vector3d b) {
-        double dx = a.getX() - b.getX();
-        double dy = a.getY() - b.getY();
-        double dz = a.getZ() - b.getZ();
+        double dx = a.x() - b.x();
+        double dy = a.y() - b.y();
+        double dz = a.z() - b.z();
         return dx*dx + dy*dy + dz*dz;
     }
 
@@ -3072,9 +3072,9 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                 var np = nt.getPosition();
                 if (op == null || np == null) return;
 
-                double dx = op.getX() - np.getX();
-                double dz = op.getZ() - np.getZ();
-                double dy = op.getY() - np.getY();
+                double dx = op.x() - np.x();
+                double dz = op.z() - np.z();
+                double dy = op.y() - np.y();
 
                 double horizontal = Math.sqrt(dx * dx + dz * dz);
 
@@ -3096,9 +3096,9 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                 if (rec.lastSampleMillis == 0L) rec.lastSampleMillis = now;
                 if (rec.lastNpcPos == null) rec.lastNpcPos = np;
                 if (now - rec.lastSampleMillis >= 400L) {
-                    double mdx = np.getX() - rec.lastNpcPos.getX();
-                    double mdy = np.getY() - rec.lastNpcPos.getY();
-                    double mdz = np.getZ() - rec.lastNpcPos.getZ();
+                    double mdx = np.x() - rec.lastNpcPos.x();
+                    double mdy = np.y() - rec.lastNpcPos.y();
+                    double mdz = np.z() - rec.lastNpcPos.z();
                     double moved = Math.sqrt(mdx * mdx + mdy * mdy + mdz * mdz);
                     if (moved > 0.25) rec.lastNpcMovedMillis = now;
                     rec.lastNpcPos = np;
@@ -3234,9 +3234,9 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                                         var np2 = npcT.getPosition();
                                         var tp2 = tgtT.getPosition();
 
-                                        double dx2 = tp2.getX() - np2.getX();
-                                        double dz2 = tp2.getZ() - np2.getZ();
-                                        double dy2 = tp2.getY() - np2.getY();
+                                        double dx2 = tp2.x() - np2.x();
+                                        double dz2 = tp2.z() - np2.z();
+                                        double dy2 = tp2.y() - np2.y();
                                         double h2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
                                         double ady2 = Math.abs(dy2);
 
@@ -3250,7 +3250,7 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                                                 double len = Math.sqrt(dx2 * dx2 + dz2 * dz2);
                                                 double nx = (len > 0.001) ? (-dx2 / len) : 1.0;
                                                 double nz = (len > 0.001) ? (-dz2 / len) : 0.0;
-                                                Vector3d npos = new Vector3d(np2.getX() + nx * 0.80, np2.getY(), np2.getZ() + nz * 0.80);
+                                                Vector3d npos = new Vector3d(np2.x() + nx * 0.80, np2.y(), np2.z() + nz * 0.80);
                                                 npcT.teleportPosition(npos);
                                                 rec.lastCombatNudgeMillis = now;
                                             } catch (Throwable ignored) {}
@@ -3399,16 +3399,16 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                     }
 
                     // Posiciona um pouco afastado do player (4~7 blocos), preferindo a direção de onde o NPC veio.
-                    double vx = np.getX() - op.getX();
-                    double vz = np.getZ() - op.getZ();
+                    double vx = np.x() - op.x();
+                    double vz = np.z() - op.z();
                     double vlen = Math.sqrt(vx * vx + vz * vz);
                     double ox = (vlen > 1.0e-6) ? (vx / vlen) : 1.0;
                     double oz = (vlen > 1.0e-6) ? (vz / vlen) : 0.0;
                     double dist = 6.0;
-                    nt.teleportPosition(new com.hypixel.hytale.math.vector.Vector3d(
-                            op.getX() + (ox * dist),
-                            op.getY(),
-                            op.getZ() + (oz * dist)
+                    nt.teleportPosition(new org.joml.Vector3d(
+                            op.x() + (ox * dist),
+                            op.y(),
+                            op.z() + (oz * dist)
                     ));
                 }
             } catch (Throwable ignored) {}
@@ -3872,9 +3872,9 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
                 return;
             }
 
-            double dx = tp.getX() - np.getX();
-            double dz = tp.getZ() - np.getZ();
-            double dy = tp.getY() - np.getY();
+            double dx = tp.x() - np.x();
+            double dz = tp.z() - np.z();
+            double dy = tp.y() - np.y();
             double horizontal = Math.sqrt(dx*dx + dz*dz);
 
             // Pode atacar com tolerância vertical baseada na altura do alvo (mobs ~2 blocos ou mais)
@@ -4505,7 +4505,7 @@ private static Object buildNoopTriConsumer() {
 
     private static Object newVector3d(double x, double y, double z) {
         String[] candidates = {
-                "com.hypixel.hytale.math.vector.Vector3d",
+                "org.joml.Vector3d",
                 "com.hypixel.hytale.math.Vector3d",
                 "com.hypixel.hytale.util.math.Vector3d",
                 "com.hypixel.hytale.protocol.util.Vector3d",
