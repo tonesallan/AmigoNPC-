@@ -1475,7 +1475,6 @@ public final class AmigoNpcManager {
          }
 
          rec.refObj = null;
-         rec.worldObj = null;
       }
    }
 
