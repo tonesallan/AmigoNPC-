@@ -3532,10 +3532,14 @@ public final class AmigoNpcManager {
 
          try {
             Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
-            if (maybePlayer != null && !this.pvpEnabled) {
+            if (maybePlayer != null) {
                return;
             }
          } catch (Throwable var58) {
+         }
+
+         if (this.isAmigoRef(targetRefObj) && !this.pvpEnabled) {
+            return;
          }
 
          TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
@@ -3770,11 +3774,16 @@ public final class AmigoNpcManager {
 
          try {
             Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
-            if (maybePlayer != null && !this.pvpEnabled) {
+            if (maybePlayer != null) {
                this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.pvp_blocked", rec.equippedWeaponId));
                return;
             }
          } catch (Throwable var62) {
+         }
+
+         if (this.isAmigoRef(targetRefObj) && !this.pvpEnabled) {
+            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.pvp_blocked", rec.equippedWeaponId));
+            return;
          }
 
          TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());

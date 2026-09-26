@@ -25,6 +25,9 @@ public final class LootService {
 
    public boolean openLoot(UUID ownerId, PlayerRef viewerPlayerRef, Ref<EntityStore> viewerEntityRef, Store<EntityStore> store) {
       if (ownerId != null && viewerPlayerRef != null && viewerEntityRef != null && store != null) {
+         if (viewerPlayerRef.getUuid() == null || !ownerId.equals(viewerPlayerRef.getUuid())) {
+            return false;
+         }
          AmigoNpcManager manager = AmigoNpcManager.getShared();
          if (!manager.hasNpc(ownerId)) {
             return false;

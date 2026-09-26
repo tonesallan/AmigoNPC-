@@ -13,6 +13,7 @@ public final class AmigoPvpCommand extends AbstractCommand {
    public AmigoPvpCommand() {
       super("amigopvp", AmigoText.text("cmd.desc.amigopvp"));
       this.setAllowsExtraArguments(true);
+      this.requireNoPermission();
       this.addSubCommand(new AmigoPvpCommand.On());
       this.addSubCommand(new AmigoPvpCommand.Off());
    }
@@ -42,6 +43,7 @@ public final class AmigoPvpCommand extends AbstractCommand {
    private static final class Off extends AbstractCommand {
       Off() {
          super("off", AmigoText.text("cmd.desc.amigopvp.off"));
+         this.requireNoPermission();
       }
 
       protected CompletableFuture<Void> execute(CommandContext ctx) {
@@ -59,6 +61,7 @@ public final class AmigoPvpCommand extends AbstractCommand {
    private static final class On extends AbstractCommand {
       On() {
          super("on", AmigoText.text("cmd.desc.amigopvp.on"));
+         this.requireNoPermission();
       }
 
       protected CompletableFuture<Void> execute(CommandContext ctx) {

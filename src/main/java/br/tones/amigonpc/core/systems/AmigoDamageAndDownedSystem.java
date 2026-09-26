@@ -144,9 +144,17 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                            }
 
                            Player maybePlayerAttacker = (Player)store.getComponent(attackerRef, Player.getComponentType());
-                           if (maybePlayerAttacker == null || manager.isPvpEnabled()) {
-                              manager.startNpcCombat(owner, attackerRef);
+                           if (maybePlayerAttacker != null) {
+                              damage.setCancelled(true);
+                              return;
                            }
+
+                           if (manager.isAmigoRef(attackerRef) && !manager.isPvpEnabled()) {
+                              damage.setCancelled(true);
+                              return;
+                           }
+
+                           manager.startNpcCombat(owner, attackerRef);
                         } else {
                            try {
                               String srcName = damage.getSource() == null ? "null" : damage.getSource().getClass().getSimpleName();
