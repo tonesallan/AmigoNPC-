@@ -5,11 +5,7 @@ public final class StatScaling {
    }
 
    public static int effectiveLevel(int level) {
-      if (level < 1) {
-         return 1;
-      } else {
-         return level > 100 ? 100 : level;
-      }
+      return Math.max(1, level);
    }
 
    public static double multiplier(int level) {

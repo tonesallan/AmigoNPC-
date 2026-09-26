@@ -24,6 +24,16 @@ public final class AttributeModifierService {
       return p <= 0 ? 0L : Math.max(0L, Math.round(p * cfg.HealthStatValuePerPoint));
    }
 
+   public long extraDefense(NpcStatsState st) {
+      if (st == null) {
+         return 0L;
+      }
+
+      NpcStatsConfig cfg = NpcStatsConfigService.getShared().get();
+      int p = st.getAllocated(NpcAttribute.DEFENSE);
+      return p <= 0 ? 0L : Math.max(0L, Math.round(p * cfg.DefenseStatValuePerPoint));
+   }
+
    public float applyOutgoingDamageMods(UUID ownerId, float baseDamage, int npcLevel) {
       NpcStatsConfig cfg = NpcStatsConfigService.getShared().get();
       if (!cfg.EnableNpcStats) {

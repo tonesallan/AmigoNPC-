@@ -6,7 +6,6 @@ import br.tones.amigonpc.api.events.NpcExperienceGainedEvent;
 import br.tones.amigonpc.api.events.NpcLevelUpEvent;
 import br.tones.amigonpc.core.AmigoPersistence;
 import br.tones.amigonpc.core.events.AmigoEventBus;
-import br.tones.amigonpc.core.npcstats.AttributeModifierService;
 import java.util.UUID;
 
 public final class NpcProgressionSupport {
@@ -73,23 +72,9 @@ public final class NpcProgressionSupport {
    }
 
    public static float mitigateIncomingDamage(UUID ownerId, long totalXp, float incomingAmount) {
-      if (ownerId == null) {
-         return incomingAmount;
-      }
-
-      float amount = Math.max(0.0F, incomingAmount);
-
-      try {
-         int lvl = resolveLevel(totalXp);
-         double mult = StatScaling.multiplier(lvl);
-         if (mult <= 0.0) {
-            return amount;
-         }
-
-         float afterLevel = (float)(amount / mult);
-         return AttributeModifierService.getShared().applyIncomingDamageMods(ownerId, afterLevel, lvl);
-      } catch (Throwable ignored) {
-         return amount;
-      }
+      // Survival scaling is represented by the NPC's real HP/defense stats.
+      // Those values are capped against the owner when scaling is applied, so
+      // no hidden level multiplier may make the companion tougher than its player.
+      return Math.max(0.0F, incomingAmount);
    }
 }

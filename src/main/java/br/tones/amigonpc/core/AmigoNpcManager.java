@@ -1961,6 +1961,17 @@ public final class AmigoNpcManager {
             long defValScaled = StatScaling.scaledDef(rec.baseDef, level);
 
             try {
+               if (NpcStatsConfigService.getShared().get().EnableNpcStats) {
+                  NpcStatsState st = NpcStatsService.getShared().load(ownerId);
+                  long extraDef = AttributeModifierService.getShared().extraDefense(st);
+                  if (extraDef > 0L) {
+                     defValScaled = Math.max(0L, defValScaled + extraDef);
+                  }
+               }
+            } catch (Throwable ignored) {
+            }
+
+            try {
                Object ownerRefObj = rec.worldObj == null ? null : invokeOneArg(rec.worldObj, "getEntityRef", UUID.class, ownerId);
                if (ownerRefObj instanceof Ref<?> rawOwnerRef) {
                   @SuppressWarnings("unchecked")
