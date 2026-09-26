@@ -9,7 +9,6 @@ final class AmigoLvlGuiSettingsAdminBuildSupport {
    }
 
    static void bind(UIEventBuilder events) {
-      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAdminGodModeToggle", "settings_admin_toggle_godmode");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAdminPvpToggle", "settings_admin_toggle_pvp");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAdminDebugInfoButton", "settings_admin_debug_info");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAdminDebugLogButton", "settings_admin_debug_toggle");

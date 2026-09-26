@@ -595,54 +595,27 @@ public final class AmigoNpcManager {
    }
 
    public boolean isGodMode(UUID ownerId) {
-      if (ownerId == null) {
-         return false;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null ? rec.godMode : AmigoPersistence.loadGodMode(ownerId);
+      return false;
    }
 
    public boolean toggleGodModeWithStore(Store<EntityStore> store, UUID ownerId) {
-      if (ownerId == null) {
-         return false;
+      if (ownerId != null) {
+         AmigoPersistence.saveGodMode(ownerId, false);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            rec.godMode = false;
+         }
       }
 
-      boolean newVal = !this.isGodMode(ownerId);
-      this.setGodModeWithStore(store, ownerId, newVal);
-      return true;
+      return false;
    }
 
    public void setGodModeWithStore(Store<EntityStore> store, UUID ownerId, boolean enabled) {
       if (ownerId != null) {
-         AmigoPersistence.saveGodMode(ownerId, enabled);
+         AmigoPersistence.saveGodMode(ownerId, false);
          AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
-            rec.godMode = enabled;
-            if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref<?> rawNpcRef) {
-               @SuppressWarnings("unchecked")
-               Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
-
-               try {
-                  EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
-                  if (stats != null) {
-                     int healthIdx = DefaultEntityStatTypes.getHealth();
-
-                     try {
-                        float max = stats.get(healthIdx).getMax();
-                        stats.setStatValue(healthIdx, max);
-                     } catch (Throwable ignored) {
-                        stats.maximizeStatValue(healthIdx);
-                     }
-
-                     store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
-                  }
-               } catch (Throwable var10) {
-               }
-            }
-
-            rec.regenStartAtMillis = 0L;
-            rec.regenLastApplyMillis = 0L;
+            rec.godMode = false;
          }
       }
    }
@@ -852,7 +825,7 @@ public final class AmigoNpcManager {
             rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
             rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
-            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
+            rec.godMode = false;
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
             rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
             int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
@@ -1126,7 +1099,7 @@ public final class AmigoNpcManager {
             rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
             rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
-            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
+            rec.godMode = false;
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
             rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
             int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);

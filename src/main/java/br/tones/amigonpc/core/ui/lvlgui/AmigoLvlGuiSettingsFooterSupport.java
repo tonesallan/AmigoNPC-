@@ -50,11 +50,6 @@ final class AmigoLvlGuiSettingsFooterSupport {
       }
 
       if (isAdmin && AmigoLvlGuiAdminSettingsLock.isHeldBy(ownerId)) {
-         if (settingsPending.godMode != settingsLive.godMode && mgr.hasNpc(ownerId)) {
-            mgr.setGodModeWithStore(store, ownerId, settingsPending.godMode);
-            changedAny = true;
-         }
-
          if (settingsPending.pvp != settingsLive.pvp) {
             mgr.setPvpEnabled(settingsPending.pvp);
             changedAny = true;

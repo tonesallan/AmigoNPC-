@@ -467,17 +467,9 @@ Group #RpgLvlLeaderboardPage {
             LayoutMode: Left;
             Anchor: (Height: 40);
 
-            $C.@TextButton #SettingsAdminGodModeToggle {
-              Anchor: (Width: 320, Height: 35);
-              Text: "GodMode: OFF";
-              Style: @CustomButtonStyle;
-            }
-
-            Group { Anchor: (Width: 10, Height: 35); }
-
             $C.@TextButton #SettingsAdminPvpToggle {
-              Anchor: (Width: 320, Height: 35);
-              Text: "PvP do Mod: OFF";
+              Anchor: (Width: 650, Height: 35);
+              Text: "PvP entre NPCs: OFF";
               Style: @CustomButtonStyle;
             }
           }

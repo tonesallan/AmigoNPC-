@@ -36,10 +36,7 @@ final class AmigoLvlGuiSettingsToggleActionSupport {
    static AmigoLvlGuiSettingsToggleActionResult handleAdminAction(
       UUID ownerId, String action, AmigoLvlGuiSettingsSnapshot settingsLive, AmigoLvlGuiSettingsSnapshot settingsPending
    ) {
-      if ("settings_admin_toggle_godmode".equals(action)) {
-         AmigoLvlGuiSettingsToggleResult toggleResult = AmigoLvlGuiSettingsAdminToggleSupport.toggleGodMode(ownerId, settingsLive, settingsPending);
-         return new AmigoLvlGuiSettingsToggleActionResult(true, toggleResult.dirty, toggleResult.message);
-      } else if ("settings_admin_toggle_pvp".equals(action)) {
+      if ("settings_admin_toggle_pvp".equals(action)) {
          AmigoLvlGuiSettingsToggleResult toggleResult = AmigoLvlGuiSettingsAdminToggleSupport.togglePvp(settingsLive, settingsPending);
          return new AmigoLvlGuiSettingsToggleActionResult(true, toggleResult.dirty, toggleResult.message);
       } else {
