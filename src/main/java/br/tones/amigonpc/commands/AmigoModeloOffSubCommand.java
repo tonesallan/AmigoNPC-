@@ -19,13 +19,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoModeloOffSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public AmigoModeloOffSubCommand() {
+public AmigoModeloOffSubCommand() {
         super("modelooff", "Remove o modelo custom do AmigoNPC");
+        this.requireNoPermission();
         this.setAllowsExtraArguments(false);
     }
 

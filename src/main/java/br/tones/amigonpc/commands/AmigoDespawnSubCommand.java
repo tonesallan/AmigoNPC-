@@ -13,15 +13,11 @@ import br.tones.amigonpc.core.AmigoService;
 public final class AmigoDespawnSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final AmigoService service;
+private final AmigoService service;
 
     public AmigoDespawnSubCommand(AmigoService service) {
         super("despawn", "Remove o NPC do jogador");
+        this.requireNoPermission();
         this.service = service;
 
         // despawn não precisa aceitar args

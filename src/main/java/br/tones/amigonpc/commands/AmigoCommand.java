@@ -11,15 +11,10 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 public final class AmigoCommand extends AbstractCommand {
 
     // ✅ Comandos públicos (sem permissão)
-    // Nesta build, AbstractCommand gera um permission node automaticamente ao registrar o comando.
-    // Se desativarmos isso, getPermission() fica null e o comando vira "público".
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public AmigoCommand(AmigoService service) {
+    // A API atual exige requireNoPermission() para comandos públicos.
+public AmigoCommand(AmigoService service) {
         super("amigo", "Comandos do AmigoNPC");
+        this.requireNoPermission();
 
         // ✅ MUITO IMPORTANTE: permite "/amigo <algo>" sem o parser travar em Expected: 0
         this.setAllowsExtraArguments(true);

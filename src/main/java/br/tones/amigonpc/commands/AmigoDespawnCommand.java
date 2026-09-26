@@ -10,15 +10,11 @@ import br.tones.amigonpc.core.AmigoService;
 public final class AmigoDespawnCommand extends AbstractCommand {
 
     // ✅ comando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final AmigoService service;
+private final AmigoService service;
 
     public AmigoDespawnCommand(AmigoService service) {
         super("amigodespawn", "Remove o NPC do AmigoNPC");
+        this.requireNoPermission();
         this.service = service;
     }
 

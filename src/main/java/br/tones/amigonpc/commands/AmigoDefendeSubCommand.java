@@ -25,15 +25,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoDefendeSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final OptionalArg valueArg;
+private final OptionalArg valueArg;
 
     public AmigoDefendeSubCommand() {
         super("defende", "Alterna o modo de defesa/assistência do AmigoNPC (ON/OFF)");
+        this.requireNoPermission();
         this.valueArg = this.withOptionalArg("valor", "on/off (sem argumento alterna)", ArgTypes.STRING);
     }
 

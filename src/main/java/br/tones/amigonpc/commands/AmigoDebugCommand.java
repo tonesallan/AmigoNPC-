@@ -13,13 +13,9 @@ import br.tones.amigonpc.ui.UiBridge;
 public final class AmigoDebugCommand extends AbstractCommand {
 
     // ✅ comando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public AmigoDebugCommand() {
+public AmigoDebugCommand() {
         super("amigo", "Debug do AmigoNPC");
+        this.requireNoPermission();
         // ⚠️ Não usamos este construtor para substituir /amigo.
         // Vamos registrar este comando como subcomando separado no próximo arquivo.
     }
@@ -37,6 +33,7 @@ public final class AmigoDebugCommand extends AbstractCommand {
 
     private AmigoDebugCommand(String name) {
         super(name, "Mostra informações de debug do AmigoNPC");
+        this.requireNoPermission();
     }
 
     @Override

@@ -14,13 +14,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoLogSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    public AmigoLogSubCommand() {
+public AmigoLogSubCommand() {
         super("log", "Alterna o log de debug do AmigoNPC no chat");
+        this.requireNoPermission();
         this.setAllowsExtraArguments(false);
     }
 

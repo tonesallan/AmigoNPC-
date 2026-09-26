@@ -25,15 +25,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 public final class AmigoDefenderSubCommand extends AbstractPlayerCommand {
 
     // ✅ subcomando público (sem permissão)
-    @Override
-    protected boolean canGeneratePermission() {
-        return false;
-    }
-
-    private final OptionalArg stateArg;
+private final OptionalArg stateArg;
 
     public AmigoDefenderSubCommand() {
         super("defender", "Alterna o modo Defender do AmigoNPC");
+        this.requireNoPermission();
         this.addAliases("defende");
 
         this.stateArg = this.withOptionalArg(
