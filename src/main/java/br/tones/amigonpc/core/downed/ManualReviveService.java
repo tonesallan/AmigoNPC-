@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentMap;
 public final class ManualReviveService {
    private static final ManualReviveService SHARED = new ManualReviveService();
    private static final long REQUIRED_HOLD_MILLIS = 10000L;
-   private static final long SIGNAL_GRACE_MILLIS = 1200L;
+   private static final long ABANDONED_ATTEMPT_TIMEOUT_MILLIS = 20000L;
    private final ConcurrentMap<UUID, Attempt> attempts = new ConcurrentHashMap<>();
 
    private ManualReviveService() {
@@ -85,12 +85,12 @@ public final class ManualReviveService {
             continue;
          }
 
-         if (now - attempt.lastSignalMillis > SIGNAL_GRACE_MILLIS) {
+         if (now - attempt.startedAtMillis > ABANDONED_ATTEMPT_TIMEOUT_MILLIS) {
             this.attempts.remove(helperId, attempt);
             continue;
          }
 
-         if (now - attempt.startedAtMillis >= REQUIRED_HOLD_MILLIS) {
+         if (attempt.holdConfirmed && now - attempt.startedAtMillis >= REQUIRED_HOLD_MILLIS) {
             if (this.attempts.remove(helperId, attempt)) {
                AmigoNpcManager.getShared().revive(attempt.npcOwnerId, true);
             }
@@ -112,6 +112,7 @@ public final class ManualReviveService {
       private final UUID npcOwnerId;
       private final long startedAtMillis;
       private volatile long lastSignalMillis;
+      private volatile boolean holdConfirmed;
 
       private Attempt(UUID npcOwnerId, long startedAtMillis, long lastSignalMillis) {
          this.npcOwnerId = npcOwnerId;
