@@ -15,6 +15,20 @@ java {
     }
 }
 
+
+def recoveredLangZip = file("recovery/resources/AmigoNPC_LANG_ORIGINAL_2.0.1.zip")
+
+processResources {
+    if (recoveredLangZip.exists()) {
+        from(zipTree(recoveredLangZip)) {
+            eachFile { details ->
+                details.path = details.path.replace('\\\\', '/')
+            }
+            includeEmptyDirs = false
+        }
+    }
+}
+
 dependencies {
     // Permite compilar em outras máquinas/ambientes sem precisar editar este arquivo:
     // - Se a env HYTALE_SERVER_JAR existir, usamos ela.
