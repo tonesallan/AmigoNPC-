@@ -395,6 +395,48 @@ public final class AmigoNpcManager {
       setCombatMode(owner, enabled ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY);
    }
 
+   public boolean isAutoWeaponSwitchEnabled(UUID ownerId) {
+      if (ownerId == null) {
+         return true;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? rec.autoWeaponSwitchEnabled : AmigoPersistence.loadAutoWeaponSwitch(ownerId);
+   }
+
+   public void setAutoWeaponSwitchEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId == null) {
+         return;
+      }
+
+      AmigoPersistence.saveAutoWeaponSwitch(ownerId, enabled);
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         rec.autoWeaponSwitchEnabled = enabled;
+      }
+   }
+
+   public boolean isInterruptAttacksEnabled(UUID ownerId) {
+      if (ownerId == null) {
+         return true;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? rec.interruptAttacksEnabled : AmigoPersistence.loadInterruptAttacks(ownerId);
+   }
+
+   public void setInterruptAttacksEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId == null) {
+         return;
+      }
+
+      AmigoPersistence.saveInterruptAttacks(ownerId, enabled);
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         rec.interruptAttacksEnabled = enabled;
+      }
+   }
+
    public boolean isAutoLootEnabled(UUID ownerId) {
       if (ownerId == null) {
          return true;
@@ -798,7 +840,10 @@ public final class AmigoNpcManager {
             rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
+            rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
+            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
+            rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
+            rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
             rec.godMode = AmigoPersistence.loadGodMode(ownerId);
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
@@ -1069,7 +1114,10 @@ public final class AmigoNpcManager {
             rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
+            rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
+            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
+            rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
+            rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
             rec.godMode = AmigoPersistence.loadGodMode(ownerId);
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
@@ -4863,7 +4911,10 @@ public final class AmigoNpcManager {
       volatile double lastTargetHorizontal = -1.0;
       volatile long lastTargetSampleMillis;
       volatile boolean chaseDisengaged;
-      volatile boolean defendeEnabled;
+      volatile CombatMode combatMode = CombatMode.PROTECT_OWNER;
+      volatile boolean defendeEnabled = true;
+      volatile boolean autoWeaponSwitchEnabled = true;
+      volatile boolean interruptAttacksEnabled = true;
       volatile boolean autoLootEnabled = true;
       volatile boolean debugLogEnabled;
       volatile boolean godMode;

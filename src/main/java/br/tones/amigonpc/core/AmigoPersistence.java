@@ -19,6 +19,8 @@ public final class AmigoPersistence {
    private static final String KEY_EQUIPPED_WEAPON_ID = "equippedWeaponId";
    private static final String KEY_DEFENDER_ENABLED = "defenderEnabled";
    private static final String KEY_COMBAT_MODE = "combatMode";
+   private static final String KEY_AUTO_WEAPON_SWITCH = "autoWeaponSwitch";
+   private static final String KEY_INTERRUPT_ATTACKS = "interruptAttacks";
    private static final String KEY_AUTOLOOT_ENABLED = "autoLootEnabled";
    private static final String KEY_HUD_ENABLED = "hudEnabled";
    private static final String KEY_GODMODE = "godMode";
@@ -149,6 +151,34 @@ public final class AmigoPersistence {
          try {
             AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), FORMAT_VERSION, KEY_COMBAT_MODE, mode.name());
             saveDefenderEnabled(ownerId, mode == CombatMode.PROTECT_OWNER);
+         } catch (Throwable ignored) {
+         }
+      }
+   }
+
+   public static boolean loadAutoWeaponSwitch(UUID ownerId) {
+      return ownerId == null || AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), KEY_AUTO_WEAPON_SWITCH, true);
+   }
+
+   public static void saveAutoWeaponSwitch(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), FORMAT_VERSION, KEY_AUTO_WEAPON_SWITCH, enabled);
+         } catch (IOException ignored) {
+         } catch (Throwable ignored) {
+         }
+      }
+   }
+
+   public static boolean loadInterruptAttacks(UUID ownerId) {
+      return ownerId == null || AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), KEY_INTERRUPT_ATTACKS, true);
+   }
+
+   public static void saveInterruptAttacks(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), FORMAT_VERSION, KEY_INTERRUPT_ATTACKS, enabled);
+         } catch (IOException ignored) {
          } catch (Throwable ignored) {
          }
       }
