@@ -53,13 +53,7 @@ public LootCommand() {
 
         final SimpleItemContainer bag = manager.getOrLoadBackpack(owner);
 
-        Player sender = ctx.senderAs(Player.class);
-        if (sender == null) {
-            ctx.sendMessage(Message.raw("§c[AmigoNPC] Não consegui obter o Player nesta build."));
-            return CompletableFuture.completedFuture(null);
-        }
-
-        PlayerRef playerRef = sender.getPlayerRef();
+        PlayerRef playerRef = ctx.senderAs(PlayerRef.class);
         if (playerRef == null) {
             ctx.sendMessage(Message.raw("§c[AmigoNPC] PlayerRef indisponível. Tente relogar."));
             return CompletableFuture.completedFuture(null);
