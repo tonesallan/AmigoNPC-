@@ -1,7 +1,6 @@
 package br.tones.amigonpc.core.progress;
 
 public final class XpProgression {
-   public static final int MAX_LEVEL = 100;
    private static final double LEVEL_BASE_XP = 150.0;
    private static final double LEVEL_OFFSET = 0.0;
    private static final double LEVEL_POWER = 2.5;
@@ -13,95 +12,105 @@ public final class XpProgression {
    }
 
    public static double xpRequiredForLevelD(int level) {
-      int L = Math.max(1, level);
-      return L <= 1 ? 0.0 : 150.0 * Math.pow(L, 2.5) + 0.0;
+      int safeLevel = Math.max(1, level);
+      return safeLevel <= 1 ? 0.0 : LEVEL_BASE_XP * Math.pow((double)safeLevel, LEVEL_POWER) + LEVEL_OFFSET;
    }
 
    public static double xpNeededForNextLevelD(int level) {
-      int L = Math.max(1, level);
-      if (L >= 100) {
-         return 0.0;
+      int safeLevel = Math.max(1, level);
+      if (safeLevel == Integer.MAX_VALUE) {
+         return Double.POSITIVE_INFINITY;
       }
 
-      double a = xpRequiredForLevelD(L);
-      double b = xpRequiredForLevelD(L + 1);
-      return b - a;
+      return xpRequiredForLevelD(safeLevel + 1) - xpRequiredForLevelD(safeLevel);
    }
 
    public static long xpToNext(int level) {
-      int L = Math.max(1, level);
-      double d = xpNeededForNextLevelD(L);
-      return !(d > 0.0) ? 0L : (long)Math.floor(d);
+      double value = xpNeededForNextLevelD(level);
+      if (!(value > 0.0) || Double.isNaN(value)) {
+         return 0L;
+      }
+
+      if (Double.isInfinite(value) || value >= Long.MAX_VALUE) {
+         return Long.MAX_VALUE;
+      }
+
+      return Math.max(1L, (long)Math.floor(value));
    }
 
    public static long xpStartOfLevel(int level) {
-      int L = Math.max(1, level);
-      double d = xpRequiredForLevelD(L);
-      return d >= 0.0 && !Double.isNaN(d) && !Double.isInfinite(d) ? (long)Math.floor(d) : 0L;
+      double value = xpRequiredForLevelD(level);
+      if (Double.isNaN(value) || value < 0.0) {
+         return 0L;
+      }
+
+      if (Double.isInfinite(value) || value >= Long.MAX_VALUE) {
+         return Long.MAX_VALUE;
+      }
+
+      return (long)Math.floor(value);
    }
 
    public static int levelFromTotalXp(long totalXp) {
-      long xpL = Math.max(0L, totalXp);
-      double xp = xpL;
-      int lo = 1;
-      int hi = 100;
+      long xp = Math.max(0L, totalXp);
+      if (xp == 0L) {
+         return 1;
+      }
 
-      while (lo < hi) {
-         int mid = lo + hi + 1 >>> 1;
-         double req = xpRequiredForLevelD(mid);
-         if (req <= xp) {
-            lo = mid;
+      int low = 1;
+      int high = 2;
+      while (high < Integer.MAX_VALUE && xpStartOfLevel(high) <= xp) {
+         low = high;
+         if (high > Integer.MAX_VALUE / 2) {
+            high = Integer.MAX_VALUE;
+            break;
+         }
+
+         high *= 2;
+      }
+
+      while (low < high) {
+         int mid = low + (high - low + 1) / 2;
+         long required = xpStartOfLevel(mid);
+         if (required != Long.MAX_VALUE && required <= xp) {
+            low = mid;
          } else {
-            hi = mid - 1;
+            high = mid - 1;
          }
       }
 
-      return lo;
+      return Math.max(1, low);
    }
 
    public static long xpIntoLevel(long totalXp) {
       long xp = Math.max(0L, totalXp);
-      int level = levelFromTotalXp(xp);
-      long minThisLevel = xpStartOfLevel(level);
-      return Math.max(0L, xp - minThisLevel);
+      long start = xpStartOfLevel(levelFromTotalXp(xp));
+      return start == Long.MAX_VALUE ? 0L : Math.max(0L, xp - start);
    }
 
    public static long xpNeededThisLevel(long totalXp) {
-      long xp = Math.max(0L, totalXp);
-      int level = levelFromTotalXp(xp);
-      return xpToNext(level);
+      return xpToNext(levelFromTotalXp(Math.max(0L, totalXp)));
    }
 
-   public static double deathRateForLevel(int level) {
-      int L = Math.max(1, level);
-      if (L <= 10) {
-         return 0.0;
-      } else if (L <= 50) {
-         return 0.002;
-      } else if (L <= 90) {
-         return 0.004;
-      } else {
-         return L <= 500 ? 0.008 : 0.01;
+   public static long applyCurrentLevelPenalty(long totalXp, double rate) {
+      long xp = Math.max(0L, totalXp);
+      double safeRate = Math.max(0.0, Math.min(1.0, rate));
+      if (xp == 0L || safeRate <= 0.0) {
+         return xp;
       }
+
+      int level = levelFromTotalXp(xp);
+      long start = xpStartOfLevel(level);
+      if (start == Long.MAX_VALUE) {
+         return xp;
+      }
+
+      long intoLevel = Math.max(0L, xp - start);
+      long loss = (long)Math.floor(intoLevel * safeRate);
+      return loss <= 0L ? xp : Math.max(start, xp - loss);
    }
 
    public static long applyDeathPenalty(long totalXp) {
-      long xp = Math.max(0L, totalXp);
-      int level = levelFromTotalXp(xp);
-      double rate = deathRateForLevel(level);
-      long rawLoss = (long)Math.floor(xp * rate);
-      if (rawLoss <= 0L) {
-         return xp;
-      }
-
-      long minThisLevel = xpStartOfLevel(level);
-      if (minThisLevel == Long.MAX_VALUE) {
-         return xp;
-      }
-
-      long xpIntoLevel = Math.max(0L, xp - minThisLevel);
-      long loss = Math.min(rawLoss, xpIntoLevel);
-      long out = xp - loss;
-      return Math.max(0L, out);
+      return applyCurrentLevelPenalty(totalXp, 0.40);
    }
 }
