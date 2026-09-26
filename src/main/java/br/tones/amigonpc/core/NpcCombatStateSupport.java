@@ -50,8 +50,10 @@ final class NpcCombatStateSupport {
             if (!rec.downed) {
                if (rec.refObj != null) {
                   if (attackerRefObj != rec.refObj) {
+                     long now = System.currentTimeMillis();
                      rec.combatTargetRefObj = attackerRefObj;
-                     rec.combatUntilMillis = System.currentTimeMillis() + combatWindowMillis;
+                     rec.combatUntilMillis = now + combatWindowMillis;
+                     rec.ownerCombatContextUntilMillis = now + combatWindowMillis;
                      rec.npcCombatTargetRefObj = null;
                      rec.npcCombatUntilMillis = 0L;
                      rec.assistTargetRefObj = null;
@@ -97,6 +99,7 @@ final class NpcCombatStateSupport {
             long now = System.currentTimeMillis();
             rec.assistTargetRefObj = targetRefObj;
             rec.assistUntilMillis = now + 3000L;
+            rec.ownerCombatContextUntilMillis = now + 3000L;
 
             try {
                ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=owner_attack");

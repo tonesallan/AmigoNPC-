@@ -34,9 +34,7 @@ final class NpcTargetAcquisitionSupport {
       }
 
       long now = System.currentTimeMillis();
-      boolean ownerCombatContext = NpcCombatStateSupport.getActiveCombatTarget(rec, now) != null
-         || NpcCombatStateSupport.getActiveAssistTarget(rec, now) != null;
-      if (!ownerCombatContext) {
+      if (rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
          return null;
       }
 

@@ -1663,6 +1663,7 @@ public final class AmigoNpcManager {
             rec.combatTargetRefObj = null;
             rec.assistUntilMillis = 0L;
             rec.assistTargetRefObj = null;
+            rec.ownerCombatContextUntilMillis = 0L;
             rec.chaseDisengaged = false;
             rec.targetLostSinceMillis = 0L;
             rec.targetStuckSinceMillis = 0L;
@@ -2193,7 +2194,9 @@ public final class AmigoNpcManager {
    }
 
    private Object findNearestTargetNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Object excludeRefObj) {
-      return NpcTargetAcquisitionSupport.findNearestTargetNearNpc(store, rec, ownerRefObj, npcPos, excludeRefObj, this.pvpEnabled, 12.0, 2.5, 35.0);
+      return NpcTargetAcquisitionSupport.findWeakestCombatTarget(
+         store, rec, ownerRefObj, npcPos, this.pvpEnabled, 12.0, 2.5, 35.0, this::isAmigoRef
+      );
    }
 
    private static boolean isAnyEnemyNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, double radius) {
@@ -3306,16 +3309,12 @@ public final class AmigoNpcManager {
          }
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
-         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
-         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         if (!rec.defendeEnabled) {
-            if (!isAggressor) {
-               return;
-            }
-         } else if (!isAggressor && !isAssist) {
+         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER ? (isOwnerAggressor || isAssist) : isAssist;
+         if (!authorized || rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
             return;
          }
+         boolean isAggressor = isOwnerAggressor;
 
          if (now - rec.lastRangedAttackMillis < 1150L) {
             return;
@@ -3566,16 +3565,12 @@ public final class AmigoNpcManager {
          }
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
-         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
-         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         if (!rec.defendeEnabled) {
-            if (!isAggressor) {
-               return;
-            }
-         } else if (!isAggressor && !isAssist) {
+         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER ? (isOwnerAggressor || isAssist) : isAssist;
+         if (!authorized || rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
             return;
          }
+         boolean isAggressor = isOwnerAggressor;
 
          long cd = isAggressor ? 650L : 850L;
          if (now - rec.lastMeleeAttackMillis < cd) {
@@ -4906,6 +4901,7 @@ public final class AmigoNpcManager {
       volatile long npcCombatUntilMillis;
       volatile Object assistTargetRefObj;
       volatile long assistUntilMillis;
+      volatile long ownerCombatContextUntilMillis;
       volatile long targetLostSinceMillis;
       volatile long targetStuckSinceMillis;
       volatile double lastTargetHorizontal = -1.0;

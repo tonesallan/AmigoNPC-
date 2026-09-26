@@ -58,28 +58,26 @@ final class NpcDefenderTargetingSupport {
          }
 
          assistHousekeeper.tick(rec, store, now);
-         if (!rec.chaseDisengaged
-            && !rec.lootingActive
-            && combatTarget == null
-            && npcCombatTarget == null
-            && rec.assistTargetRefObj == null
-            && rec.assistUntilMillis == 0L) {
-            Object autoTarget = autoTargetFinder.find(store, rec, ownerRefObj, ownerPos);
-            if (autoTarget != null) {
-               rec.assistTargetRefObj = autoTarget;
+         Object assistTarget = NpcCombatStateSupport.getActiveAssistTarget(rec, now);
+         if (assistTarget != null && !aliveChecker.isAlive(store, assistTarget)) {
+            rec.assistTargetRefObj = null;
+            rec.assistUntilMillis = 0L;
+            assistTarget = null;
+         }
+
+         Object desiredTarget;
+         if (rec.combatMode == CombatMode.WEAKEST_ENEMY) {
+            Object weakestTarget = autoTargetFinder.find(store, rec, ownerRefObj, ownerPos);
+            if (weakestTarget != null) {
+               rec.assistTargetRefObj = weakestTarget;
                rec.assistUntilMillis = 0L;
-               debugLogger.log(rec, ownerId, "autoAssist: targetRef=" + autoTarget);
+               desiredTarget = weakestTarget;
+               debugLogger.log(rec, ownerId, "weakestTarget: targetRef=" + weakestTarget);
+            } else {
+               desiredTarget = ownerRefObj;
             }
-         }
-
-         Object desiredTarget = combatTarget;
-         if (desiredTarget == null) {
-            desiredTarget = npcCombatTarget != null ? npcCombatTarget : null;
-         }
-
-         if (desiredTarget == null) {
-            Object assistTarget = NpcCombatStateSupport.getActiveAssistTarget(rec, now);
-            desiredTarget = assistTarget != null ? assistTarget : ownerRefObj;
+         } else {
+            desiredTarget = combatTarget != null ? combatTarget : (assistTarget != null ? assistTarget : ownerRefObj);
          }
 
          boolean inCombatOrAssist = desiredTarget != null && !refEq(desiredTarget, ownerRefObj);
