@@ -2,12 +2,13 @@ package br.tones.amigonpc.core.lifecycle;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.downed.ManualReviveService;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.Packet;
 import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChain;
 import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChains;
-import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.io.adapter.PacketAdapters;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.server.core.io.adapter.PacketFilter;
 import com.hypixel.hytale.server.core.io.adapter.PlayerPacketWatcher;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.joml.Vector3d;
@@ -55,8 +57,9 @@ public final class ManualReviveCoordinator {
 
          Player player = event.getPlayer();
          PlayerRef playerRef = player == null ? null : player.getPlayerRef();
-         Entity target = event.getTargetEntity();
-         if (playerRef == null || target == null || !isNearEnough(player, target)) {
+         Ref<EntityStore> playerEntityRef = event.getPlayerRef();
+         Ref<EntityStore> targetRef = event.getTargetRef();
+         if (playerRef == null || playerEntityRef == null || targetRef == null || !isNearEnough(playerEntityRef, targetRef)) {
             if (playerRef != null) {
                ManualReviveService.getShared().cancel(playerRef.getUuid());
             }
@@ -84,10 +87,19 @@ public final class ManualReviveCoordinator {
       }
    }
 
-   private static boolean isNearEnough(Player player, Entity target) {
+   private static boolean isNearEnough(Ref<EntityStore> playerRef, Ref<EntityStore> targetRef) {
       try {
-         TransformComponent playerTransform = player.getTransformComponent();
-         TransformComponent targetTransform = target.getTransformComponent();
+         if (playerRef == null || targetRef == null || !playerRef.isValid() || !targetRef.isValid()) {
+            return false;
+         }
+
+         Store<EntityStore> store = playerRef.getStore();
+         if (store == null || targetRef.getStore() != store) {
+            return false;
+         }
+
+         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
+         TransformComponent targetTransform = store.getComponent(targetRef, TransformComponent.getComponentType());
          if (playerTransform == null || targetTransform == null) {
             return false;
          }
