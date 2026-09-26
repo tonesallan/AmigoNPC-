@@ -67,14 +67,19 @@ final class NpcDefenderTargetingSupport {
 
          Object desiredTarget;
          if (rec.combatMode == CombatMode.WEAKEST_ENEMY) {
-            Object weakestTarget = autoTargetFinder.find(store, rec, ownerRefObj, ownerPos);
-            if (weakestTarget != null) {
-               rec.assistTargetRefObj = weakestTarget;
-               rec.assistUntilMillis = 0L;
-               desiredTarget = weakestTarget;
-               debugLogger.log(rec, ownerId, "weakestTarget: targetRef=" + weakestTarget);
+            if (assistTarget != null) {
+               // Keep attacking the chosen weakest target until it is eliminated.
+               desiredTarget = assistTarget;
             } else {
-               desiredTarget = ownerRefObj;
+               Object weakestTarget = autoTargetFinder.find(store, rec, ownerRefObj, ownerPos);
+               if (weakestTarget != null) {
+                  rec.assistTargetRefObj = weakestTarget;
+                  rec.assistUntilMillis = 0L;
+                  desiredTarget = weakestTarget;
+                  debugLogger.log(rec, ownerId, "weakestTargetLocked: targetRef=" + weakestTarget);
+               } else {
+                  desiredTarget = ownerRefObj;
+               }
             }
          } else {
             desiredTarget = combatTarget != null ? combatTarget : (assistTarget != null ? assistTarget : ownerRefObj);

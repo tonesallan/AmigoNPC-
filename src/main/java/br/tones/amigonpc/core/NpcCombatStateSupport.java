@@ -36,6 +36,13 @@ final class NpcCombatStateSupport {
          return null;
       }
 
+      // Weakest-enemy mode locks the selected target until it is defeated or
+      // explicitly discarded by targeting/chase validation. It may not acquire
+      // a new target without an active owner combat context.
+      if (rec.combatMode == CombatMode.WEAKEST_ENEMY) {
+         return rec.assistTargetRefObj;
+      }
+
       if (rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
          rec.assistTargetRefObj = null;
          rec.assistUntilMillis = 0L;
