@@ -124,7 +124,9 @@ final class NpcGatheringSupport {
 
       bag.addItemStacks(drops);
       rec.backpackDirty = true;
-      rec.nextBackpackSaveMillis = now;
+      if (rec.nextBackpackSaveMillis <= now) {
+         rec.nextBackpackSaveMillis = now + 500L;
+      }
       rec.lootPausedInventoryFull = false;
       rec.gatherTargetX = target.x;
       rec.gatherTargetY = target.y;

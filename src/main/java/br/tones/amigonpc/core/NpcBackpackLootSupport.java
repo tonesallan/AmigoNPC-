@@ -180,8 +180,8 @@ final class NpcBackpackLootSupport {
             } else {
                rec.backpackDirty = true;
                long now = System.currentTimeMillis();
-               if (rec.nextBackpackSaveMillis == 0L) {
-                  rec.nextBackpackSaveMillis = now + 5000L;
+               if (rec.nextBackpackSaveMillis <= now) {
+                  rec.nextBackpackSaveMillis = now + 500L;
                }
 
                if (rem != null && remQty > 0) {

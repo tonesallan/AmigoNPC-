@@ -286,7 +286,9 @@ final class NpcAutoLootSupport {
 
                                        picked[0]++;
                                        rec.backpackDirty = true;
-                                       rec.nextBackpackSaveMillis = Math.min(rec.nextBackpackSaveMillis, now + backpackSaveDebounceMs);
+                                       if (rec.nextBackpackSaveMillis <= now) {
+                                          rec.nextBackpackSaveMillis = now + Math.max(100L, backpackSaveDebounceMs);
+                                       }
                                        if (remainder != null && remQty > 0) {
                                           try {
                                              ic.setItemStack(remainder);
@@ -357,6 +359,7 @@ final class NpcAutoLootSupport {
             try {
                AmigoPersistence.saveBackpack(ownerId, bag);
                rec.backpackDirty = false;
+               rec.nextBackpackSaveMillis = 0L;
             } catch (Throwable t) {
                debugger.log(rec, ownerId, AmigoText.format("core.debug.autoloot.save_backpack_failed", t.getMessage()));
             }
