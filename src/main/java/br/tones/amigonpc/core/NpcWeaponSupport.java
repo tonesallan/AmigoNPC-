@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 final class NpcWeaponSupport {
@@ -80,6 +81,130 @@ final class NpcWeaponSupport {
       } catch (Throwable ignored) {
          return false;
       }
+   }
+
+   static String selectBestBackpackWeapon(SimpleItemContainer backpack, boolean ranged) {
+      if (backpack == null) {
+         return null;
+      }
+
+      String bestId = null;
+      int bestLevel = Integer.MIN_VALUE;
+      short capacity;
+      try {
+         capacity = backpack.getCapacity();
+      } catch (Throwable ignored) {
+         return null;
+      }
+
+      for (short slot = 0; slot < capacity; slot++) {
+         ItemStack stack;
+         try {
+            stack = backpack.getItemStack(slot);
+         } catch (Throwable ignored) {
+            continue;
+         }
+
+         if (stack == null || stack.isEmpty() || stack.isBroken()) {
+            continue;
+         }
+
+         Item item;
+         try {
+            item = stack.getItem();
+         } catch (Throwable ignored) {
+            continue;
+         }
+
+         if (item == null || item.getWeapon() == null || isRangedWeapon(item) != ranged) {
+            continue;
+         }
+
+         int level;
+         try {
+            level = item.getItemLevel();
+         } catch (Throwable ignored) {
+            level = 0;
+         }
+
+         if (bestId == null || level > bestLevel) {
+            bestId = stack.getItemId();
+            bestLevel = level;
+         }
+      }
+
+      return bestId;
+   }
+
+   static boolean backpackContainsWeapon(SimpleItemContainer backpack, String itemId) {
+      if (backpack == null || itemId == null || itemId.isBlank()) {
+         return false;
+      }
+
+      short capacity;
+      try {
+         capacity = backpack.getCapacity();
+      } catch (Throwable ignored) {
+         return false;
+      }
+
+      for (short slot = 0; slot < capacity; slot++) {
+         try {
+            ItemStack stack = backpack.getItemStack(slot);
+            if (stack != null && !stack.isEmpty() && !stack.isBroken() && itemId.equals(stack.getItemId())) {
+               Item item = stack.getItem();
+               return item != null && item.getWeapon() != null;
+            }
+         } catch (Throwable ignored) {
+         }
+      }
+
+      return false;
+   }
+
+   static boolean clearHotbar0(Store<EntityStore> store, Ref<EntityStore> npcRef) {
+      try {
+         InventoryComponent.Hotbar hotbarComponent = (InventoryComponent.Hotbar)store.getComponent(
+            npcRef, InventoryComponent.Hotbar.getComponentType()
+         );
+         if (hotbarComponent == null || hotbarComponent.getInventory() == null) {
+            return true;
+         }
+
+         hotbarComponent.getInventory().removeItemStackFromSlot((short)0);
+         hotbarComponent.markDirty();
+         hotbarComponent.setOutdatedEquipment(true);
+         return true;
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
+   private static boolean isRangedWeapon(Item item) {
+      if (item == null || item.getWeapon() == null) {
+         return false;
+      }
+
+      String animationId = null;
+      try {
+         animationId = item.getPlayerAnimationsId();
+      } catch (Throwable ignored) {
+      }
+
+      if (animationId == null) {
+         return false;
+      }
+
+      String id = animationId.toLowerCase(java.util.Locale.ROOT);
+      return id.contains("bow")
+         || id.contains("crossbow")
+         || id.contains("rifle")
+         || id.contains("gun")
+         || id.contains("handgun")
+         || id.contains("staff")
+         || id.contains("wand")
+         || id.contains("spellbook")
+         || id.contains("throwing");
    }
 
    static double getWeaponBaseDamage(String itemId) {

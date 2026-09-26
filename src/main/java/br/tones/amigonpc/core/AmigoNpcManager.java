@@ -2063,40 +2063,51 @@ public final class AmigoNpcManager {
    }
 
    private static String resolveConfiguredOrLegacyMeleeWeaponId(AmigoNpcManager.NpcRecord rec) {
-      if (rec == null) {
-         return null;
-      }
-
-      String configured = rec.equippedWeaponId;
-      return configured != null && !configured.isBlank()
-         ? configured
-         : br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level));
+      return rec == null ? null : rec.equippedWeaponId;
    }
 
    private void applySwordWeaponNow(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, boolean saveNow) {
-      if (store != null && npcRef != null && rec != null && ownerId != null) {
-         int lvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
-         String expected = resolveConfiguredOrLegacyMeleeWeaponId(rec);
-         if (expected != null && !expected.isBlank()) {
-            boolean slotOk = NpcWeaponSupport.isHotbar0Item(store, npcRef, expected);
-            if (expected.equals(rec.equippedWeaponId) && slotOk) {
-               if (saveNow) {
-                  AmigoPersistence.saveSwordState(ownerId, lvl, rec.equippedWeaponId);
-               }
-            } else {
-               boolean equipped = NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, expected);
-               if (equipped) {
-                  rec.equippedWeaponId = expected;
-                  if (saveNow) {
-                     AmigoPersistence.saveSwordState(ownerId, lvl, rec.equippedWeaponId);
-                  }
+      if (store == null || npcRef == null || rec == null || ownerId == null) {
+         return;
+      }
 
-                  this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.success", expected, lvl));
-               } else {
-                  this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.failed", expected, lvl, NpcWeaponSupport.getHotbar0ItemId(store, npcRef)));
-               }
-            }
+      if (rec.backpack == null) {
+         rec.backpack = this.getOrLoadBackpack(ownerId);
+      }
+
+      String expected;
+      if (rec.autoWeaponSwitchEnabled) {
+         expected = NpcWeaponSupport.selectBestBackpackWeapon(rec.backpack, false);
+      } else {
+         expected = NpcWeaponSupport.backpackContainsWeapon(rec.backpack, rec.equippedWeaponId) ? rec.equippedWeaponId : null;
+      }
+
+      int lvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+      if (expected == null || expected.isBlank()) {
+         NpcWeaponSupport.clearHotbar0(store, npcRef);
+         rec.equippedWeaponId = null;
+         if (saveNow) {
+            AmigoPersistence.saveSwordState(ownerId, lvl, null);
          }
+         return;
+      }
+
+      if (NpcWeaponSupport.isHotbar0Item(store, npcRef, expected)) {
+         rec.equippedWeaponId = expected;
+         if (saveNow) {
+            AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+         }
+         return;
+      }
+
+      if (NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, expected)) {
+         rec.equippedWeaponId = expected;
+         if (saveNow) {
+            AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+         }
+         this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.success", expected, lvl));
+      } else {
+         this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.failed", expected, lvl, NpcWeaponSupport.getHotbar0ItemId(store, npcRef)));
       }
    }
 
@@ -3259,34 +3270,35 @@ public final class AmigoNpcManager {
 
    private void tryEquipDefaultBow(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, long now) {
       try {
-         if (store == null || rec == null) {
+         if (store == null || rec == null || !rec.autoWeaponSwitchEnabled || !(rec.refObj instanceof Ref<?> rawRef)) {
             return;
          }
 
-         if (!(rec.refObj instanceof Ref)) {
+         if (rec.backpack == null) {
+            rec.backpack = this.getOrLoadBackpack(rec.ownerId);
+         }
+
+         String rangedId = NpcWeaponSupport.selectBestBackpackWeapon(rec.backpack, true);
+         if (rangedId == null || rangedId.isBlank()) {
+            rec.rangedBowItemId = null;
+            rec.rangedBowReadyAtMillis = 0L;
             return;
          }
 
-         String bowId = resolveDefaultBowId();
-         if (bowId == null || bowId.isBlank()) {
-            return;
-         }
-
-         rec.rangedBowItemId = bowId;
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
-         if (NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
+         rec.rangedBowItemId = rangedId;
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
+         if (NpcWeaponSupport.isHotbar0Item(store, npcRef, rangedId)) {
             if (rec.rangedBowReadyAtMillis <= 0L) {
                rec.rangedBowReadyAtMillis = now;
             }
-
             return;
          }
 
-         boolean ok = NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, bowId);
-         if (ok) {
+         if (NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, rangedId)) {
             rec.rangedBowReadyAtMillis = now + 900L;
          }
-      } catch (Throwable var8) {
+      } catch (Throwable ignored) {
       }
    }
 
@@ -3335,11 +3347,7 @@ public final class AmigoNpcManager {
          Ref<EntityStore> targetRef = (Ref<EntityStore>)targetRefObj;
          Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
          String bowId = rec.rangedBowItemId;
-         if (bowId == null || bowId.isBlank()) {
-            bowId = resolveDefaultBowId();
-         }
-
-         if (bowId == null || bowId.isBlank()) {
+         if (bowId == null || bowId.isBlank() || rec.backpack == null || !NpcWeaponSupport.backpackContainsWeapon(rec.backpack, bowId)) {
             return;
          }
 
