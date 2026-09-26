@@ -191,51 +191,52 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                      incoming = manager.mitigateIncomingDamage(owner, incoming);
                   }
 
-                  float newHp = currentHp - incoming;
-                  ActiveAnimationComponent anim = (ActiveAnimationComponent)buffer.ensureAndGetComponent(targetRef, ActiveAnimationComponent.getComponentType());
-                  MovementStatesComponent move = (MovementStatesComponent)buffer.ensureAndGetComponent(targetRef, MovementStatesComponent.getComponentType());
-                  MovementStates states = move.getMovementStates();
-                  if (states == null) {
-                     states = new MovementStates();
-                     states.idle = true;
-                     states.onGround = true;
-                     move.setMovementStates(states);
-                     buffer.replaceComponent(targetRef, MovementStatesComponent.getComponentType(), move);
+                  incoming = Math.max(0.0F, incoming);
+                  if (incoming <= 0.0F) {
+                     damage.setCancelled(true);
+                     return;
                   }
 
-                  if (newHp <= 0.0F) {
-                     stats.setStatValue(healthIdx, 1.0F);
-                     buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
-
-                     try {
-                        String[] deathIds = DefaultAnimations.getDeathAnimationIds(states, damage.getCause());
-                        if (deathIds != null && deathIds.length > 0 && deathIds[0] != null) {
-                           anim.setPlayingAnimation(AnimationSlot.Action, deathIds[0]);
-                           buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
-                        }
-                     } catch (Throwable var20) {
-                     }
-
-                     if (owner != null) {
-                        manager.markDowned(owner);
-                     }
-
-                     damage.setCancelled(true);
-                  } else {
-                     stats.setStatValue(healthIdx, newHp);
-                     buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
-
-                     try {
-                        String[] hurtIds = DefaultAnimations.getHurtAnimationIds(states, damage.getCause());
-                        if (hurtIds != null && hurtIds.length > 0 && hurtIds[0] != null) {
-                           anim.setPlayingAnimation(AnimationSlot.Action, hurtIds[0]);
-                           buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
-                        }
-                     } catch (Throwable var21) {
-                     }
-
-                     damage.setCancelled(true);
+                  // Preserve Hytale's normal damage pipeline for every non-lethal
+                  // hit. Only a lethal hit is intercepted so the companion can
+                  // transition to DOWNED instead of entering the normal death flow.
+                  if (currentHp - incoming > 0.0F) {
+                     damage.setAmount(incoming);
+                     return;
                   }
+
+                  stats.setStatValue(healthIdx, 1.0F);
+                  buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
+
+                  try {
+                     ActiveAnimationComponent anim = (ActiveAnimationComponent)buffer.ensureAndGetComponent(
+                        targetRef, ActiveAnimationComponent.getComponentType()
+                     );
+                     MovementStatesComponent move = (MovementStatesComponent)buffer.ensureAndGetComponent(
+                        targetRef, MovementStatesComponent.getComponentType()
+                     );
+                     MovementStates states = move.getMovementStates();
+                     if (states == null) {
+                        states = new MovementStates();
+                        states.idle = true;
+                        states.onGround = true;
+                        move.setMovementStates(states);
+                        buffer.replaceComponent(targetRef, MovementStatesComponent.getComponentType(), move);
+                     }
+
+                     String[] deathIds = DefaultAnimations.getDeathAnimationIds(states, damage.getCause());
+                     if (deathIds != null && deathIds.length > 0 && deathIds[0] != null) {
+                        anim.setPlayingAnimation(AnimationSlot.Action, deathIds[0]);
+                        buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
+                     }
+                  } catch (Throwable ignored) {
+                  }
+
+                  if (owner != null) {
+                     manager.markDowned(owner);
+                  }
+
+                  damage.setCancelled(true);
                }
             }
          }
