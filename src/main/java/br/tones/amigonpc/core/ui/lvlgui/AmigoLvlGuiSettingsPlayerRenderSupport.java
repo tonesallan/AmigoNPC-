@@ -2,6 +2,7 @@ package br.tones.amigonpc.core.ui.lvlgui;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.AmigoPersistence;
+import br.tones.amigonpc.core.CombatMode;
 import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.UUID;
@@ -34,8 +35,20 @@ final class AmigoLvlGuiSettingsPlayerRenderSupport {
          AmigoText.format("ui.settings.toggle.autoloot", AmigoText.onOff(settingsPending.autoLoot))
       );
       cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsDefenderToggle.Text",
-         AmigoText.format("ui.settings.toggle.defender", AmigoText.onOff(settingsPending.defender))
+         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsCombatProtectOwner.Text",
+         (settingsPending.combatMode == CombatMode.PROTECT_OWNER ? "(*) " : "( ) ") + AmigoText.text("ui.settings.combat.protect_owner")
+      );
+      cmd.set(
+         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsCombatWeakest.Text",
+         (settingsPending.combatMode == CombatMode.WEAKEST_ENEMY ? "(*) " : "( ) ") + AmigoText.text("ui.settings.combat.weakest")
+      );
+      cmd.set(
+         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAutoWeaponToggle.Text",
+         AmigoText.format("ui.settings.toggle.auto_weapon", AmigoText.onOff(settingsPending.autoWeaponSwitch))
+      );
+      cmd.set(
+         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsInterruptToggle.Text",
+         AmigoText.format("ui.settings.toggle.interrupt", AmigoText.onOff(settingsPending.interruptAttacks))
       );
       cmd.set(
          "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsHudToggle.Text",

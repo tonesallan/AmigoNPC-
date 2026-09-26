@@ -212,9 +212,39 @@ Group #RpgLvlLeaderboardPage {
 
             Group { Anchor: (Height: 6); }
 
-            $C.@TextButton #SettingsDefenderToggle {
+            Label #SettingsCombatModeTitle {
+              Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+              Text: "MODO DE COMBATE";
+              Padding: (Bottom: 6);
+            }
+
+            $C.@TextButton #SettingsCombatProtectOwner {
               Anchor: (Width: 640, Height: 35);
-              Text: "Defender: OFF";
+              Text: "(*) Foco em quem me ataca (combate em dupla)";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            $C.@TextButton #SettingsCombatWeakest {
+              Anchor: (Width: 640, Height: 35);
+              Text: "( ) Foco em inimigos frágeis";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 10); }
+
+            $C.@TextButton #SettingsAutoWeaponToggle {
+              Anchor: (Width: 640, Height: 35);
+              Text: "Troca automática de arma: ON";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            $C.@TextButton #SettingsInterruptToggle {
+              Anchor: (Width: 640, Height: 35);
+              Text: "Interromper ataques inimigos: ON";
               Style: @CustomButtonStyle;
             }
 

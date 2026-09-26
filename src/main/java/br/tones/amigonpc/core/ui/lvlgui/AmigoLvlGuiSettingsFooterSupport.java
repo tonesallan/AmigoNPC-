@@ -25,8 +25,18 @@ final class AmigoLvlGuiSettingsFooterSupport {
          changedAny = true;
       }
 
-      if (settingsPending.defender != settingsLive.defender) {
-         mgr.setDefendeEnabled(ownerId, settingsPending.defender);
+      if (settingsPending.combatMode != settingsLive.combatMode) {
+         mgr.setCombatMode(ownerId, settingsPending.combatMode);
+         changedAny = true;
+      }
+
+      if (settingsPending.autoWeaponSwitch != settingsLive.autoWeaponSwitch) {
+         mgr.setAutoWeaponSwitchEnabled(ownerId, settingsPending.autoWeaponSwitch);
+         changedAny = true;
+      }
+
+      if (settingsPending.interruptAttacks != settingsLive.interruptAttacks) {
+         mgr.setInterruptAttacksEnabled(ownerId, settingsPending.interruptAttacks);
          changedAny = true;
       }
 

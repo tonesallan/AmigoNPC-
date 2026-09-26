@@ -1,6 +1,7 @@
 package br.tones.amigonpc.core.ui.lvlgui;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
+import br.tones.amigonpc.core.CombatMode;
 import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.UUID;
@@ -19,8 +20,19 @@ final class AmigoLvlGuiSettingsStateSupport {
       }
 
       try {
-         s.defender = mgr.isDefendeEnabled(ownerId);
-      } catch (Throwable var7) {
+         s.combatMode = mgr.getCombatMode(ownerId);
+      } catch (Throwable ignored) {
+         s.combatMode = CombatMode.PROTECT_OWNER;
+      }
+
+      try {
+         s.autoWeaponSwitch = mgr.isAutoWeaponSwitchEnabled(ownerId);
+      } catch (Throwable ignored) {
+      }
+
+      try {
+         s.interruptAttacks = mgr.isInterruptAttacksEnabled(ownerId);
+      } catch (Throwable ignored) {
       }
 
       try {

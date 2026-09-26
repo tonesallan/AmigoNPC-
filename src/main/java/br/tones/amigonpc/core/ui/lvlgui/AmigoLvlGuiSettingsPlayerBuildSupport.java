@@ -8,7 +8,10 @@ final class AmigoLvlGuiSettingsPlayerBuildSupport {
 
    static void bind(UIEventBuilder events) {
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAutoLootToggle", "settings_toggle_autoloot");
-      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsDefenderToggle", "settings_toggle_defender");
+      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsCombatProtectOwner", "settings_combat_protect_owner");
+      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsCombatWeakest", "settings_combat_weakest");
+      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsAutoWeaponToggle", "settings_toggle_auto_weapon");
+      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsInterruptToggle", "settings_toggle_interrupt");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsHudToggle", "settings_toggle_hud");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsSpawnButton", "settings_spawn");
       AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsDespawnButton", "settings_despawn");
