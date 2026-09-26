@@ -49,6 +49,16 @@ public final class AmigoText {
       Map.entry("uk", "uk_ua"),
       Map.entry("vi", "vi_vn")
    );
+   private static final Map<String, String> EXTRA_DEFAULTS = Map.ofEntries(
+      Map.entry("ui.settings.combat.protect_owner", "Foco em quem me ataca (combate em dupla)"),
+      Map.entry("ui.settings.combat.weakest", "Foco em inimigos frágeis"),
+      Map.entry("ui.settings.toggle.auto_weapon", "Troca automática de arma: {0}"),
+      Map.entry("ui.settings.toggle.interrupt", "Interromper ataques inimigos: {0}"),
+      Map.entry("ui.settings.feedback.combat_protect_pending", "Modo de combate: proteger o jogador (pendente)"),
+      Map.entry("ui.settings.feedback.combat_weakest_pending", "Modo de combate: inimigo com menos vida (pendente)"),
+      Map.entry("ui.settings.feedback.auto_weapon_pending", "Troca automática de arma: {0} (pendente)"),
+      Map.entry("ui.settings.feedback.interrupt_pending", "Interromper ataques inimigos: {0} (pendente)")
+   );
    private static volatile String currentLocale = "pt_br";
 
    private AmigoText() {
@@ -75,7 +85,8 @@ public final class AmigoText {
             }
          }
 
-         return key;
+         String extra = EXTRA_DEFAULTS.get(key);
+         return extra != null ? extra : key;
       } else {
          return "";
       }
