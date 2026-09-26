@@ -10,6 +10,7 @@ import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
@@ -238,27 +239,16 @@ final class NpcAutoLootSupport {
                                     } catch (Throwable var56) {
                                     }
 
-                                    ItemStack collected = null;
-
+                                    ItemStackTransaction tx;
                                     try {
-                                       // Hytale's helper performs the container insertion itself.
-                                       // Its return value is the portion that was actually collected,
-                                       // not the remainder left on the ground.
-                                       collected = ItemComponent.addToItemContainer(store, itemRef, bag);
+                                       // Keep the ground entity untouched while this ECS chunk is being
+                                       // iterated. The backpack transaction tells us exactly what remains.
+                                       tx = bag.addItemStack(before);
                                     } catch (Throwable ignored) {
-                                       collected = null;
+                                       tx = null;
                                     }
 
-                                    int inserted = 0;
-                                    if (collected != null) {
-                                       try {
-                                          inserted = Math.max(0, collected.getQuantity());
-                                       } catch (Throwable ignored) {
-                                          inserted = 0;
-                                       }
-                                    }
-
-                                    if (inserted <= 0) {
+                                    if (tx == null || !tx.succeeded()) {
                                        if (checker.isFull(bag)) {
                                           rec.lootPausedInventoryFull = true;
                                           rec.nextLootFullRecheckMillis = now + 1000L;
@@ -269,11 +259,42 @@ final class NpcAutoLootSupport {
                                        continue;
                                     }
 
+                                    ItemStack remainder = null;
+                                    try {
+                                       remainder = tx.getRemainder();
+                                    } catch (Throwable ignored) {
+                                    }
+
+                                    int remQty = 0;
+                                    if (remainder != null && !remainder.isEmpty()) {
+                                       try {
+                                          remQty = Math.max(0, remainder.getQuantity());
+                                       } catch (Throwable ignored) {
+                                          remQty = beforeQty;
+                                       }
+                                    }
+
+                                    int inserted = Math.max(0, beforeQty - remQty);
+                                    if (inserted <= 0) {
+                                       continue;
+                                    }
+
                                     accumulator.add(rec, itemIdStr, inserted, now);
                                     picked[0]++;
                                     rec.backpackDirty = true;
                                     if (rec.nextBackpackSaveMillis <= now) {
                                        rec.nextBackpackSaveMillis = now + Math.max(100L, backpackSaveDebounceMs);
+                                    }
+
+                                    if (remQty > 0) {
+                                       try {
+                                          ic.setItemStack(remainder);
+                                          updateLaterRef.add(itemRef);
+                                          updateLaterComp.add(ic);
+                                       } catch (Throwable ignored) {
+                                       }
+                                    } else {
+                                       removeLater.add(itemRef);
                                     }
                                  }
                               }

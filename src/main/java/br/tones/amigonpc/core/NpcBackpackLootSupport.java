@@ -3,9 +3,11 @@ package br.tones.amigonpc.core;
 import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
 import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -149,26 +151,28 @@ final class NpcBackpackLootSupport {
          }
 
          try {
-            // Hytale performs the transfer and updates/removes the ground-item
-            // entity internally. The returned stack is the collected portion.
-            ItemStack collected = ItemComponent.addToItemContainer(store, itemRef, bag);
-            int inserted = 0;
-            if (collected != null) {
-               try {
-                  inserted = Math.max(0, collected.getQuantity());
-               } catch (Throwable ignored) {
-                  inserted = 0;
-               }
-            }
-
-            if (inserted <= 0) {
+            ItemStackTransaction tx = bag.addItemStack(before);
+            if (tx == null || !tx.succeeded()) {
                if (isBackpackCompletelyFull(bag)) {
                   rec.lootPausedInventoryFull = true;
                   rec.lootingActive = false;
                   fullBackpackNotifier.notify(rec, ownerId, rec.worldObj, System.currentTimeMillis());
                }
-
                return false;
+            }
+
+            ItemStack remainder = tx.getRemainder();
+            int remQty = remainder != null && !remainder.isEmpty() ? Math.max(0, remainder.getQuantity()) : 0;
+            int inserted = Math.max(0, beforeQty - remQty);
+            if (inserted <= 0) {
+               return false;
+            }
+
+            if (remQty > 0) {
+               ic.setItemStack(remainder);
+               store.putComponent(itemRef, ItemComponent.getComponentType(), ic);
+            } else if (itemRef.isValid()) {
+               store.removeEntity(itemRef, RemoveReason.REMOVE);
             }
 
             rec.backpackDirty = true;
