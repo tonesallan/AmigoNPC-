@@ -1565,8 +1565,14 @@ public final class AmigoNpcManager {
          }
 
          try {
+            this.saveNpcWardrobeNowInternal(ownerId);
+         } catch (Throwable ignored) {
+         }
+
+         try {
             if (rec.backpack != null) {
                AmigoPersistence.saveBackpack(ownerId, rec.backpack);
+               rec.backpackDirty = false;
             }
          } catch (Throwable ignored) {
          }
@@ -1582,32 +1588,70 @@ public final class AmigoNpcManager {
       }
 
       this.pendingRespawns.clear();
+
+      for (AmigoNpcManager.NpcRecord rec : records) {
+         this.removeNpcForReload(rec);
+      }
+
       this.debugLogByOwner.clear();
       this.npcRefPorPlayer.clear();
       this.amigoRefs.clear();
       WEAPON_ATTACK_ANIM_CACHE.clear();
       LAST_ERROR = null;
+   }
 
-      for (AmigoNpcManager.NpcRecord rec : records) {
-         if (rec == null || rec.worldObj == null || rec.refObj == null) {
-            continue;
+   private void removeNpcForReload(AmigoNpcManager.NpcRecord rec) {
+      if (rec == null || rec.worldObj == null || rec.refObj == null) {
+         return;
+      }
+
+      Object worldObj = rec.worldObj;
+      Object refObj = rec.refObj;
+
+      try {
+         if (worldObj instanceof World world && world.isInThread()) {
+            Object storeObj = getComponentStoreFromWorld(worldObj);
+            if (storeObj != null) {
+               doRemoveEntity(storeObj, refObj);
+            }
+            this.amigoRefs.remove(refObj);
+            rec.refObj = null;
+            return;
          }
+      } catch (Throwable ignored) {
+      }
 
-         Object worldObj = rec.worldObj;
-         Object refObj = rec.refObj;
-         try {
-            HytaleBridge.worldExecute(worldObj, () -> {
-               try {
-                  Object storeObj = getComponentStoreFromWorld(worldObj);
-                  if (storeObj != null) {
-                     doRemoveEntity(storeObj, refObj);
-                  }
-               } catch (Throwable ignored) {
+      CountDownLatch latch = new CountDownLatch(1);
+      boolean queued = false;
+      try {
+         queued = HytaleBridge.worldExecute(worldObj, () -> {
+            try {
+               Object storeObj = getComponentStoreFromWorld(worldObj);
+               if (storeObj != null) {
+                  doRemoveEntity(storeObj, refObj);
                }
-            });
-         } catch (Throwable ignored) {
-         }
+            } catch (Throwable ignored) {
+            } finally {
+               this.amigoRefs.remove(refObj);
+               if (rec.refObj == refObj) {
+                  rec.refObj = null;
+               }
+               latch.countDown();
+            }
+         });
+      } catch (Throwable ignored) {
+      }
 
+      if (queued) {
+         try {
+            latch.await(2000L, TimeUnit.MILLISECONDS);
+         } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+         }
+      }
+
+      this.amigoRefs.remove(refObj);
+      if (rec.refObj == refObj) {
          rec.refObj = null;
       }
    }
