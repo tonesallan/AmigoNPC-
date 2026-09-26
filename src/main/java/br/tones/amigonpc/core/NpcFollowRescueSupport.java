@@ -39,10 +39,19 @@ final class NpcFollowRescueSupport {
          boolean shouldRescue = NpcFollowMaintenanceSupport.shouldRescue(
             rec, now, horizontal, dy, inCombatOrAssist, ownerUnderground, undergroundTeleportDistance
          );
-         if (shouldRescue && NpcFollowMaintenanceSupport.beginRescue(rec, now, assistGraceMillis)) {
+         if (shouldRescue && NpcFollowMaintenanceSupport.beginRescue(rec, now, assistGraceMillis, inCombatOrAssist)) {
             teleportNearOwner(ownerPos, ownerTransform, npcTransform, yawExtractor, offsetInFrontResolver, vector3dCoercer);
-            reattachFollow(store, rec, ownerRefObj, npcEntityComponentType, componentGetter, lockedTargetSetter, markedTargetSetter);
-            debugLogger.log(rec, ownerId, "hardTeleport: h=" + String.format(Locale.US, "%.2f", horizontal) + " dy=" + String.format(Locale.US, "%.2f", dy));
+            if (!inCombatOrAssist) {
+               reattachFollow(store, rec, ownerRefObj, npcEntityComponentType, componentGetter, lockedTargetSetter, markedTargetSetter);
+            }
+
+            debugLogger.log(
+               rec,
+               ownerId,
+               (inCombatOrAssist ? "combatRescue" : "hardTeleport")
+                  + ": h=" + String.format(Locale.US, "%.2f", horizontal)
+                  + " dy=" + String.format(Locale.US, "%.2f", dy)
+            );
          }
       }
    }

@@ -84,7 +84,7 @@ final class NpcFollowMaintenanceSupport {
       return shouldRescue || horizontal > forcedTeleportDist;
    }
 
-   static boolean beginRescue(AmigoNpcManager.NpcRecord rec, long now, long assistGraceMillis) {
+   static boolean beginRescue(AmigoNpcManager.NpcRecord rec, long now, long assistGraceMillis, boolean inCombatOrAssist) {
       if (rec == null) {
          return false;
       }
@@ -94,6 +94,16 @@ final class NpcFollowMaintenanceSupport {
       }
 
       rec.lastTeleportMillis = now;
+      rec.targetLostSinceMillis = 0L;
+      rec.targetStuckSinceMillis = 0L;
+      rec.lastTargetHorizontal = -1.0;
+      rec.lastTargetSampleMillis = 0L;
+
+      if (inCombatOrAssist) {
+         rec.chaseDisengaged = false;
+         return true;
+      }
+
       rec.combatUntilMillis = 0L;
       rec.combatTargetRefObj = null;
       rec.npcCombatUntilMillis = 0L;
@@ -102,10 +112,6 @@ final class NpcFollowMaintenanceSupport {
       rec.assistTargetRefObj = null;
       rec.ownerCombatContextUntilMillis = 0L;
       rec.chaseDisengaged = true;
-      rec.targetLostSinceMillis = 0L;
-      rec.targetStuckSinceMillis = 0L;
-      rec.lastTargetHorizontal = -1.0;
-      rec.lastTargetSampleMillis = 0L;
       rec.currentTargetMobLevel = 0;
       rec.currentTargetMobUuid = null;
       return true;

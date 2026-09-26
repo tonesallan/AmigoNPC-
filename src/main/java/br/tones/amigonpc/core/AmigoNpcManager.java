@@ -155,7 +155,6 @@ public final class AmigoNpcManager {
    private static final long SPAWN_FX_FOLLOW_INTERVAL_MS = 180L;
    private static final long REGEN_DELAY_MS = 3000L;
    private static final float REGEN_RATE_PER_SECOND = 0.12F;
-   private static volatile String RESOLVED_BOW_ID;
 
    public static AmigoNpcManager getShared() {
       return SHARED;
@@ -3243,47 +3242,6 @@ public final class AmigoNpcManager {
    private static void setFlockState(Store<EntityStore> store, Object npcRefObj, String state, String subState) {
    }
 
-   private static String resolveDefaultBowId() {
-      String cached = RESOLVED_BOW_ID;
-      if (cached != null) {
-         return cached.isBlank() ? null : cached;
-      }
-
-      String found = null;
-      String[] candidates = new String[]{
-         "Weapon_Shortbow_Onyxium",
-         "Weapon_Shortbow",
-         "Weapon_Bow_Crude",
-         "Weapon_Bow_Wood",
-         "Weapon_Bow_Iron",
-         "Weapon_Bow_Steel",
-         "Weapon_Bow_Mithril",
-         "Weapon_Bow_Thorium",
-         "Weapon_Bow_Onyxium",
-         "Weapon_Bow",
-         "Weapon_Ranged_Bow"
-      };
-
-      try {
-         for (String id : candidates) {
-            try {
-               if (id != null && !id.isBlank()) {
-                  Item it = (Item)Item.getAssetMap().getAsset(id);
-                  if (it != null) {
-                     found = id;
-                     break;
-                  }
-               }
-            } catch (Throwable var8) {
-            }
-         }
-      } catch (Throwable var9) {
-      }
-
-      RESOLVED_BOW_ID = found == null ? "" : found;
-      return found;
-   }
-
    private static boolean isAirborneTarget(Store<EntityStore> store, Ref<EntityStore> targetRef, Vector3d npcPos) {
       try {
          if (store != null && targetRef != null && npcPos != null) {
@@ -3450,8 +3408,11 @@ public final class AmigoNpcManager {
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER ? (isOwnerAggressor || isAssist) : isAssist;
-         if (!authorized || rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
+         boolean ownerCombatContextActive = rec.ownerCombatContextUntilMillis > 0L && now <= rec.ownerCombatContextUntilMillis;
+         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER
+            ? ownerCombatContextActive && (isOwnerAggressor || isAssist)
+            : isAssist;
+         if (!authorized) {
             return;
          }
          boolean isAggressor = isOwnerAggressor;
@@ -3481,11 +3442,6 @@ public final class AmigoNpcManager {
 
          if (!NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
             rec.rangedBowReadyAtMillis = Math.max(rec.rangedBowReadyAtMillis, now + 200L);
-            return;
-         }
-
-         if (!NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
-            this.tryEquipDefaultBow(store, rec, now);
             return;
          }
 
@@ -3701,8 +3657,11 @@ public final class AmigoNpcManager {
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER ? (isOwnerAggressor || isAssist) : isAssist;
-         if (!authorized || rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
+         boolean ownerCombatContextActive = rec.ownerCombatContextUntilMillis > 0L && now <= rec.ownerCombatContextUntilMillis;
+         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER
+            ? ownerCombatContextActive && (isOwnerAggressor || isAssist)
+            : isAssist;
+         if (!authorized) {
             return;
          }
          boolean isAggressor = isOwnerAggressor;
