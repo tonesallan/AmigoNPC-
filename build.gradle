@@ -9,23 +9,61 @@ repositories {
     mavenCentral()
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+
+// Exact language bundle recovered from the preserved AmigoNPC 2.0.1 JAR.
+// Stored as Base64 text parts so the original ZIP bytes can be reproduced
+// without rewriting any translated .properties content.
+def recoveredLangParts = (1..8).collect {
+    file(String.format("recovery/resources/langzip.part%02d", it))
+}
+def recoveredLangZipOutput = layout.buildDirectory.file("recovery/AmigoNPC_LANG_ORIGINAL_2.0.1.zip")
+def recoveredLangZipSha256 = "2E6B76719EF21EB68C8B35D96ACA4EF85FC5E23F70750030199D85F11450D709"
+
+tasks.register("prepareRecoveredLangZip") {
+    inputs.files(recoveredLangParts)
+    outputs.file(recoveredLangZipOutput)
+
+    doLast {
+        def missing = recoveredLangParts.findAll { !it.exists() }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing recovered language resource parts: " + missing.join(", "))
+        }
+
+        def encoded = recoveredLangParts.collect { it.getText("UTF-8").trim() }.join("")
+        def bytes = java.util.Base64.getDecoder().decode(encoded)
+
+        def digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+        def actualSha256 = digest.collect { String.format("%02X", it & 0xff) }.join()
+
+        if (actualSha256 != recoveredLangZipSha256) {
+            throw new GradleException(
+                "Recovered language bundle checksum mismatch. Expected " +
+                recoveredLangZipSha256 + ", got " + actualSha256
+            )
+        }
+
+        def outZip = recoveredLangZipOutput.get().asFile
+        outZip.parentFile.mkdirs()
+        outZip.bytes = bytes
     }
 }
 
+tasks.named("processResources") {
+    dependsOn("prepareRecoveredLangZip")
 
-def recoveredLangZip = file("recovery/resources/AmigoNPC_LANG_ORIGINAL_2.0.1.zip")
-
-processResources {
-    if (recoveredLangZip.exists()) {
-        from(zipTree(recoveredLangZip)) {
-            eachFile { details ->
-                details.path = details.path.replace('\\\\', '/')
-            }
-            includeEmptyDirs = false
+    from({
+        zipTree(recoveredLangZipOutput.get().asFile)
+    }) {
+        eachFile { details ->
+            details.path = details.path.replace('\\', '/')
         }
+        includeEmptyDirs = false
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
