@@ -64,53 +64,44 @@ public final class AmigoCommand extends AbstractCommand {
       } catch (Throwable var12) {
       }
 
-      if (ctx.sender() instanceof Player player) {
-         try {
-            ActionTraceService.getShared().record(ctx.sender().getUuid(), "command", "/amigo");
-         } catch (Throwable var11) {
-         }
-
-         Ref<EntityStore> ref = player.getReference();
-         if (ref != null && ref.isValid()) {
-            Store<EntityStore> store = ref.getStore();
-            World world = null;
-
-            try {
-               if (store.getExternalData() instanceof EntityStore es) {
-                  world = es.getWorld();
-               }
-            } catch (Throwable var10) {
-            }
-
-            if (world == null) {
-               try {
-                  PlayerRef playerRef = (PlayerRef)store.getComponent(ref, PlayerRef.getComponentType());
-                  if (playerRef != null) {
-                     AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
-                  }
-               } catch (Throwable var9) {
-               }
-
-               return CompletableFuture.completedFuture(null);
-            } else {
-               World executor = world;
-               return CompletableFuture.runAsync(() -> {
-                  try {
-                     PlayerRef playerRef = (PlayerRef)store.getComponent(ref, PlayerRef.getComponentType());
-                     if (playerRef != null) {
-                        AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
-                     }
-                  } catch (Throwable var4x) {
-                  }
-               }, executor);
-            }
-         } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
-            return CompletableFuture.completedFuture(null);
-         }
-      } else {
+      Ref<EntityStore> ref = ctx.senderAsPlayerRef();
+      if (ref == null) {
          ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.only_players")));
          return CompletableFuture.completedFuture(null);
       }
+
+      if (!ref.isValid()) {
+         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+         return CompletableFuture.completedFuture(null);
+      }
+
+      try {
+         ActionTraceService.getShared().record(ctx.sender().getUuid(), "command", "/amigo");
+      } catch (Throwable ignored) {
+      }
+
+      Store<EntityStore> store = ref.getStore();
+      World world;
+      try {
+         world = store.getExternalData().getWorld();
+      } catch (Throwable ignored) {
+         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+         return CompletableFuture.completedFuture(null);
+      }
+
+      return CompletableFuture.runAsync(() -> {
+         try {
+            PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+            Player player = store.getComponent(ref, Player.getComponentType());
+            if (playerRef == null || player == null) {
+               ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+               return;
+            }
+
+            AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
+         } catch (Throwable ignored) {
+            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+         }
+      }, world);
    }
 }
