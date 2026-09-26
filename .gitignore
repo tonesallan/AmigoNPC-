@@ -8,10 +8,13 @@ out/
 .idea/
 *.iml
 .vscode/
+.classpath
+.project
+.settings/
+.nb-gradle/
 
-# Java
+# Java build products
 *.class
-*.jar
 
 # OS / editor
 .DS_Store

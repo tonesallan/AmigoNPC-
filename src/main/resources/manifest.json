@@ -1,8 +1,8 @@
 {
   "Group": "br.tones",
   "Name": "AmigoNPC",
-  "Version": "0.1.1",
-  "Description": "AmigoNPC - teste de carregamento e comando base.",
+  "Version": "1.0.1",
+  "Description": "AmigoNPC - NPC companheiro server-side para Hytale.",
   "Authors": [
     {
       "Name": "Tones Allan de Oliveira Alves",
