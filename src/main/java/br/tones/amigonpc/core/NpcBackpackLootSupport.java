@@ -3,12 +3,10 @@ package br.tones.amigonpc.core;
 import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
 import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
-import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
@@ -151,24 +149,18 @@ final class NpcBackpackLootSupport {
          }
 
          try {
-            ItemStack rem;
-            try {
-               rem = ItemComponent.addToItemContainer(store, itemRef, bag);
-            } catch (Throwable ignored) {
-               ItemStackTransaction tx = bag.addItemStack(before);
-               rem = tx != null ? tx.getRemainder() : null;
-            }
-
-            int remQty = 0;
-
-            try {
-               if (rem != null) {
-                  remQty = rem.getQuantity();
+            // Hytale performs the transfer and updates/removes the ground-item
+            // entity internally. The returned stack is the collected portion.
+            ItemStack collected = ItemComponent.addToItemContainer(store, itemRef, bag);
+            int inserted = 0;
+            if (collected != null) {
+               try {
+                  inserted = Math.max(0, collected.getQuantity());
+               } catch (Throwable ignored) {
+                  inserted = 0;
                }
-            } catch (Throwable var17) {
             }
 
-            int inserted = beforeQty - remQty;
             if (inserted <= 0) {
                if (isBackpackCompletelyFull(bag)) {
                   rec.lootPausedInventoryFull = true;
@@ -177,24 +169,17 @@ final class NpcBackpackLootSupport {
                }
 
                return false;
-            } else {
-               rec.backpackDirty = true;
-               long now = System.currentTimeMillis();
-               if (rec.nextBackpackSaveMillis <= now) {
-                  rec.nextBackpackSaveMillis = now + 500L;
-               }
-
-               if (rem != null && remQty > 0) {
-                  ic.setItemStack(rem);
-                  store.putComponent(itemRef, ItemComponent.getComponentType(), ic);
-               } else {
-                  store.removeEntity(itemRef, RemoveReason.REMOVE);
-               }
-
-               lootAccumulator.add(rec, itemId, inserted, now);
-               return true;
             }
-         } catch (Throwable var25) {
+
+            rec.backpackDirty = true;
+            long now = System.currentTimeMillis();
+            if (rec.nextBackpackSaveMillis <= now) {
+               rec.nextBackpackSaveMillis = now + 500L;
+            }
+
+            lootAccumulator.add(rec, itemId, inserted, now);
+            return true;
+         } catch (Throwable ignored) {
             return false;
          }
       }
