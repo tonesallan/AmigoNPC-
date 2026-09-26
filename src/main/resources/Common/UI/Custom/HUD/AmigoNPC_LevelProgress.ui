@@ -1,0 +1,26 @@
+Group #LevelProgressHud {
+  Anchor: (Bottom: 10, Width: 662, Height: 18);
+
+  Group {
+    Anchor: (Left: 0, Width: 662, Height: 18);
+    Background: "AmigoNPC_XPBackground.png";
+
+    ProgressBar #ProgressBar {
+      Anchor: (Width: 662, Height: 18);
+      BarTexturePath: "AmigoNPC_XPFill.png";
+      EffectTexturePath: "AmigoNPC_XPEffect.png";
+      Value: 0.0;
+    }
+
+    Label #LevelLabel {
+      Style: (
+        FontSize: 14,
+        TextColor: #000000,
+        RenderBold: true,
+        Alignment: Center
+      );
+      Anchor: (Left: 0, Top: 0, Width: 662, Height: 18);
+      Text: "LEVEL: 1 XP: 0 / 0";
+    }
+  }
+}

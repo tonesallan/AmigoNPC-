@@ -1,0 +1,1987 @@
+$C = "../Common.ui";
+
+@CustomButtonStyle = TextButtonStyle(
+  Default: (Background: $C.@DefaultSquareButtonDefaultBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Hovered: (Background: $C.@DefaultSquareButtonHoveredBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Pressed: (Background: $C.@DefaultSquareButtonPressedBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Disabled: (Background: $C.@DefaultSquareButtonDisabledBackground, LabelStyle: $C.@DefaultButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds,
+);
+
+Group #StatsPage {
+  LayoutMode: Top;
+  Padding: (Full: 0);
+
+  // BEGIN StatsHeader
+  Group #PlayerHeaderRow {
+    LayoutMode: Top;
+    Padding: (Top: 8, Bottom: 10);
+
+    Group #PlayerHeaderContainer { }
+
+    Label #AvailablePointsLabel {
+      Style: (
+        FontSize: 20,
+        TextColor: #ffffff,
+        RenderBold: true
+      );
+      Anchor: ();
+      Text: "Available Stat Points: 0";
+      Padding: (Top: 2, Bottom: 5);
+    }
+  }
+  // END StatsHeader
+
+Group #StatsList {
+Anchor: (Width: 720);
+FlexWeight: 1;
+LayoutMode: TopScrolling;
+Padding: (Left: 7, Top: 2, Right: 12, Bottom: 4);
+ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+// BEGIN StatsCards
+Group {
+  LayoutMode: Top;
+
+  // BEGIN StatsCardsSurvivalSection
+  // BEGIN StatsSurvivalHealthCard
+  Group #HealthGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #HealthIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #HealthIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #HealthAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Health";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #HealthPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #HealthPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #HealthPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #HealthValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #HealthValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0 HP";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #HealthValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #HealthDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #HealthDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #HealthDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #HealthIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #HealthIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsSurvivalHealthCard
+
+  // BEGIN StatsSurvivalStaminaCard
+  Group #StaminaGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+    Visible: false;
+
+    Group #StaminaIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #StaminaIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #StaminaAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Stamina";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #StaminaDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #StaminaDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #StaminaDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #StaminaIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #StaminaIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsSurvivalStaminaCard
+
+  // BEGIN StatsSurvivalStaminaRegenCard
+  Group #StaminaRegenDelayGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+    Visible: false;
+
+    Group #StaminaRegenDelayIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #StaminaRegenDelayIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #StaminaRegenDelayAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Stamina Regen Speed";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaRegenDelayPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaRegenDelayPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaRegenDelayPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaRegenDelayValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaRegenDelayValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0×";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaRegenDelayValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #StaminaRegenDelayDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #StaminaRegenDelayDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #StaminaRegenDelayDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #StaminaRegenDelayIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #StaminaRegenDelayIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsSurvivalStaminaRegenCard
+
+  // BEGIN StatsSurvivalStaminaConsumptionCard
+  Group #StaminaConsumptionGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+    Visible: false;
+
+    Group #StaminaConsumptionIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #StaminaConsumptionIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #StaminaConsumptionAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Stamina Consumption";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaConsumptionPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaConsumptionPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaConsumptionPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #StaminaConsumptionValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #StaminaConsumptionValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0%";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #StaminaConsumptionValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #StaminaConsumptionDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #StaminaConsumptionDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #StaminaConsumptionDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #StaminaConsumptionIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #StaminaConsumptionIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsSurvivalStaminaConsumptionCard
+  // END StatsCardsSurvivalSection
+
+  // BEGIN StatsCardsCombatSection
+  // BEGIN StatsCombatDefenseCard
+  Group #DefenseGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #DefenseIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #DefenseIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #DefenseAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Defense";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #DefensePoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #DefensePointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #DefensePointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #DefenseValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #DefenseValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0%";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #DefenseValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #DefenseDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #DefenseDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #DefenseDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #DefenseIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #DefenseIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsCombatDefenseCard
+
+  // BEGIN StatsCombatDamageCard
+  Group #DamageGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #DamageIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #DamageIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #DamageAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Damage";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #DamagePoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #DamagePointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #DamagePointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #DamageValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #DamageValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0%";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #DamageValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #DamageDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #DamageDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #DamageDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #DamageIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #DamageIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsCombatDamageCard
+
+  // BEGIN StatsCombatCriticalDamageCard
+  Group #CriticalDamageGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #CriticalDamageIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #CriticalDamageIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #CriticalDamageAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Critical Damage";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #CriticalDamagePoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #CriticalDamagePointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #CriticalDamagePointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #CriticalDamageValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #CriticalDamageValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0%";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #CriticalDamageValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #CriticalDamageDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #CriticalDamageDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #CriticalDamageDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #CriticalDamageIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #CriticalDamageIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsCombatCriticalDamageCard
+  // END StatsCardsCombatSection
+
+  // BEGIN StatsCardsResourcesSection
+  // BEGIN StatsResourcesManaCard
+  Group #ManaGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+    Visible: false;
+
+    Group #ManaIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #ManaIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #ManaAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Mana";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #ManaPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #ManaPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #ManaPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #ManaValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #ManaValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0 MP";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #ManaValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #ManaDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #ManaDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #ManaDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #ManaIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #ManaIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsResourcesManaCard
+
+  // BEGIN StatsResourcesAmmoCard
+  Group #AmmoGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+    Visible: false;
+
+    Group #AmmoIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #AmmoIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #AmmoAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Ammo";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #AmmoPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #AmmoPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #AmmoPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #AmmoValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #AmmoValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #AmmoValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #AmmoDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #AmmoDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #AmmoDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #AmmoIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #AmmoIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsResourcesAmmoCard
+
+  // BEGIN StatsResourcesOxygenCard
+  Group #OxygenGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #OxygenIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #OxygenIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #OxygenAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Oxygen";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #OxygenPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #OxygenPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #OxygenPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #OxygenValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #OxygenValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #OxygenValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #OxygenDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #OxygenDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #OxygenDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #OxygenIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #OxygenIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsResourcesOxygenCard
+  // END StatsCardsResourcesSection
+
+  // BEGIN StatsCardsGatheringSection
+  // BEGIN StatsGatheringMiningCard
+  Group #MiningGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #MiningIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #MiningIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #MiningAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Mining";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #MiningPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #MiningPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #MiningPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #MiningValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #MiningValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #MiningValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #MiningDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #MiningDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #MiningDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #MiningIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #MiningIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsGatheringMiningCard
+
+  // BEGIN StatsGatheringWoodcuttingCard
+  Group #WoodcuttingGroup {
+    Anchor: (Width: 680, Height: 86, Bottom: 3);
+    LayoutMode: Left;
+    Padding: (Full: 8);
+    Background: #1a1a1a(0.5);
+
+    Group #WoodcuttingIconContainer {
+      Anchor: (Width: 64, Height: 48);
+      LayoutMode: Left;
+      Group {
+        Anchor: (Width: 48, Height: 48);
+        Background: #3a3a3a;
+        Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+        Group {
+          Anchor: (Width: 44, Height: 44);
+          Background: (Color: #2a2a2a(0.8));
+          ItemIcon #WoodcuttingIcon {
+            Anchor: (Left: 2, Top: 2, Width: 40, Height: 40);
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Padding: (Left: 4, Right: 5);
+
+      Label #WoodcuttingAllocation {
+        Style: (
+          FontSize: 16,
+          TextColor: #ffffff,
+          RenderBold: true
+        );
+        Anchor: (Width: 340, Height: 20);
+        Text: "Woodcutting";
+        Padding: (Bottom: 2);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #WoodcuttingPoints {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Points: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #WoodcuttingPointsNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #WoodcuttingPointsPending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Width: 340);
+
+        Label #WoodcuttingValue {
+          Style: (FontSize: 12, TextColor: #b8c4d0, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "Value: ";
+          Padding: (Bottom: 2, Right: 2);
+        }
+
+        Label #WoodcuttingValueNum {
+          Style: (FontSize: 12, TextColor: #e8c030, RenderBold: false);
+          Anchor: (Height: 16);
+          Text: "0";
+          Padding: (Bottom: 2, Right: 4);
+        }
+
+        Label #WoodcuttingValuePending {
+          Style: (FontSize: 12, TextColor: #90ee90, RenderBold: true);
+          Anchor: (Height: 16);
+          Text: "";
+          Padding: (Bottom: 2);
+          Visible: false;
+        }
+      }
+
+      Label #WoodcuttingDescription {
+        Style: (
+          FontSize: 12,
+          TextColor: #b0b8c0,
+          RenderBold: false
+        );
+        Anchor: (Width: 340);
+        Text: "";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Padding: (Left: 0, Right: 0);
+
+      $C.@CancelTextButton #WoodcuttingDecrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-5";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@CancelTextButton #WoodcuttingDecrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "-1";
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Width: 10, Height: 35);
+      }
+
+      $C.@TextButton #WoodcuttingIncrement1 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+1";
+        Style: @CustomButtonStyle;
+      }
+
+      Group {
+        Anchor: (Width: 5, Height: 35);
+      }
+
+      $C.@TextButton #WoodcuttingIncrement5 {
+        Anchor: (Width: 50, Height: 35);
+        Padding: (Left: 4, Right: 4, Top: 2, Bottom: 2);
+        Text: "+5";
+        Style: @CustomButtonStyle;
+        Visible: false;
+      }
+    }
+  }
+  // END StatsGatheringWoodcuttingCard
+  // END StatsCardsGatheringSection
+
+}
+// END StatsCards
+      }
+
+// BEGIN StatsFooter
+Label #ErrorLabel {
+Style: (
+  FontSize: 16,
+  TextColor: #ff0000,
+  RenderBold: true
+);
+Anchor: ();
+Text: "";
+Padding: (Top: 5);
+      }
+
+Group {
+  LayoutMode: Left;
+
+Group #ResetStatsGroup {
+  LayoutMode: Left;
+  Visible: true;
+
+  $C.@CancelTextButton #ResetStatsButton {
+    Anchor: (Width: 120, Height: 40);
+    Text: "RESET ALL";
+    Padding: (Left: 8, Right: 8, Top: 4, Bottom: 4);
+  }
+
+  Label #ResetPointsCount {
+    Style: (FontSize: 14, TextColor: #e8e8e8, RenderBold: true);
+    Anchor: (Left: 8, Top: 12);
+    Text: "x0";
+  }
+      }
+
+Group {
+  FlexWeight: 1;
+}
+
+$C.@CancelTextButton #CancelButton {
+  Anchor: (Width: 100, Height: 40);
+  Text: "Cancel";
+  Padding: (Left: 8, Right: 8, Top: 4, Bottom: 4);
+  Visible: false;
+}
+
+$C.@TextButton #SaveButton {
+  Anchor: (Left: 10, Width: 100, Height: 40);
+  Text: "Save";
+  Padding: (Left: 8, Right: 8, Top: 4, Bottom: 4);
+  Style: @CustomButtonStyle;
+  Visible: false;
+}
+      }
+// END StatsFooter
+}

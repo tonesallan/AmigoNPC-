@@ -1,3620 +1,2627 @@
 package br.tones.amigonpc.core;
 
+import br.tones.amigonpc.api.NpcXpContext;
+import br.tones.amigonpc.api.NpcXpSource;
+import br.tones.amigonpc.api.events.NpcExperienceGainedEvent;
+import br.tones.amigonpc.api.events.NpcLevelUpEvent;
+import br.tones.amigonpc.core.debug.ActionTraceService;
+import br.tones.amigonpc.core.debug.DebugVec3;
+import br.tones.amigonpc.core.debug.NpcDebugSnapshot;
+import br.tones.amigonpc.core.debug.NpcDebugSnapshotSupport;
+import br.tones.amigonpc.core.events.AmigoEventBus;
+import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
+import br.tones.amigonpc.core.i18n.AmigoText;
+import br.tones.amigonpc.core.npcstats.AttributeModifierService;
+import br.tones.amigonpc.core.npcstats.NpcStatsConfigService;
+import br.tones.amigonpc.core.npcstats.NpcStatsService;
+import br.tones.amigonpc.core.npcstats.NpcStatsState;
+import br.tones.amigonpc.core.optional.AmigoWardrobePersistence;
+import br.tones.amigonpc.core.progress.NpcLevelProgressSnapshot;
+import br.tones.amigonpc.core.progress.NpcProgressionSupport;
+import br.tones.amigonpc.core.progress.StatScaling;
+import br.tones.amigonpc.core.progress.XpProgression;
+import br.tones.amigonpc.core.rpgleveling.stage1.RpgLevelingStage1Config;
+import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1Formulas;
+import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1MobLevelCalculator;
+import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1MobLevelHelper;
+import br.tones.amigonpc.core.ui.lvlgui.AmigoLvlGuiService;
+import br.tones.amigonpc.core.zones.AmigoZonesConfigService;
+import br.tones.amigonpc.core.zones.MobLevelVarianceCalculator;
+import br.tones.amigonpc.core.zones.ZoneMobService;
+import br.tones.amigonpc.core.zones.ZoneModel;
+import com.hypixel.hytale.component.Archetype;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Holder;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.AnimationSlot;
+import com.hypixel.hytale.protocol.Color;
+import com.hypixel.hytale.protocol.ItemAnimation;
+import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.itemanimation.config.ItemPlayerAnimations;
+import com.hypixel.hytale.server.core.asset.type.particle.config.WorldParticle;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
+import com.hypixel.hytale.server.core.entity.AnimationUtils;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
+import com.hypixel.hytale.server.core.modules.entity.component.ActiveAnimationComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.RespondToHit;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage.EntitySource;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage.Particles;
+import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
+import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
+import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier.ModifierTarget;
+import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier.CalculationType;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
-import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.ComponentAccessor;
-import com.hypixel.hytale.component.Archetype;
-import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
-import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.PickupItemComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.PreventPickup;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
-import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
-import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
-import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
-
-import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
-import com.hypixel.hytale.server.core.modules.entity.component.ActiveAnimationComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
-import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.RespondToHit;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.entity.AnimationUtils;
-import com.hypixel.hytale.server.core.inventory.InventoryComponent;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
-import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
-import com.hypixel.hytale.server.core.asset.type.item.config.Item;
-import com.hypixel.hytale.server.core.asset.type.itemanimation.config.ItemPlayerAnimations;
-
-import br.tones.amigonpc.core.swords.SwordMessages;
-import br.tones.amigonpc.core.swords.SwordProgression;
-import br.tones.amigonpc.core.progress.XpProgression;
-import br.tones.amigonpc.core.progress.StatScaling;
-import com.hypixel.hytale.protocol.AnimationSlot;
-import com.hypixel.hytale.protocol.ItemAnimation;
-import com.hypixel.hytale.protocol.MovementStates;
-import com.hypixel.hytale.math.shape.Box;
-import org.joml.Vector3d;
-
-/**
- * 1 NPC por player.
- *
- * Spawn VISÍVEL: usa NPCPlugin.spawnNPC(Store,...), que já cria a entidade com setup/modelo correto.
- * Despawn: remove pelo Store.removeEntity(ref, RemoveReason.*).
- *
- * Tudo por reflexão pra aguentar variação de build.
- *
- * CORREÇÃO PRINCIPAL:
- * - world.execute(...) pode executar no próximo tick.
- * - NÃO aguardar latch/timeout, pois o spawn pode acontecer e o plugin "achar que falhou"
- *   (não registra ref) -> duplica e não consegue despawn.
- *
- * Solução:
- * - registrar SPAWNING no map ANTES de enfileirar
- * - quando executar, preencher ref e virar ACTIVE
- * - se pedir despawn durante spawn, marcar DESPAWNING e remover assim que tiver ref
- */
 public final class AmigoNpcManager {
+   private static final AmigoNpcManager SHARED = new AmigoNpcManager();
+   private static final String DEFAULT_MODEL_ID = "PlayerTestModel_V";
+   private static final double DEFAULT_MODEL_SCALE = 1.0;
+   private static final String DEFAULT_ROLE_NAME = "Amigo_Follow";
+   private static final boolean DEBUG_COMBAT_DEFAULT = false;
+   private static final Map<String, String> WEAPON_ATTACK_ANIM_CACHE = new ConcurrentHashMap<>();
+   private final Map<UUID, AmigoNpcManager.NpcRecord> npcRefPorPlayer = new ConcurrentHashMap<>();
+   private final Map<UUID, Boolean> debugLogByOwner = new ConcurrentHashMap<>();
+   private final Map<UUID, PendingRespawn> pendingRespawns = new ConcurrentHashMap<>();
+   private final Map<Object, UUID> amigoRefs = new ConcurrentHashMap<>();
+   private static volatile String LAST_ERROR;
+   private volatile boolean pvpEnabled = false;
+   private static final long COMBAT_WINDOW_MILLIS = 3000L;
+   private static final long ASSIST_GRACE_MILLIS = 3000L;
+   private static final long MELEE_COOLDOWN_MILLIS = 850L;
+   private static final double DEFENDER_AUTO_ACQUIRE_RADIUS = 12.0;
+   private static final double DEFENDER_AUTO_ACQUIRE_MAX_DY = 2.5;
+   private static final double CHASE_MAX_DISTANCE = 30.0;
+   private static final double CHASE_REACQUIRE_DISTANCE = 10.0;
+   private static final double RANGED_AIR_MAX_DISTANCE = 20.0;
+   private static final double RANGED_AIR_MAX_DY = 35.0;
+   private static final long RANGED_COOLDOWN_MILLIS = 1150L;
+   private static final long LEVEL_UP_FX_MILLIS = 1000L;
+   private static final long LEVEL_UP_FX_TICK_MILLIS = 250L;
+   private static final double AUTOLOOT_RADIUS = 5.0;
+   private static final double AUTOLOOT_OWNER_RADIUS = 20.0;
+   private static final long AUTOLOOT_INTERVAL_MS = 250L;
+   private static final int AUTOLOOT_MAX_ITEMS_PER_SCAN = 8;
+   private static final long AUTOLOOT_FULL_MSG_COOLDOWN_MS = 30000L;
+   private static final Archetype<EntityStore> AUTOLOOT_QUERY = Archetype.of(
+      new ComponentType[]{TransformComponent.getComponentType(), ItemComponent.getComponentType()}
+   );
+   private static final long BACKPACK_SAVE_DEBOUNCE_MS = 400L;
+   private static final long UNDERGROUND_CHECK_INTERVAL_MS = 500L;
+   private static final int UNDERGROUND_CEILING_SCAN_BLOCKS = 12;
+   private static final double UNDERGROUND_TELEPORT_DISTANCE = 10.0;
+   private static final String LOCKED_TARGET_CLOSE_SLOT = "LockedTargetClose";
+   private static final double LOOTING_NO_ENEMY_RADIUS = 4.0;
+   private static final double LOOT_TAG_SCAN_RADIUS = 6.0;
+   private static final double LOOT_PICKUP_DISTANCE = 5.0;
+   private static final String LOOT_CHAT_TEMPLATE = "{quantidade} {item} Coletado.";
+   private static final long LOOT_CHAT_SUMMARY_DELAY_MS = 500L;
+   private static final long COMBAT_TAG_CLEAR_MS = 25000L;
+   private static final double COMBAT_TAG_CLEAR_DISTANCE = 25.0;
+   private static final long LOOT_SKIP_RETRY_MS = 4000L;
+   private static final long LOOT_TARGET_TIMEOUT_MS = 12000L;
+   private static final long LOOT_POST_COMBAT_STICK_MS = 500L;
+   private static final int COMBAT_TAG_MAX = 16;
+   private static final int LOOT_PENDING_MAX = 512;
+   private static final long XP_PER_HIT = 0L;
+   private static final long XP_PER_KILL = 40L;
+   private static final RpgLevelingStage1Config RPG_STAGE1_CFG = new RpgLevelingStage1Config();
+   private static final RpgStage1MobLevelCalculator RPG_STAGE1_MOB_CALC = new RpgStage1MobLevelCalculator(RPG_STAGE1_CFG);
+   private static final long SPAWN_FX_FOLLOW_MS = 1800L;
+   private static final long SPAWN_FX_FOLLOW_INTERVAL_MS = 180L;
+   private static final long REGEN_DELAY_MS = 3000L;
+   private static final float REGEN_RATE_PER_SECOND = 0.12F;
+   private static volatile String RESOLVED_BOW_ID;
 
-    private static final AmigoNpcManager SHARED = new AmigoNpcManager();
-    public static AmigoNpcManager getShared() { return SHARED; }
+   public static AmigoNpcManager getShared() {
+      return SHARED;
+   }
 
-    // Modelo padrão fixo conforme solicitado (passivo + Wraith)
-    private static final String DEFAULT_MODEL_ID = "Wraith";
-    private static final double DEFAULT_MODEL_SCALE = 1.0;
-    // Role padrão: manter passivo e compatível com qualquer build.
-    // (Alguns servidores carregam apenas o .jar e NÃO montam asset-pack do mod,
-    // então não dependemos de Role custom aqui.)
-    private static final String DEFAULT_ROLE_NAME = "Amigo_Follow";
+   public static boolean saveNpcWardrobeNow(UUID ownerId) {
+      try {
+         return SHARED.saveNpcWardrobeNowInternal(ownerId);
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
 
-    // Debug de combate/equip (use false para desligar logs)
-    private static final boolean DEBUG_COMBAT_DEFAULT = false;
+   public NpcDebugSnapshot getNpcDebugSnapshot(UUID ownerId) {
+      String ownerUuid = ownerId != null ? String.valueOf(ownerId) : null;
+      NpcDebugSnapshot s = new NpcDebugSnapshot();
+      s.ownerUuid = ownerUuid;
+      if (ownerId == null) {
+         return NpcDebugSnapshotSupport.emptySnapshot(ownerUuid, "NONE");
+      }
 
-    // Cache: resolve chave de animação de ataque por arma (best-effort via ItemPlayerAnimations)
-    private static final Map<String, String> WEAPON_ATTACK_ANIM_CACHE = new ConcurrentHashMap<>();
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null) {
+         return NpcDebugSnapshotSupport.emptySnapshot(ownerUuid, "MISSING");
+      }
 
-    private enum State { SPAWNING, ACTIVE, DESPAWNING }
+      s.hasRecord = true;
+      s.hasNpcRef = rec.refObj != null;
+      s.state = rec.state != null ? rec.state.name() : "UNKNOWN";
+      s.downed = rec.downed;
+      s.downedUntilMillis = rec.downedUntilMillis;
+      s.deathDespawnAtMillis = rec.deathDespawnAtMillis;
+      s.npcLevel = rec.npcLevelCached;
+      s.totalXp = rec.totalXp;
+      s.xpRemainder = rec.stage1XpRemainder;
+      s.inCombatRecently = rec.wasInCombat;
+      s.lastCombatTagMillis = rec.lastCombatTagMillis;
+      s.lastCombatEndMillis = rec.lastCombatEndMillis;
+      s.lootingActive = rec.lootingActive;
+      s.lootStickUntilMillis = rec.lootStickUntilMillis;
+      s.regenStartAtMillis = rec.regenStartAtMillis;
+      s.regenLastApplyMillis = rec.regenLastApplyMillis;
+      s.regenActive = rec.regenStartAtMillis > 0L;
+      s.lootPausedInventoryFull = rec.lootPausedInventoryFull;
+      s.lastOwnerPos = vec(rec.lastOwnerPos);
+      s.lastNpcPos = vec(rec.lastNpcPos);
+      s.lastBattleCenter = vec(rec.lastBattleCenter);
+      NpcDebugSnapshotSupport.populateBackpackSummary(s, rec.backpack);
+      return s;
+   }
 
-    private static final class NpcRecord {
-        final Object worldObj;
-        final UUID ownerId;
-        volatile Object refObj;  // null enquanto spawnando
-        volatile State state;
+   private static DebugVec3 vec(Vector3d v) {
+      return NpcDebugSnapshotSupport.toVec3(v);
+   }
 
-        // Vida real / DOWNED
-        volatile boolean downed;
-        volatile long downedUntilMillis;
+   private boolean saveNpcWardrobeNowInternal(UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      }
 
-        // Persistência (1 arquivo por player): mochila 45 slots
-        volatile SimpleItemContainer backpack;
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null || rec.worldObj == null || !(rec.refObj instanceof Ref)) {
+         return false;
+      }
 
-        // Auto-loot (passivo): coleta itens dropados num raio curto
-        volatile long nextAutoLootMillis;
-        volatile boolean lootPausedInventoryFull;
-        volatile long nextLootFullRecheckMillis;
-        volatile long nextLootFullMsgMillis;
-        volatile boolean backpackDirty;
-        volatile long nextBackpackSaveMillis;
+      if (this.executeWardrobeSaveNow(rec, ownerId)) {
+         return true;
+      }
 
+      CountDownLatch latch = new CountDownLatch(1);
+      boolean[] result = new boolean[]{false};
+      boolean queued = HytaleBridge.worldExecute(rec.worldObj, () -> {
+         try {
+            result[0] = this.executeWardrobeSaveNow(rec, ownerId);
+         } finally {
+            latch.countDown();
+         }
+      });
+      if (!queued) {
+         return false;
+      }
 
-// Loot pós-combate: combat tags (anti-roubo) + LOOTING correndo até o item
-final java.util.ArrayList<CombatTag> combatTags = new java.util.ArrayList<>();
-volatile long lastCombatEndMillis;
-volatile long lastCombatTagMillis;
-volatile Vector3d lastBattleCenter;
-volatile boolean wasInCombat;
-volatile boolean lootingActive;
-volatile Object lootTargetRefObj;
-volatile long lootTargetSinceMillis;
-final java.util.ArrayList<Object> pendingLootRefObjs = new java.util.ArrayList<>();
-final java.util.Map<Object, Long> lootProcessedUntil = new java.util.concurrent.ConcurrentHashMap<>();
+      try {
+         latch.await(400L, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException ignored) {
+         Thread.currentThread().interrupt();
+      }
 
+      return result[0];
+   }
 
-        
-// Loot chat summary (reduz poluição): acumula quantidades e envia após um pequeno atraso
-final java.util.Map<String, Integer> lootChatAcc = new java.util.LinkedHashMap<>();
-volatile long lootChatSendAtMillis;
-// XP/nível (simples, etapa inicial)
-        volatile int level = 1;
-        volatile String equippedWeaponId;
-        volatile double xpInLevel = 0.0; // progresso dentro do nível atual
+   private boolean executeWardrobeSaveNow(AmigoNpcManager.NpcRecord rec, UUID ownerId) {
+      if (rec != null && ownerId != null && rec.worldObj != null && rec.refObj instanceof Ref<?> npcRefRaw) {
+         try {
+            if (getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> storeRaw) {
+               Store<EntityStore> store = (Store<EntityStore>)storeRaw;
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
+               return AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+            } else {
+               return false;
+            }
+         } catch (Throwable ignored) {
+            return false;
+         }
+      } else {
+         return false;
+      }
+   }
 
-        // Progressão do NPC (XP acumulativa + level calculado)
-        volatile long totalXp = 0L;
-        volatile int npcLevelCached = 1;
+   private static void armWardrobeRestoreRetry(AmigoNpcManager.NpcRecord rec, UUID ownerId) {
+      if (rec != null && ownerId != null) {
+         boolean hasSaved = false;
 
-        // Stats base (capturados 1x) para scaling (HP/DEF)
-        volatile long baseHp = -1L;
-        volatile long baseDef = -1L;
+         try {
+            hasSaved = AmigoWardrobePersistence.hasSavedCosmetics(ownerId);
+         } catch (Throwable var4) {
+         }
 
-        // Aparência opcional (model spawn via spawnEntity)
-        volatile String modelId;
-        volatile double modelScale;
+         rec.wardrobeRestorePending = hasSaved;
+         rec.wardrobeRestoreAttempts = 0;
+         rec.nextWardrobeRestoreMillis = hasSaved ? 0L : Long.MAX_VALUE;
+      }
+   }
 
-        // Re-spawn automático (ex.: teleport do dono)
-        volatile boolean respawnRequested;
-        volatile Object respawnWorldObj;
-        volatile Object respawnSenderObj;
-        volatile long respawnAtMillis;
-        volatile String respawnMessage;
+   private static void clearWardrobeRestoreRetry(AmigoNpcManager.NpcRecord rec) {
+      if (rec != null) {
+         rec.wardrobeRestorePending = false;
+         rec.wardrobeRestoreAttempts = 0;
+         rec.nextWardrobeRestoreMillis = Long.MAX_VALUE;
+      }
+   }
 
-        // Follow/anim: suavização para evitar "correndo parado" e ficar colado
-        volatile long lastMoveToMillis;
-        volatile long lastSampleMillis;
-        volatile Vector3d lastMoveTarget;
-        volatile long lastMoveIssuedMillis;
-        volatile Vector3d lastOwnerPos;
-        volatile Vector3d lastNpcPos;
-        volatile long lastNpcMovedMillis;
-        volatile long lastTeleportMillis;
-        long farSinceMillis;
+   private static void tickWardrobeRestore(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
+      if (store != null && rec != null && rec.wardrobeRestorePending) {
+         if (rec.refObj instanceof Ref<?> npcRefRaw && ownerRefObj instanceof Ref<?> ownerRefRaw) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
+               if (rec.nextWardrobeRestoreMillis <= now) {
+                  boolean restored = false;
 
-        // Combate corpo a corpo (cooldown simples)
-        volatile long lastMeleeAttackMillis;
+                  try {
+                     Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
+                     Ref<EntityStore> ownerRef = (Ref<EntityStore>)ownerRefRaw;
+                     restored = AmigoWardrobePersistence.restoreNpcWardrobe(rec.ownerId, store, ownerRef, npcRef);
+                  } catch (Throwable var10) {
+                  }
 
-        // Reposicionamento em combate (best-effort, para mobs altos)
-        volatile long lastCombatNudgeMillis;
+                  rec.wardrobeRestoreAttempts++;
+                  if (restored) {
+                     clearWardrobeRestoreRetry(rec);
+                  } else if (rec.wardrobeRestoreAttempts >= 12) {
+                     clearWardrobeRestoreRetry(rec);
+                  } else {
+                     rec.nextWardrobeRestoreMillis = now + 250L;
+                  }
+               }
+            }
+         }
+      }
+   }
 
-        // "Aggro pulse": tenta fazer o inimigo mirar no NPC também
-        volatile long lastAggroPulseMillis;
+   private static long coerceStage1XpGainToLong(AmigoNpcManager.NpcRecord rec, double xpGainDouble) {
+      if (rec == null) {
+         return 0L;
+      }
 
-        // Animação de ataque (limpeza best-effort para não travar na pose)
-        volatile String lastAttackAnimId;
-        volatile long clearAttackAnimAtMillis;
+      if (xpGainDouble > 0.0 && !Double.isNaN(xpGainDouble) && !Double.isInfinite(xpGainDouble)) {
+         double rem = rec.stage1XpRemainder;
+         if (Double.isNaN(rem) || Double.isInfinite(rem) || rem < 0.0) {
+            rem = 0.0;
+         }
 
-        // Debug (rate limit)
-        volatile long debugNextEquipMillis;
-        volatile long debugNextCombatMillis;
-        volatile long debugNextAttackMillis;
+         double sum = xpGainDouble + rem;
+         long whole = (long)Math.floor(sum);
+         double newRem = sum - whole;
+         if (!(newRem >= 0.0) || Double.isNaN(newRem) || Double.isInfinite(newRem)) {
+            newRem = 0.0;
+         }
 
-        // idle look-around (sutil)
-        volatile float idleLookYawOffset;
-        volatile long idleLookNextMillis;
+         rec.stage1XpRemainder = newRem;
+         return Math.max(0L, whole);
+      } else {
+         return 0L;
+      }
+   }
 
-        // Combate (etapa inicial): quando o dono sofre dano, o NPC troca o LockedTarget
-        // para o agressor por alguns segundos, depois volta a seguir.
-        volatile Object combatTargetRefObj;
-        volatile long combatUntilMillis;
+   public String getLastError() {
+      return LAST_ERROR;
+   }
 
-        // Assistência: alvo do primeiro ataque do player (apenas quando defender ON e sem agressor)
-        volatile Object assistTargetRefObj;
-        volatile long assistUntilMillis;
+   private static void setError(String msg) {
+      LAST_ERROR = msg;
+   }
 
-        // Target lost / stuck (para não ficar parado esperando o mob voltar)
-        volatile long targetLostSinceMillis;
-        volatile long targetStuckSinceMillis;
-        volatile double lastTargetHorizontal = -1.0;
-        volatile long lastTargetSampleMillis;
+   public boolean isPvpEnabled() {
+      return this.pvpEnabled;
+   }
 
-        // Controle de perseguição: quando estoura o limite de chase, só volta a adquirir alvo
-        // ao retornar perto do dono (evita o NPC "sumir" longe e ficar trocando alvo).
-        volatile boolean chaseDisengaged;
+   public void setPvpEnabled(boolean enabled) {
+      this.pvpEnabled = enabled;
 
-        // Estado do Role (para permitir follow diferente em combate)
+      try {
+         AmigoPersistence.savePvpEnabledGlobal(enabled);
+      } catch (Throwable var3) {
+      }
+   }
 
+   public boolean isDefendeEnabled(UUID owner) {
+      if (owner == null) {
+         return false;
+      }
 
-        // Flags de comportamento (alguns comandos antigos dependem disso)
-        volatile boolean defendeEnabled;
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+      return rec != null ? rec.defendeEnabled : AmigoPersistence.loadDefenderEnabled(owner);
+   }
 
-        // Auto-loot (toggle via /autoloot)
-        volatile boolean autoLootEnabled = true;
-
-        // Log de debug no chat (/amigo log)
-        volatile boolean debugLogEnabled;
-
-        NpcRecord(Object worldObj, UUID ownerId, Object refObj, State state) {
-            this.worldObj = worldObj;
-            this.ownerId = ownerId;
-            this.refObj = refObj;
-            this.state = state;
-            this.debugLogEnabled = DEBUG_COMBAT_DEFAULT;
-        }
-    }
-
-    private static final class PendingRespawn {
-        final Object worldObj;
-        final Object senderObj;
-        final long atMillis;
-        final String message;
-
-        PendingRespawn(Object worldObj, Object senderObj, long atMillis, String message) {
-            this.worldObj = worldObj;
-            this.senderObj = senderObj;
-            this.atMillis = atMillis;
-            this.message = message;
-        }
-    }
-
-
-private static final class CombatTag {
-    final Object targetRefObj;
-    Vector3d pos;
-    long lastSeenMillis;
-
-    CombatTag(Object targetRefObj, Vector3d pos, long lastSeenMillis) {
-        this.targetRefObj = targetRefObj;
-        this.pos = pos;
-        this.lastSeenMillis = lastSeenMillis;
-    }
-}
-
-    private final Map<UUID, NpcRecord> npcRefPorPlayer = new ConcurrentHashMap<>();
-    private final Map<UUID, Boolean> debugLogByOwner = new ConcurrentHashMap<>();
-    private final Map<UUID, PendingRespawn> pendingRespawns = new ConcurrentHashMap<>();
-    // Set rápido para identificar o NPC do Amigo em eventos (ex.: Damage)
-    private final Map<Object, UUID> amigoRefs = new ConcurrentHashMap<>();
-    private static volatile String LAST_ERROR;
-
-    // PvP entre NPCs (controlado por /amigopvp on|off – admin)
-    private volatile boolean pvpEnabled = false;
-
-    // Janela de combate (tuning): 3s, renovada por sinais de combate
-    private static final long COMBAT_WINDOW_MILLIS = 3_000L;
-    private static final long ASSIST_GRACE_MILLIS = 3_000L;
-    // Cooldown base (o real é calculado por estilo agressivo/defensivo)
-    private static final long MELEE_COOLDOWN_MILLIS = 850L;
-    // Auto-aquisicao de alvo quando Defender esta ON (sem precisar do player dar hit)
-    private static final double DEFENDER_AUTO_ACQUIRE_RADIUS = 12.0; // blocos (horizontal)
-    private static final double DEFENDER_AUTO_ACQUIRE_MAX_DY = 2.5;  // tolerancia vertical
-
-    // Limite de perseguição: se o NPC se afastar demais do dono, ele desiste e volta.
-    private static final double CHASE_MAX_DISTANCE = 15.0;
-    // Após desistir, só volta a adquirir alvo quando estiver perto do dono.
-    private static final double CHASE_REACQUIRE_DISTANCE = 10.0;
-
-    // Auto-loot passivo (raio fixo)
-    private static final double AUTOLOOT_RADIUS = 3.0;
-    private static final double AUTOLOOT_OWNER_RADIUS = 20.0; // barreira simples para nao sugar loot de outros players
-    private static final long AUTOLOOT_INTERVAL_MS = 250L;
-    private static final int AUTOLOOT_MAX_ITEMS_PER_SCAN = 8;
-    private static final long AUTOLOOT_FULL_MSG_COOLDOWN_MS = 30_000L;
-    private static final Archetype<EntityStore> AUTOLOOT_QUERY = Archetype.of(
-            TransformComponent.getComponentType(),
-            ItemComponent.getComponentType()
-    );
-
-    // Debounce de persistência da mochila quando itens são inseridos rapidamente.
-    private static final long BACKPACK_SAVE_DEBOUNCE_MS = 400L;
-
-    
-// =========================================================
-// Loot pós-combate (combat tag) — LOOTING correndo até o item
-// =========================================================
-// Só entra em LOOTING quando não há inimigo muito próximo do NPC.
-private static final double LOOTING_NO_ENEMY_RADIUS = 4.0;
-// Raio para considerar drops "do combate" ao redor de cada combat tag.
-private static final double LOOT_TAG_SCAN_RADIUS = 6.0;
-// Distância para efetivar o pickup (chegou perto do item).
-// Um pouco maior para compensar o path/offset do Role (o NPC tende a parar "do lado").
-private static final double LOOT_PICKUP_DISTANCE = 3.2;
-
-private static final String LOOT_CHAT_TEMPLATE = "{quantidade} {item} Coletado.";
-
-
-private static final long LOOT_CHAT_SUMMARY_DELAY_MS = 500L;
-// Limpa combat tags: 25 segundos após o fim do combate OU ao sair 25 blocos do local.
-private static final long COMBAT_TAG_CLEAR_MS = 25_000L;
-private static final double COMBAT_TAG_CLEAR_DISTANCE = 25.0;
-
-// Anti-loop: se um item não couber/der erro, ignora por alguns segundos e tenta outros.
-private static final long LOOT_SKIP_RETRY_MS = 4_000L;
-// Se ficar tempo demais tentando alcançar um item, troca para outro.
-private static final long LOOT_TARGET_TIMEOUT_MS = 12_000L;
-
-private static final int COMBAT_TAG_MAX = 16;
-private static final int LOOT_PENDING_MAX = 512;
-
-// XP do NPC (totalXp): XP por hit foi desativado para manter a barra/nível
-    // sincronizados com a XP “por monstro derrotado” (mensagem no chat ocorre no kill).
-    private static final long XP_PER_HIT = 0L;
-    private static final long XP_PER_KILL = 40L;
-
-
-    public String getLastError() { return LAST_ERROR; }
-    private static void setError(String msg) { LAST_ERROR = msg; }
-
-    public boolean isPvpEnabled() { return pvpEnabled; }
-    public void setPvpEnabled(boolean enabled) { this.pvpEnabled = enabled; }
-
-    // =========================================================
-    // Defender (persistente)
-    // =========================================================
-
-    /** Se não houver NPC em memória, lê do arquivo do player. */
-    public boolean isDefendeEnabled(UUID owner) {
-        if (owner == null) return false;
-        NpcRecord rec = npcRefPorPlayer.get(owner);
-        if (rec != null) return rec.defendeEnabled;
-        return AmigoPersistence.loadDefenderEnabled(owner);
-    }
-
-    /**
-     * Seta o modo Defender e persiste.
-     * - OFF limpa assistência imediatamente
-     */
-    public void setDefendeEnabled(UUID owner, boolean enabled) {
-        if (owner == null) return;
-
-        // persistência (1 arquivo por player)
-        AmigoPersistence.saveDefenderEnabled(owner, enabled);
-
-        NpcRecord rec = npcRefPorPlayer.get(owner);
-        if (rec != null) {
+   public void setDefendeEnabled(UUID owner, boolean enabled) {
+      if (owner != null) {
+         AmigoPersistence.saveDefenderEnabled(owner, enabled);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+         if (rec != null) {
             rec.defendeEnabled = enabled;
             if (!enabled) {
-                clearAssist(rec);
+               this.clearAssist(rec);
             }
-        }
-    }
+         }
+      }
+   }
 
-    // =========================================================
-    // =========================================================
-    // AutoLoot (/autoloot)
-    // =========================================================
+   public boolean isAutoLootEnabled(UUID ownerId) {
+      if (ownerId == null) {
+         return true;
+      }
 
-    public boolean isAutoLootEnabled(UUID ownerId) {
-        if (ownerId == null) return true;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec != null) return rec.autoLootEnabled;
-        return AmigoPersistence.loadAutoLootEnabled(ownerId);
-    }
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? rec.autoLootEnabled : AmigoPersistence.loadAutoLootEnabled(ownerId);
+   }
 
-    public boolean toggleAutoLoot(UUID ownerId) {
-        boolean newVal = !isAutoLootEnabled(ownerId);
-        setAutoLootEnabled(ownerId, newVal);
-        return newVal;
-    }
+   public boolean toggleAutoLoot(UUID ownerId) {
+      boolean newVal = !this.isAutoLootEnabled(ownerId);
+      this.setAutoLootEnabled(ownerId, newVal);
+      return newVal;
+   }
 
-    public void setAutoLootEnabled(UUID ownerId, boolean enabled) {
-        if (ownerId == null) return;
-        AmigoPersistence.saveAutoLootEnabled(ownerId, enabled);
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec != null) {
+   public void setAutoLootEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         AmigoPersistence.saveAutoLootEnabled(ownerId, enabled);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
             rec.autoLootEnabled = enabled;
             if (!enabled) {
-                // ao desligar, garantir que não fica em estado de looting/pausa
-                endCombatTaggedLooting(rec);
-                rec.lootPausedInventoryFull = false;
-                rec.lootChatAcc.clear();
-                rec.lootChatSendAtMillis = 0L;
+               endCombatTaggedLooting(rec);
+               rec.lootPausedInventoryFull = false;
+               rec.lootChatAcc.clear();
+               rec.lootChatSendAtMillis = 0L;
             }
-        }
-    }
+         }
+      }
+   }
 
-    // Finaliza e limpa qualquer estado interno de LOOTING/combattag.
-    // Mantemos simples para evitar ficar preso em itens/ref inválidos.
-    private static void endCombatTaggedLooting(NpcRecord rec) {
-        if (rec == null) return;
-        rec.lootingActive = false;
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        if (rec.pendingLootRefObjs != null) rec.pendingLootRefObjs.clear();
-        if (rec.lootProcessedUntil != null) rec.lootProcessedUntil.clear();
-        if (rec.combatTags != null) rec.combatTags.clear();
-        rec.lastBattleCenter = null;
-        rec.lastCombatEndMillis = 0L;
-        rec.lootPausedInventoryFull = false;
-        // Reutiliza o timer já existente do auto-loot para evitar um campo extra.
-        rec.nextAutoLootMillis = 0L;
-    }
+   public String getCustomName(UUID ownerId) {
+      if (ownerId == null) {
+         return null;
+      }
 
-    // Log de debug (chat)
-    // =========================================================
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? normalizeCustomName(rec.customName) : normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
+   }
 
-    public boolean isDebugLogEnabled(UUID owner) {
-        if (owner == null) return false;
-        NpcRecord rec = npcRefPorPlayer.get(owner);
-        if (rec != null) return rec.debugLogEnabled;
-        Boolean v = debugLogByOwner.get(owner);
-        return v != null && v;
-    }
-
-    public boolean toggleDebugLog(UUID owner) {
-        if (owner == null) return false;
-        boolean enabled = !isDebugLogEnabled(owner);
-        setDebugLogEnabled(owner, enabled);
-        return enabled;
-    }
-
-    public void setDebugLogEnabled(UUID owner, boolean enabled) {
-        if (owner == null) return;
-        debugLogByOwner.put(owner, enabled);
-        NpcRecord rec = npcRefPorPlayer.get(owner);
-        if (rec != null) rec.debugLogEnabled = enabled;
-    }
-
-    // =========================================================
-    // Escolha do tipo (com preferência passiva temporária)
-    // =========================================================
-
-    /**
-     * Em algumas builds, getPresetCoverageTestNPCs() devolve um "corvo"/pássaro de teste.
-     * Para o AmigoNPC ficar com cara de companheiro, tentamos preferir templates humanoides.
-     *
-     * AJUSTE TEMPORÁRIO: prioriza tipos civis/passivos se existirem.
-     */
-    private static String choosePreferredNpcType(Object npcPlugin) {
-        // ✅ ajuste temporário: tenta forçar passivos
-        final String[] FORCED_PASSIVE = { "citizen", "villager", "merchant", "trader", "worker", "farmer" };
-
-        // 1) Role templates spawnáveis
-        Object rolesObj = invokeOneArg(npcPlugin, "getRoleTemplateNames", boolean.class, true);
-        List<String> roles = toStringList(rolesObj);
-
-        // 1.1) tenta match exato (case-insensitive)
-        for (String want : FORCED_PASSIVE) {
-            for (String r : roles) {
-                if (r != null && r.equalsIgnoreCase(want)) return r;
+   public void setCustomNameWithStore(Store<EntityStore> store, UUID ownerId, String customName) {
+      if (ownerId != null) {
+         String normalizedName = normalizeCustomName(customName);
+         AmigoPersistence.saveCustomName(ownerId, normalizedName);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            rec.customName = normalizedName;
+            if (store != null && rec.refObj instanceof Ref<EntityStore> npcRef) {
+               try {
+                  NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+               } catch (Throwable var7) {
+               }
             }
-        }
+         }
+      }
+   }
 
-        // 1.2) tenta contains (ex.: human_citizen)
-        for (String want : FORCED_PASSIVE) {
-            for (String r : roles) {
-                if (r == null) continue;
-                if (r.toLowerCase().contains(want)) return r;
+   private static String normalizeCustomName(String customName) {
+      if (customName == null) {
+         return null;
+      }
+
+      String normalized = customName.trim();
+      if (normalized.isBlank()) {
+         return null;
+      }
+
+      if (normalized.length() > 20) {
+         normalized = normalized.substring(0, 20);
+      }
+
+      return normalized;
+   }
+
+   public String getAutoLootStatus(UUID ownerId) {
+      if (ownerId == null) {
+         return AmigoText.text("core.autoloot.status.unknown");
+      }
+
+      boolean enabled = this.isAutoLootEnabled(ownerId);
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      long now = System.currentTimeMillis();
+      String state = rec == null ? "NO_NPC" : String.valueOf(rec.state);
+      boolean downed = rec != null && rec.downed;
+      boolean pausedFull = rec != null && rec.lootPausedInventoryFull;
+      int pending = 0;
+
+      try {
+         pending = rec != null && rec.pendingLootRefObjs != null ? rec.pendingLootRefObjs.size() : 0;
+      } catch (Throwable var16) {
+      }
+
+      long stickLeft = 0L;
+
+      try {
+         stickLeft = rec != null ? Math.max(0L, rec.autoLootStickUntilMillis - now) : 0L;
+      } catch (Throwable var15) {
+      }
+
+      int freeSlots = -1;
+
+      try {
+         SimpleItemContainer bag = rec != null ? rec.backpack : null;
+         if (bag == null && rec != null) {
+            bag = this.getOrLoadBackpack(ownerId);
+            rec.backpack = bag;
+         }
+
+         if (bag != null) {
+            freeSlots = countFreeSlots(bag);
+         }
+      } catch (Throwable var14) {
+      }
+
+      return AmigoText.format("core.autoloot.status.summary", AmigoText.onOff(enabled), state, downed, pausedFull, pending, stickLeft, freeSlots);
+   }
+
+   private static int countFreeSlots(SimpleItemContainer bag) {
+      if (bag == null) {
+         return -1;
+      }
+
+      short cap;
+      try {
+         cap = bag.getCapacity();
+      } catch (Throwable t) {
+         return -1;
+      }
+
+      int free = 0;
+
+      for (short slot = 0; slot < cap; slot++) {
+         ItemStack st;
+         try {
+            st = bag.getItemStack(slot);
+         } catch (Throwable t) {
+            continue;
+         }
+
+         if (st == null || st.isEmpty()) {
+            free++;
+         }
+      }
+
+      return free;
+   }
+
+   public boolean isGodMode(UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? rec.godMode : AmigoPersistence.loadGodMode(ownerId);
+   }
+
+   public boolean toggleGodModeWithStore(Store<EntityStore> store, UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      }
+
+      boolean newVal = !this.isGodMode(ownerId);
+      this.setGodModeWithStore(store, ownerId, newVal);
+      return true;
+   }
+
+   public void setGodModeWithStore(Store<EntityStore> store, UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         AmigoPersistence.saveGodMode(ownerId, enabled);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            rec.godMode = enabled;
+            if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref<EntityStore> npcRef) {
+               try {
+                  EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                  if (stats != null) {
+                     int healthIdx = DefaultEntityStatTypes.getHealth();
+
+                     try {
+                        float max = stats.get(healthIdx).getMax();
+                        stats.setStatValue(healthIdx, max);
+                     } catch (Throwable ignored) {
+                        stats.maximizeStatValue(healthIdx);
+                     }
+
+                     store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+                  }
+               } catch (Throwable var10) {
+               }
             }
-        }
 
-        // 2) fallback: humanoides (evita aves/test)
-        String pick = pickHumanLike(roles);
-        if (pick != null) return pick;
-        if (!roles.isEmpty()) return roles.get(0);
+            rec.regenStartAtMillis = 0L;
+            rec.regenLastApplyMillis = 0L;
+         }
+      }
+   }
 
-        // 3) Fallback: presets de coverage test (podem ser pássaros)
-        return firstStringFromArray(invokeNoArg(npcPlugin, "getPresetCoverageTestNPCs"));
-    }
+   public void notifyNpcDamaged(UUID ownerId, long now) {
+      if (ownerId != null) {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            rec.regenWasInCombat = true;
+            rec.regenStartAtMillis = 0L;
+            rec.regenLastApplyMillis = 0L;
+         }
+      }
+   }
 
-    private static List<String> toStringList(Object listObj) {
-        if (listObj instanceof List<?> list) {
-            java.util.ArrayList<String> out = new java.util.ArrayList<>();
-            for (Object v : list) {
-                if (v != null) out.add(String.valueOf(v));
+   private static void endCombatTaggedLooting(AmigoNpcManager.NpcRecord rec) {
+      NpcCombatLootFlowSupport.endCombatTaggedLooting(rec);
+   }
+
+   private void tickSpawnFollowFx(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
+      NpcRecoveryEffectSupport.tickSpawnFollowFx(store, rec, ownerRefObj, now, 180L, AmigoNpcManager::spawnParticleToOwner);
+   }
+
+   private void tickAutoRegen(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
+      NpcRecoveryEffectSupport.tickAutoRegen(store, rec, ownerRefObj, now, 0.12F, AmigoNpcManager::spawnParticleToOwner);
+   }
+
+   public boolean isDebugLogEnabled(UUID owner) {
+      if (owner == null) {
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+      if (rec != null) {
+         return rec.debugLogEnabled;
+      }
+
+      Boolean v = this.debugLogByOwner.get(owner);
+      return v != null && v;
+   }
+
+   public boolean toggleDebugLog(UUID owner) {
+      if (owner == null) {
+         return false;
+      }
+
+      boolean enabled = !this.isDebugLogEnabled(owner);
+      this.setDebugLogEnabled(owner, enabled);
+      return enabled;
+   }
+
+   public void setDebugLogEnabled(UUID owner, boolean enabled) {
+      if (owner != null) {
+         this.debugLogByOwner.put(owner, enabled);
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+         if (rec != null) {
+            rec.debugLogEnabled = enabled;
+         }
+      }
+   }
+
+   private static String choosePreferredNpcType(Object npcPlugin) {
+      String[] FORCED_PASSIVE = new String[]{"citizen", "villager", "merchant", "trader", "worker", "farmer"};
+      Object rolesObj = invokeOneArg(npcPlugin, "getRoleTemplateNames", boolean.class, true);
+      List<String> roles = toStringList(rolesObj);
+
+      for (String want : FORCED_PASSIVE) {
+         for (String r : roles) {
+            if (r != null && r.equalsIgnoreCase(want)) {
+               return r;
             }
-            return out;
-        }
-        return List.of();
-    }
+         }
+      }
 
-    private static String pickHumanLike(List<String> candidates) {
-        if (candidates == null || candidates.isEmpty()) return null;
+      for (String want : FORCED_PASSIVE) {
+         for (String r : roles) {
+            if (r != null && r.toLowerCase().contains(want)) {
+               return r;
+            }
+         }
+      }
 
-        // evita os mais comuns de teste que saem voando
-        String[] deny = {"crow", "raven", "bird", "avian", "bat", "eagle", "hawk", "falcon", "vulture", "owl", "pigeon", "duck", "seagull", "test"};
+      String pick = pickHumanLike(roles);
+      if (pick != null) {
+         return pick;
+      } else {
+         return !roles.isEmpty() ? roles.get(0) : firstStringFromArray(invokeNoArg(npcPlugin, "getPresetCoverageTestNPCs"));
+      }
+   }
 
-        // preferências (ordem importa)
-        String[] prefer = {"citizen", "human", "villager", "guard", "soldier", "merchant", "trader", "worker", "farmer", "npc"};
+   private static List<String> toStringList(Object listObj) {
+      if (listObj instanceof List<?> list) {
+         ArrayList<String> out = new ArrayList<>();
 
-        for (String p : prefer) {
+         for (Object v : list) {
+            if (v != null) {
+               out.add(String.valueOf(v));
+            }
+         }
+
+         return out;
+      } else {
+         return List.of();
+      }
+   }
+
+   private static String pickHumanLike(List<String> candidates) {
+      if (candidates != null && !candidates.isEmpty()) {
+         String[] deny = new String[]{
+            "crow", "raven", "bird", "avian", "bat", "eagle", "hawk", "falcon", "vulture", "owl", "pigeon", "duck", "seagull", "test"
+         };
+         String[] prefer = new String[]{"citizen", "human", "villager", "guard", "soldier", "merchant", "trader", "worker", "farmer", "npc"};
+
+         for (String p : prefer) {
             for (String s : candidates) {
-                String low = s.toLowerCase();
-                if (low.contains(p) && !containsAny(low, deny)) return s;
+               String low = s.toLowerCase();
+               if (low.contains(p) && !containsAny(low, deny)) {
+                  return s;
+               }
             }
-        }
+         }
 
-        // se não achou um "humanoide", pelo menos evite aves/test
-        for (String s : candidates) {
+         for (String s : candidates) {
             String low = s.toLowerCase();
-            if (!containsAny(low, deny)) return s;
-        }
-
-        return null;
-    }
-
-    private static boolean containsAny(String low, String[] needles) {
-        for (String n : needles) {
-            if (low.contains(n)) return true;
-        }
-        return false;
-    }
-
-    public boolean hasNpc(UUID ownerId) {
-        return ownerId != null && npcRefPorPlayer.containsKey(ownerId);
-    }
-
-    /** Compat com chamadas antigas (ex.: UI/Service). */
-    public boolean spawn(Object worldObj, UUID ownerId) {
-        return spawn(worldObj, ownerId, null);
-    }
-
-    /**
-     * Spawn real via NPCPlugin.
-     * @param senderObj opcional (player/sender) pra ajudar a pegar posição; pode ser null.
-     *
-     * ✅ Agora é assíncrono: retorna true quando foi enfileirado com sucesso.
-     * Isso evita duplicação causada por timeout falso.
-     */
-    public boolean spawn(Object worldObj, UUID ownerId, Object senderObj) {
-        if (worldObj == null || ownerId == null) {
-            setError("worldObj ou ownerId null.");
-            return false;
-        }
-
-        // Anti-dup: se já existe em SPAWNING/ACTIVE, não cria outro
-        NpcRecord existing = npcRefPorPlayer.get(ownerId);
-        if (existing != null) {
-            if (existing.state == State.SPAWNING || existing.state == State.ACTIVE) {
-                setError("NPC já existe para este player (evitando duplicação).");
-                return false;
+            if (!containsAny(low, deny)) {
+               return s;
             }
-            setError("NPC está em processo de remoção. Tente novamente em instantes.");
-            return false;
-        }
+         }
 
-        // Registra SPAWNING antes do execute (chave do fix)
-        final NpcRecord rec = new NpcRecord(worldObj, ownerId, null, State.SPAWNING);
-        // aplica preferencia de log (runtime)
-        try {
-            Boolean dbg = debugLogByOwner.get(ownerId);
-            rec.debugLogEnabled = (dbg != null) ? dbg.booleanValue() : DEBUG_COMBAT_DEFAULT;
-        } catch (Throwable ignored) {}
-        // ✅ carrega mochila do disco (1 arquivo por player)
-        rec.backpack = AmigoPersistence.loadBackpack(ownerId);
-        // ✅ carrega aparência (opcional)
-        String savedModel = AmigoPersistence.loadModelId(ownerId);
-        rec.modelId = (savedModel == null || savedModel.isBlank()) ? DEFAULT_MODEL_ID : savedModel;
-        double savedScale = AmigoPersistence.loadModelScale(ownerId);
-        rec.modelScale = (savedScale <= 0.0) ? DEFAULT_MODEL_SCALE : savedScale;
-        // ✅ carrega nível de espadas + arma equipada (progressão corpo a corpo)
-        rec.level = SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
-        rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-        // ✅ carrega modo Defender (persistente)
-        rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
-        rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
+         return null;
+      } else {
+         return null;
+      }
+   }
 
-        // ✅ Progressão do NPC (XP total + stats base para scaling)
-        rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
-        rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
+   private static boolean containsAny(String low, String[] needles) {
+      for (String n : needles) {
+         if (low.contains(n)) {
+            return true;
+         }
+      }
 
-        // ✅ Sincroniza o nível de espadas com o level calculado do totalXp (HUD e combate usam nível da espada)
-        int computedSwordLevel = SwordProgression.clampLevel(rec.npcLevelCached);
-        if (computedSwordLevel != rec.level) {
-            rec.level = computedSwordLevel;
-            String expectedWeapon = SwordProgression.weaponIdForLevel(rec.level);
-            rec.equippedWeaponId = expectedWeapon;
-            AmigoPersistence.saveSwordState(ownerId, rec.level, expectedWeapon);
-        }
-        rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
-        rec.baseDef = AmigoPersistence.loadBaseDef(ownerId);
-        npcRefPorPlayer.put(ownerId, rec);
+      return false;
+   }
 
-        boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
+   public boolean hasNpc(UUID ownerId) {
+      return ownerId != null && this.npcRefPorPlayer.containsKey(ownerId);
+   }
+
+   public boolean isNpcActive(UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj instanceof Ref && rec.worldObj != null && !rec.downed;
+   }
+
+   public void scheduleAutoLootSecondScan(UUID ownerId, Vector3d anchorPos, Object deadRefObjOrNull) {
+      if (ownerId != null) {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
+               if (rec.autoLootEnabled) {
+                  long now = System.currentTimeMillis();
+                  rec.autoLootStickUntilMillis = Math.max(rec.autoLootStickUntilMillis, now + 900L);
+                  if (anchorPos != null) {
+                     rec.autoLootStickAnchorPos = anchorPos;
+                  }
+
+                  if (deadRefObjOrNull != null) {
+                     rec.autoLootStickDeadRefObj = deadRefObjOrNull;
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public boolean spawn(Object worldObj, UUID ownerId) {
+      return this.spawn(worldObj, ownerId, null);
+   }
+
+   public boolean spawn(Object worldObj, UUID ownerId, Object senderObj) {
+      if (worldObj != null && ownerId != null) {
+         AmigoNpcManager.NpcRecord existing = this.npcRefPorPlayer.get(ownerId);
+         if (existing == null) {
+            AmigoNpcManager.NpcRecord rec = new AmigoNpcManager.NpcRecord(worldObj, ownerId, null, AmigoNpcManager.State.SPAWNING);
+
             try {
-                // Se o record já foi removido/substituído, aborta
-                if (npcRefPorPlayer.get(ownerId) != rec) return;
-
-                // 1) Store = world.getEntityStore().getStore()
-                Object componentStore = getComponentStoreFromWorld(worldObj);
-                if (componentStore == null) {
-                    setError("Não consegui obter Store via world.getEntityStore().getStore().");
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                // 2) NPCPlugin.get()
-                Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
-                if (npcPlugin == null) {
-                    setError("NPCPlugin.get() não disponível nesta build.");
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                // 4) posição
-                Object pos = tryGetOwnerPositionFromWorldStore(worldObj, componentStore, ownerId);
-                if (pos == null) pos = tryGetSenderPosition(senderObj);
-
-                pos = coerceToVector3d(pos);
-                if (pos == null) {
-                    setError("Não consegui obter posição Vector3d do player.");
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                // spawn pertinho
-                pos = offsetVector3d(pos, 1.5, 0.0, 1.5);
-
-                // 5) rotação
-                Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
-                if (rot == null) rot = newVector3f(0f, 0f, 0f);                // 6) spawnNPC(Store store, String npcType, String groupType, Vector3d pos, Vector3f rot)
-                Object pair;
-
-                // ✅ Padrão: sempre spawnEntity com role passivo (Empty_Role) + ModelAsset.
-                // Se o player configurou um modelId via comando, ele substitui o padrão Wraith.
-                Object model = buildModelFromAssetId(rec.modelId, (float) rec.modelScale);
-                if (model == null) {
-                    setError("ModelAsset não encontrado/ inválido: " + rec.modelId);
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, DEFAULT_ROLE_NAME);
-                if (roleIndex < 0) {
-                    setError("Missing NPC role: " + DEFAULT_ROLE_NAME);
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
-                pair = invokeSpawnEntity(npcPlugin, componentStore, roleIndex, pos, rot, model, ownerRef);
-                if (pair == null) {
-                    setError("spawnEntity retornou null (assinatura incompatível). modelId=" + rec.modelId);
-                    npcRefPorPlayer.remove(ownerId, rec);
-                    return;
-                }
-
-                // Pair normalmente tem a Ref no "left/first/key"
-                Object ref = extractRefFromPair(pair);
-                rec.refObj = (ref != null ? ref : pair);
-
-                // Marca como "Amigo" para filtros (ex.: imunidade a dano)
-                if (rec.refObj != null) {
-                    amigoRefs.put(rec.refObj, ownerId);
-                }
-
-                // Se pediram despawn enquanto spawnava: remove já (e respeita respawn automático)
-                if (rec.state == State.DESPAWNING) {
-                    if (doRemoveEntity(componentStore, rec.refObj)) {
-                        finalizeRemove(ownerId, rec);
-                    } else {
-                        // mantém record pra tentar despawn depois
-                        setError("Spawn OK, mas falha ao remover imediatamente (DESPAWNING).");
-                    }
-                    return;
-                }
-
-                // ✅ equipa arma corpo-a-corpo conforme nível (pode trocar até em combate)
-                try {
-                    @SuppressWarnings("unchecked")
-                    Store<EntityStore> store = (Store<EntityStore>) componentStore;
-                    @SuppressWarnings("unchecked")
-                    Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-                    applySwordWeaponNow(store, npcRef, ownerId, rec, true);
-
-                    // ✅ captura baseHp/baseDef (1x) e aplica scaling (HP/DEF) conforme level (cap 100)
-                    applyNpcScaling(store, npcRef, ownerId, rec, true);
-                } catch (Throwable ignored) {}
-
-                rec.state = State.ACTIVE;
-
-            } catch (Throwable t) {
-                setError("spawn() falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
-                npcRefPorPlayer.remove(ownerId, rec);
-                if (rec.refObj != null) amigoRefs.remove(rec.refObj);
+               Boolean dbg = this.debugLogByOwner.get(ownerId);
+               rec.debugLogEnabled = dbg != null ? dbg : false;
+            } catch (Throwable var12) {
             }
-        });
 
-        if (!queued) {
-            setError("world.execute falhou: " + HytaleBridge.getLastError());
-            npcRefPorPlayer.remove(ownerId, rec);
-            return false;
-        }
-
-        return true; // enfileirado com record registrado
-    }
-
-    /**
-     * Spawn síncrono usando o Store entregue pela API de comandos.
-     *
-     * Motivo: em algumas builds, o spawn assíncrono via world.execute pode finalizar,
-     * mas o registro interno ser removido por erro de reflection (Store/posição),
-     * causando "NPC criado" e depois "/amigo despawn" dizer que não existe.
-     *
-     * Esse caminho evita reflection para obter Store e posição.
-     */
-    public boolean spawnWithStore(Object worldObj,
-                                 Store<EntityStore> store,
-                                 Ref<EntityStore> playerEntityRef,
-                                 UUID ownerId,
-                                 Object senderObj) {
-        if (worldObj == null || store == null || playerEntityRef == null || ownerId == null) {
-            setError("world/store/playerEntityRef/ownerId inválidos.");
-            return false;
-        }
-
-        // Anti-dup
-        NpcRecord existing = npcRefPorPlayer.get(ownerId);
-        if (existing != null) {
-            if (existing.state == State.SPAWNING || existing.state == State.ACTIVE) {
-                setError("NPC já existe para este player (evitando duplicação)." );
-                return false;
+            rec.backpack = AmigoPersistence.loadBackpack(ownerId);
+            String savedModel = AmigoPersistence.loadModelId(ownerId);
+            boolean hasSavedWardrobeCosmetics = hasSavedWardrobeCosmetics(ownerId);
+            rec.modelId = savedModel != null && !savedModel.isBlank() ? savedModel : (hasSavedWardrobeCosmetics ? null : "PlayerTestModel_V");
+            double savedScale = AmigoPersistence.loadModelScale(ownerId);
+            rec.modelScale = savedScale <= 0.0 ? 1.0 : savedScale;
+            rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
+            rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
+            rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
+            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
+            rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
+            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
+            rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+            rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
+            int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
+            if (computedSwordLevel != rec.level) {
+               rec.level = computedSwordLevel;
+               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
             }
-            setError("NPC está em processo de remoção. Tente novamente em instantes.");
+
+            rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
+            rec.baseDef = AmigoPersistence.loadBaseDef(ownerId);
+            this.npcRefPorPlayer.put(ownerId, rec);
+            boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  if (this.npcRefPorPlayer.get(ownerId) != rec) {
+                     return;
+                  }
+
+                  Object componentStore = getComponentStoreFromWorld(worldObj);
+                  if (componentStore == null) {
+                     setError(AmigoText.text("core.error.store.unavailable"));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
+                  if (npcPlugin == null) {
+                     setError(AmigoText.text("core.error.npcplugin.unavailable"));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  Object pos = tryGetOwnerPositionFromWorldStore(worldObj, componentStore, ownerId);
+                  if (pos == null) {
+                     pos = tryGetSenderPosition(senderObj);
+                  }
+
+                  pos = coerceToVector3d(pos);
+                  if (pos == null) {
+                     setError(AmigoText.text("core.error.player_position.unavailable"));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  Float yaw = tryGetOwnerYawFromWorldStore(worldObj, componentStore, ownerId);
+                  if (yaw == null) {
+                     yaw = tryGetSenderYaw(senderObj);
+                  }
+
+                  pos = offsetInFrontOfYaw(pos, yaw, 4.0);
+                  Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
+                  if (rot == null) {
+                     rot = newVector3f(0.0F, 0.0F, 0.0F);
+                  }
+
+                  Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+                  Object model = buildPreferredSpawnModel(ownerId, componentStore, ownerRef, rec.modelId, (float)rec.modelScale);
+                  if (model == null) {
+                     setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
+                  if (roleIndex < 0) {
+                     setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  Object pair = invokeSpawnEntity(npcPlugin, componentStore, roleIndex, pos, rot, model, ownerRef);
+                  if (pair == null) {
+                     setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return;
+                  }
+
+                  Object ref = extractRefFromPair(pair);
+                  rec.refObj = ref != null ? ref : pair;
+                  if (rec.refObj != null) {
+                     this.amigoRefs.put(rec.refObj, ownerId);
+                  }
+
+                  if (rec.state == AmigoNpcManager.State.DESPAWNING) {
+                     if (doRemoveEntity(componentStore, rec.refObj)) {
+                        this.finalizeRemove(ownerId, rec);
+                     } else {
+                        setError(AmigoText.text("core.error.spawn.remove_after_spawn_failed"));
+                     }
+
+                     return;
+                  }
+
+                  try {
+                     Store<EntityStore> store = (Store<EntityStore>)componentStore;
+                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                     this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
+                     this.applyNpcScaling(store, npcRef, ownerId, rec, true);
+                     armWardrobeRestoreRetry(rec, ownerId);
+
+                     try {
+                        if (rec.wardrobeRestorePending) {
+                           boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, (Ref<EntityStore>)ownerRef, npcRef);
+                           if (restored) {
+                              clearWardrobeRestoreRetry(rec);
+                           } else {
+                              rec.nextWardrobeRestoreMillis = System.currentTimeMillis() + 250L;
+                           }
+                        }
+                     } catch (Throwable var18) {
+                     }
+
+                     playNpcSpawnFx(store, npcRef, ownerRef);
+                     rec.spawnFxUntilMillis = System.currentTimeMillis() + 1800L;
+                     rec.spawnFxNextMillis = 0L;
+                  } catch (Throwable var19) {
+                  }
+
+                  rec.state = AmigoNpcManager.State.ACTIVE;
+               } catch (Throwable t) {
+                  setError(AmigoText.format("core.error.spawn.failed", t.getClass().getSimpleName(), t.getMessage()));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  if (rec.refObj != null) {
+                     this.amigoRefs.remove(rec.refObj);
+                  }
+               }
+            });
+            if (!queued) {
+               setError(AmigoText.format("core.error.world_execute.failed", HytaleBridge.getLastError()));
+               this.npcRefPorPlayer.remove(ownerId, rec);
+               return false;
+            } else {
+               return true;
+            }
+         } else if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
+            setError(AmigoText.text("core.error.npc.removing"));
             return false;
-        }
+         } else {
+            setError(AmigoText.text("core.error.npc.already_exists"));
+            return false;
+         }
+      } else {
+         setError(AmigoText.text("core.error.spawn.invalid_world_owner_null"));
+         return false;
+      }
+   }
 
-        final NpcRecord rec = new NpcRecord(worldObj, ownerId, null, State.SPAWNING);
-        // aplica preferencia de log (runtime)
-        try {
-            Boolean dbg = debugLogByOwner.get(ownerId);
-            rec.debugLogEnabled = (dbg != null) ? dbg.booleanValue() : DEBUG_COMBAT_DEFAULT;
-        } catch (Throwable ignored) {}
-        rec.backpack = AmigoPersistence.loadBackpack(ownerId);
-        String savedModel = AmigoPersistence.loadModelId(ownerId);
-        rec.modelId = (savedModel == null || savedModel.isBlank()) ? DEFAULT_MODEL_ID : savedModel;
-        double savedScale = AmigoPersistence.loadModelScale(ownerId);
-        rec.modelScale = (savedScale <= 0.0) ? DEFAULT_MODEL_SCALE : savedScale;
-        // ✅ carrega nível de espadas + arma equipada (progressão corpo a corpo)
-        rec.level = SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
-        rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-        // ✅ carrega modo Defender (persistente)
-        rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
-        rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
-
-        // ✅ Progressão do NPC (XP total + stats base para scaling)
-        rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
-        rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
-
-        // ✅ Sincroniza o nível de espadas com o level calculado do totalXp (HUD e combate usam nível da espada)
-        int computedSwordLevel = SwordProgression.clampLevel(rec.npcLevelCached);
-        if (computedSwordLevel != rec.level) {
-            rec.level = computedSwordLevel;
-            String expectedWeapon = SwordProgression.weaponIdForLevel(rec.level);
-            rec.equippedWeaponId = expectedWeapon;
-            AmigoPersistence.saveSwordState(ownerId, rec.level, expectedWeapon);
-        }
-        rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
-        rec.baseDef = AmigoPersistence.loadBaseDef(ownerId);
-        npcRefPorPlayer.put(ownerId, rec);
-
-        try {
+   private void spawnIntoExistingRecord(Object worldObj, Object componentStore, UUID ownerId, Object senderObj, AmigoNpcManager.NpcRecord rec) {
+      if (worldObj != null && componentStore != null && ownerId != null && rec != null) {
+         try {
             Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
             if (npcPlugin == null) {
-                setError("NPCPlugin.get() não disponível nesta build.");
-                npcRefPorPlayer.remove(ownerId, rec);
-                return false;
+               npcPlugin = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "INSTANCE");
             }
 
-            // posição do player via store + TransformComponent
-            Object pos = tryGetPositionFromStore(store, playerEntityRef);
+            if (npcPlugin == null) {
+               setError(AmigoText.text("core.error.npcplugin.unavailable"));
+               return;
+            }
+
+            Object pos = tryGetOwnerPositionFromWorldStore(worldObj, componentStore, ownerId);
             if (pos == null) {
-                // fallback
-                pos = tryGetSenderPosition(senderObj);
+               pos = tryGetSenderPosition(senderObj);
             }
 
             pos = coerceToVector3d(pos);
             if (pos == null) {
-                setError("Não consegui obter posição Vector3d do player.");
-                npcRefPorPlayer.remove(ownerId, rec);
-                return false;
+               setError(AmigoText.text("core.error.player_position.unavailable"));
+               return;
             }
 
-            pos = offsetVector3d(pos, 1.5, 0.0, 1.5);
+            Float yaw = tryGetOwnerYawFromWorldStore(worldObj, componentStore, ownerId);
+            if (yaw == null) {
+               yaw = tryGetSenderYaw(senderObj);
+            }
+
+            pos = offsetInFrontOfYaw(pos, yaw, 4.0);
             Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
-            if (rot == null) rot = newVector3f(0f, 0f, 0f);
-            Object pair;
+            if (rot == null) {
+               rot = newVector3f(0.0F, 0.0F, 0.0F);
+            }
 
-            // ✅ Padrão: sempre spawnEntity com role passivo (Empty_Role) + ModelAsset.
-            Object model = buildModelFromAssetId(rec.modelId, (float) rec.modelScale);
+            Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+            Object model = buildPreferredSpawnModel(ownerId, componentStore, ownerRef, rec.modelId, (float)rec.modelScale);
             if (model == null) {
-                setError("ModelAsset não encontrado/ inválido: " + rec.modelId);
-                npcRefPorPlayer.remove(ownerId, rec);
-                return false;
+               setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
+               return;
             }
 
-            int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, DEFAULT_ROLE_NAME);
+            int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
             if (roleIndex < 0) {
-                setError("Missing NPC role: " + DEFAULT_ROLE_NAME);
-                npcRefPorPlayer.remove(ownerId, rec);
-                return false;
+               setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
+               return;
             }
 
-            pair = invokeSpawnEntity(npcPlugin, store, roleIndex, pos, rot, model, playerEntityRef);
+            Object pair = invokeSpawnEntity(npcPlugin, componentStore, roleIndex, pos, rot, model, ownerRef);
             if (pair == null) {
-                setError("spawnEntity retornou null (assinatura incompatível). modelId=" + rec.modelId);
-                npcRefPorPlayer.remove(ownerId, rec);
-                return false;
+               setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
+               return;
             }
 
             Object ref = extractRefFromPair(pair);
-            rec.refObj = (ref != null ? ref : pair);
-
-            // Marca como "Amigo" para filtros (ex.: imunidade a dano)
+            rec.refObj = ref != null ? ref : pair;
             if (rec.refObj != null) {
-                amigoRefs.put(rec.refObj, ownerId);
+               this.amigoRefs.put(rec.refObj, ownerId);
             }
 
-            if (rec.state == State.DESPAWNING) {
-                if (doRemoveEntity(store, rec.refObj)) {
-                    finalizeRemove(ownerId, rec);
-                } else {
-                    setError("Spawn OK, mas falha ao remover imediatamente (DESPAWNING)." );
-                }
-                return false;
-            }
-
-            // ✅ equipa arma corpo-a-corpo conforme nível (pode trocar até em combate)
             try {
-                applySwordWeaponNow(store, (Ref<EntityStore>) rec.refObj, ownerId, rec, true);
+               Store<EntityStore> store = (Store<EntityStore>)componentStore;
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+               this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
+               this.applyNpcScaling(store, npcRef, ownerId, rec, true);
+               playNpcSpawnFx(store, npcRef, ownerRef);
+               rec.spawnFxUntilMillis = System.currentTimeMillis() + 1800L;
+               rec.spawnFxNextMillis = 0L;
+               if (rec.godMode) {
+                  try {
+                     EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                     if (stats != null) {
+                        int healthIdx = DefaultEntityStatTypes.getHealth();
 
-                // ✅ captura baseHp/baseDef (1x) e aplica scaling (HP/DEF) conforme level (cap 100)
-                applyNpcScaling(store, (Ref<EntityStore>) rec.refObj, ownerId, rec, true);
-            } catch (Throwable ignored) {}
-
-            rec.state = State.ACTIVE;
-            return true;
-
-        } catch (Throwable t) {
-            setError("spawnWithStore() falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
-            npcRefPorPlayer.remove(ownerId, rec);
-            if (rec.refObj != null) amigoRefs.remove(rec.refObj);
-            return false;
-        }
-    }
-
-    /**
-     * Despawn síncrono usando o Store entregue pela API de comandos.
-     */
-    public boolean despawnWithStore(Store<EntityStore> store, UUID ownerId) {
-        if (store == null || ownerId == null) {
-            setError("store ou ownerId inválidos.");
-            return false;
-        }
-
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) {
-            setError("Nenhum NPC registrado para este player.");
-            return false;
-        }
-
-        rec.state = State.DESPAWNING;
-
-        try {
-            if (rec.backpack != null) {
-                AmigoPersistence.saveBackpack(ownerId, rec.backpack);
-            }
-            try { AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId); } catch (Throwable ignored2) {}
-        } catch (Throwable ignored) {}
-
-        if (rec.refObj == null) {
-            return true;
-        }
-
-        if (!doRemoveEntity(store, rec.refObj)) {
-            return false;
-        }
-
-        finalizeRemove(ownerId, rec);
-        return true;
-    }
-
-    /**
-     * Teleport/troca de mundo do dono: pede re-spawn automático no novo mundo.
-     * Se já existe NPC: marca respawnRequested e despawna primeiro (salvando mochila).
-     * Se não existe: só spawna.
-     */
-    public boolean requestRespawn(Object worldObj, UUID ownerId, Object senderObj) {
-        if (worldObj == null || ownerId == null) {
-            setError("worldObj ou ownerId inválidos.");
-            return false;
-        }
-
-        // 1~2s depois do teleport do player, o NPC spawna perto e avisa.
-        long now = System.currentTimeMillis();
-
-        long delay = 1000L + java.util.concurrent.ThreadLocalRandom.current().nextLong(1001L);
-        long at = now + delay;
-        String msg = "Estou chegando.";
-
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) {
-            pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
-            return true;
-        }
-
-        rec.respawnRequested = true;
-        rec.respawnWorldObj = worldObj;
-        rec.respawnSenderObj = senderObj;
-        rec.respawnAtMillis = at;
-        rec.respawnMessage = msg;
-
-        // Força despawn do atual (no mundo antigo), e o respawn acontecerá quando remover.
-        return despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
-    }
-
-    public boolean despawn(Object worldObj, UUID ownerId) {
-        if (ownerId == null) {
-            setError("ownerId null.");
-            return false;
-        }
-
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) {
-            setError("Nenhum NPC registrado para este player.");
-            return false;
-        }
-
-        // marca DESPAWNING imediatamente (impede re-spawn)
-        rec.state = State.DESPAWNING;
-
-        // ✅ Salva imediatamente o que importa (mochila)
-        // Mesmo que o despawn físico ocorra no próximo tick, o estado fica persistido.
-        try {
-            if (rec.backpack != null) {
-                AmigoPersistence.saveBackpack(ownerId, rec.backpack);
-            }
-            try { AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId); } catch (Throwable ignored2) {}
-        } catch (Throwable ignored) {}
-
-        // prefere o world salvo no spawn
-        Object worldToUse = (rec.worldObj != null ? rec.worldObj : worldObj);
-        if (worldToUse == null) {
-            setError("World indisponível para despawn.");
-            return false;
-        }
-
-        // Se ainda não tem ref (spawn ainda não executou),
-        // retorna true: quando o spawn terminar, ele verá DESPAWNING e removerá.
-        if (rec.refObj == null) {
-            return true;
-        }
-
-        boolean queued = HytaleBridge.worldExecute(worldToUse, () -> {
-            try {
-                Object componentStore = getComponentStoreFromWorld(worldToUse);
-                if (componentStore == null) {
-                    setError("Não consegui obter Store via world.getEntityStore().getStore().");
-                    return;
-                }
-
-                if (!doRemoveEntity(componentStore, rec.refObj)) {
-                    // LAST_ERROR já setado dentro
-                    return;
-                }
-
-                finalizeRemove(ownerId, rec);
-
-            } catch (Throwable t) {
-                setError("despawn() falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
-            }
-        });
-
-        if (!queued) {
-            setError("world.execute falhou: " + HytaleBridge.getLastError());
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Despawn usando o world guardado no spawn (útil para cleanup em logout).
-     */
-    public boolean despawnStored(UUID ownerId) {
-        if (ownerId == null) return false;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) return false;
-        if (rec.worldObj == null) return false;
-        return despawn(rec.worldObj, ownerId);
-    }
-
-    /**
-     * Finaliza remoção do record (remove índices) e, se existir, executa re-spawn automático.
-     * Deve ser chamado APÓS a entidade ter sido removida do store.
-     */
-    private void finalizeRemove(UUID ownerId, NpcRecord rec) {
-        if (ownerId == null || rec == null) return;
-
-        // remove do índice rápido (ref pode já ter sido nulado)
-        try {
-            if (rec.refObj != null) {
-                amigoRefs.remove(rec.refObj);
-            }
-        } catch (Throwable ignored) {}
-
-        boolean doRespawn = rec.respawnRequested && rec.respawnWorldObj != null;
-        Object respawnWorld = rec.respawnWorldObj;
-        Object respawnSender = rec.respawnSenderObj;
-
-        rec.respawnRequested = false;
-        rec.respawnWorldObj = null;
-        rec.respawnSenderObj = null;
-
-        npcRefPorPlayer.remove(ownerId, rec);
-
-        if (doRespawn) {
-            long now = System.currentTimeMillis();
-            long at = rec.respawnAtMillis > 0L ? rec.respawnAtMillis : (now + 1000L + java.util.concurrent.ThreadLocalRandom.current().nextLong(1001L));
-            String msg = rec.respawnMessage;
-            pendingRespawns.put(ownerId, new PendingRespawn(respawnWorld, respawnSender, at, msg));
-        }
-    }
-
-    /**
-     * Mochila persistente do Amigo (45 slots).
-     * Retorna sempre um container (cria/puxa do disco se necessário).
-     */
-    public SimpleItemContainer getOrLoadBackpack(UUID ownerId) {
-        if (ownerId == null) return new SimpleItemContainer((short) 45);
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec != null) {
-            if (rec.backpack == null) {
-                rec.backpack = AmigoPersistence.loadBackpack(ownerId);
-            }
-            return rec.backpack;
-        }
-        return AmigoPersistence.loadBackpack(ownerId);
-    }
-
-    /**
-     * Usado por sistemas/eventos (ex.: filtro de dano) para identificar se um Ref pertence ao AmigoNPC.
-     */
-    public boolean isAmigoRef(Object refObj) {
-        return refObj != null && amigoRefs.containsKey(refObj);
-    }
-
-    /** Retorna o dono (UUID) para um Ref de entidade do Amigo, ou null. */
-    public UUID getOwnerFromRef(Object refObj) {
-        return refObj == null ? null : amigoRefs.get(refObj);
-    }
-
-    /** Se o NPC do owner está em estado DOWNED. */
-    public boolean isDowned(UUID ownerId) {
-        NpcRecord rec = ownerId == null ? null : npcRefPorPlayer.get(ownerId);
-        return rec != null && rec.downed;
-    }
-
-    /** Marca como DOWNED e agenda revive automático (40s). */
-    public void markDowned(UUID ownerId) {
-        NpcRecord rec = ownerId == null ? null : npcRefPorPlayer.get(ownerId);
-        if (rec == null) return;
-        if (rec.downed) return;
-        rec.downed = true;
-        rec.downedUntilMillis = System.currentTimeMillis() + 40_000L;
-
-        // Ao entrar em DOWNED, interrompe combate/assist imediatamente
-        rec.combatUntilMillis = 0L;
-        rec.combatTargetRefObj = null;
-        rec.assistUntilMillis = 0L;
-        rec.assistTargetRefObj = null;
-        rec.chaseDisengaged = false;
-        rec.targetLostSinceMillis = 0L;
-        rec.targetStuckSinceMillis = 0L;
-        rec.lastTargetHorizontal = -1.0;
-        rec.lastTargetSampleMillis = 0L;
-
-        // E limpa os marked targets para não continuar correndo com um alvo antigo.
-        try {
-            if (rec.worldObj != null && (rec.refObj instanceof Ref)) {
-                Object worldObj = rec.worldObj;
-                HytaleBridge.worldExecute(worldObj, () -> {
-                    try {
-                        Object storeObj = getComponentStoreFromWorld(worldObj);
-                        if (storeObj == null) return;
-                        @SuppressWarnings("unchecked")
-                        Store<EntityStore> store = (Store<EntityStore>) storeObj;
-                        @SuppressWarnings("unchecked")
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-                        Object npcEntityObj = getComponentFromStore(store, npcRef, NPCEntity.getComponentType());
-                        if (npcEntityObj != null) {
-                            setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTarget", null);
-                            setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", null);
-                            // Volta estado do role para Idle (best-effort)
-                            setRoleStateOnNpcEntity(npcEntityObj, npcRef, store, false);
+                        try {
+                           float max = stats.get(healthIdx).getMax();
+                           stats.setStatValue(healthIdx, max);
+                        } catch (Throwable ignored) {
+                           stats.maximizeStatValue(healthIdx);
                         }
 
-                        // Opcional: força flags do MovementStates para parar imediatamente (MovementStates é um struct)
-                        try {
-                            MovementStatesComponent ms = store.getComponent(npcRef, MovementStatesComponent.getComponentType());
-                            if (ms != null) {
-                                MovementStates s = ms.getMovementStates();
-                                if (s == null) s = new MovementStates();
-
-                                s.onGround = true;
-                                s.idle = true;
-                                s.horizontalIdle = true;
-                                s.walking = false;
-                                s.running = false;
-                                s.sprinting = false;
-
-                                ms.setMovementStates(s);
-                                // manter "sent" junto ajuda o client a refletir rápido
-                                ms.setSentMovementStates(new MovementStates(s));
-                                store.putComponent(npcRef, MovementStatesComponent.getComponentType(), ms);
-                            }
-                        } catch (Throwable ignored2) {}
-                    } catch (Throwable ignored2) {}
-                });
+                        store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+                     }
+                  } catch (Throwable var21) {
+                  }
+               }
+            } catch (Throwable var22) {
             }
-        } catch (Throwable ignored) {}
 
-        // ✅ Punição por morte (sem deslevelar): remove % do totalXp limitado ao progresso do nível atual
-        try {
-            long before = rec.totalXp;
-            long after = XpProgression.applyDeathPenalty(before);
-            rec.totalXp = after;
-            rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
-            AmigoPersistence.saveTotalXp(ownerId, after);
-        } catch (Throwable ignored) {}
+            rec.downed = false;
+            rec.downedUntilMillis = 0L;
+            rec.deathDespawnAtMillis = 0L;
+            rec.regenWasInCombat = false;
+            rec.regenStartAtMillis = 0L;
+            rec.regenLastApplyMillis = 0L;
+            rec.state = AmigoNpcManager.State.ACTIVE;
+         } catch (Throwable var23) {
+         }
+      }
+   }
 
-        // Atualiza HUD imediatamente (XP/progresso do nível), se o NPC estiver ativo
-        try {
-            if (rec.state == State.ACTIVE && rec.worldObj != null && (rec.refObj instanceof Ref)) {
-                Object worldObj = rec.worldObj;
-                HytaleBridge.worldExecute(worldObj, () -> {
-                    try {
+   public boolean spawnWithStore(Object worldObj, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, UUID ownerId, Object senderObj) {
+      if (worldObj != null && store != null && playerEntityRef != null && ownerId != null) {
+         AmigoNpcManager.NpcRecord existing = this.npcRefPorPlayer.get(ownerId);
+         if (existing == null) {
+            AmigoNpcManager.NpcRecord rec = new AmigoNpcManager.NpcRecord(worldObj, ownerId, null, AmigoNpcManager.State.SPAWNING);
+
+            try {
+               Boolean dbg = this.debugLogByOwner.get(ownerId);
+               rec.debugLogEnabled = dbg != null ? dbg : false;
+            } catch (Throwable var25) {
+            }
+
+            rec.backpack = AmigoPersistence.loadBackpack(ownerId);
+            String savedModel = AmigoPersistence.loadModelId(ownerId);
+            boolean hasSavedWardrobeCosmetics = hasSavedWardrobeCosmetics(ownerId);
+            rec.modelId = savedModel != null && !savedModel.isBlank() ? savedModel : (hasSavedWardrobeCosmetics ? null : "PlayerTestModel_V");
+            double savedScale = AmigoPersistence.loadModelScale(ownerId);
+            rec.modelScale = savedScale <= 0.0 ? 1.0 : savedScale;
+            rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
+            rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
+            rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
+            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
+            rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
+            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
+            rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+            rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
+            int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
+            if (computedSwordLevel != rec.level) {
+               rec.level = computedSwordLevel;
+               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+            }
+
+            rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
+            rec.baseDef = AmigoPersistence.loadBaseDef(ownerId);
+            this.npcRefPorPlayer.put(ownerId, rec);
+
+            try {
+               Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
+               if (npcPlugin == null) {
+                  setError(AmigoText.text("core.error.npcplugin.unavailable"));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  return false;
+               }
+
+               Object pos = tryGetPositionFromStore(store, playerEntityRef);
+               if (pos == null) {
+                  pos = tryGetSenderPosition(senderObj);
+               }
+
+               pos = coerceToVector3d(pos);
+               if (pos == null) {
+                  setError(AmigoText.text("core.error.player_position.unavailable"));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  return false;
+               }
+
+               Float yaw = null;
+
+               try {
+                  TransformComponent pt = (TransformComponent)store.getComponent(playerEntityRef, TransformComponent.getComponentType());
+                  if (pt != null) {
+                     yaw = extractYawFromRotation(pt.getRotation());
+                  }
+               } catch (Throwable var24) {
+               }
+
+               if (yaw == null) {
+                  yaw = tryGetSenderYaw(senderObj);
+               }
+
+               pos = offsetInFrontOfYaw(pos, yaw, 4.0);
+               Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
+               if (rot == null) {
+                  rot = newVector3f(0.0F, 0.0F, 0.0F);
+               }
+
+               Object model = buildPreferredSpawnModel(ownerId, store, playerEntityRef, rec.modelId, (float)rec.modelScale);
+               if (model == null) {
+                  setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  return false;
+               }
+
+               int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
+               if (roleIndex < 0) {
+                  setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  return false;
+               }
+
+               Object pair = invokeSpawnEntity(npcPlugin, store, roleIndex, pos, rot, model, playerEntityRef);
+               if (pair == null) {
+                  setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
+                  this.npcRefPorPlayer.remove(ownerId, rec);
+                  return false;
+               }
+
+               Object ref = extractRefFromPair(pair);
+               rec.refObj = ref != null ? ref : pair;
+               if (rec.refObj != null) {
+                  this.amigoRefs.put(rec.refObj, ownerId);
+               }
+
+               if (rec.state == AmigoNpcManager.State.DESPAWNING) {
+                  if (doRemoveEntity(store, rec.refObj)) {
+                     this.finalizeRemove(ownerId, rec);
+                  } else {
+                     setError(AmigoText.text("core.error.spawn.remove_after_spawn_failed"));
+                  }
+
+                  return false;
+               } else {
+                  try {
+                     this.applySwordWeaponNow(store, (Ref<EntityStore>)rec.refObj, ownerId, rec, true);
+                     this.applyNpcScaling(store, (Ref<EntityStore>)rec.refObj, ownerId, rec, true);
+                     armWardrobeRestoreRetry(rec, ownerId);
+
+                     try {
+                        if (rec.wardrobeRestorePending) {
+                           boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, playerEntityRef, (Ref<EntityStore>)rec.refObj);
+                           if (restored) {
+                              clearWardrobeRestoreRetry(rec);
+                           } else {
+                              rec.nextWardrobeRestoreMillis = System.currentTimeMillis() + 250L;
+                           }
+                        }
+                     } catch (Throwable var22) {
+                     }
+
+                     playNpcSpawnFx(store, (Ref<EntityStore>)rec.refObj, playerEntityRef);
+                     rec.spawnFxUntilMillis = System.currentTimeMillis() + 1800L;
+                     rec.spawnFxNextMillis = 0L;
+                  } catch (Throwable var23) {
+                  }
+
+                  rec.state = AmigoNpcManager.State.ACTIVE;
+                  return true;
+               }
+            } catch (Throwable t) {
+               setError(AmigoText.format("core.error.spawn_with_store.failed", t.getClass().getSimpleName(), t.getMessage()));
+               this.npcRefPorPlayer.remove(ownerId, rec);
+               if (rec.refObj != null) {
+                  this.amigoRefs.remove(rec.refObj);
+               }
+
+               return false;
+            }
+         } else if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
+            setError(AmigoText.text("core.error.npc.removing"));
+            return false;
+         } else {
+            setError(AmigoText.text("core.error.npc.already_exists"));
+            return false;
+         }
+      } else {
+         setError(AmigoText.text("core.error.spawn_with_store.invalid_args"));
+         return false;
+      }
+   }
+
+   public boolean despawnWithStore(Store<EntityStore> store, UUID ownerId) {
+      if (store != null && ownerId != null) {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            setError(AmigoText.text("core.error.npc.not_registered"));
+            return false;
+         }
+
+         long now = System.currentTimeMillis();
+         if (rec.downed) {
+            try {
+               if (rec.refObj != null) {
+                  doRemoveEntity(store, rec.refObj);
+                  this.amigoRefs.remove(rec.refObj);
+                  rec.refObj = null;
+               }
+            } catch (Throwable var7) {
+            }
+
+            return true;
+         } else {
+            clearWardrobeRestoreRetry(rec);
+            rec.state = AmigoNpcManager.State.DESPAWNING;
+
+            try {
+               try {
+                  if (rec.refObj instanceof Ref<EntityStore> npcRef) {
+                     AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+                  }
+               } catch (Throwable var9) {
+               }
+
+               if (rec.backpack != null) {
+                  AmigoPersistence.saveBackpack(ownerId, rec.backpack);
+               }
+
+               try {
+                  AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+               } catch (Throwable var8) {
+               }
+            } catch (Throwable var10) {
+            }
+
+            if (rec.refObj == null) {
+               return true;
+            }
+
+            if (!doRemoveEntity(store, rec.refObj)) {
+               return false;
+            }
+
+            this.finalizeRemove(ownerId, rec);
+            return true;
+         }
+      } else {
+         setError(AmigoText.text("core.error.despawn_with_store.invalid_args"));
+         return false;
+      }
+   }
+
+   public boolean requestRespawn(Object worldObj, UUID ownerId, Object senderObj) {
+      if (worldObj != null && ownerId != null) {
+         long now = System.currentTimeMillis();
+         long delay = 1000L + ThreadLocalRandom.current().nextLong(1001L);
+         long at = now + delay;
+         String msg = AmigoText.text("core.chat.respawn.arriving");
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            this.pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
+            return true;
+         } else {
+            rec.respawnRequested = true;
+            rec.respawnWorldObj = worldObj;
+            rec.respawnSenderObj = senderObj;
+            rec.respawnAtMillis = at;
+            rec.respawnMessage = msg;
+            return this.despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
+         }
+      } else {
+         setError(AmigoText.text("core.error.respawn.invalid_args"));
+         return false;
+      }
+   }
+
+   public boolean despawn(Object worldObj, UUID ownerId) {
+      if (ownerId == null) {
+         setError(AmigoText.text("core.error.despawn.invalid_owner"));
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null) {
+         setError(AmigoText.text("core.error.npc.not_registered"));
+         return false;
+      }
+
+      long now = System.currentTimeMillis();
+      if (rec.downed) {
+         Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
+         if (worldToUse == null) {
+            try {
+               if (rec.refObj != null) {
+                  this.amigoRefs.remove(rec.refObj);
+                  rec.refObj = null;
+               }
+            } catch (Throwable var8) {
+            }
+
+            return true;
+         } else {
+            return rec.refObj == null ? true : HytaleBridge.worldExecute(worldToUse, () -> {
+               try {
+                  Object componentStore = getComponentStoreFromWorld(worldToUse);
+                  if (componentStore == null) {
+                     return;
+                  }
+
+                  try {
+                     doRemoveEntity(componentStore, rec.refObj);
+                  } catch (Throwable var6x) {
+                  }
+
+                  try {
+                     this.amigoRefs.remove(rec.refObj);
+                  } catch (Throwable var5) {
+                  }
+
+                  rec.refObj = null;
+               } catch (Throwable var7x) {
+               }
+            });
+         }
+      } else {
+         clearWardrobeRestoreRetry(rec);
+         rec.state = AmigoNpcManager.State.DESPAWNING;
+
+         try {
+            if (rec.backpack != null) {
+               AmigoPersistence.saveBackpack(ownerId, rec.backpack);
+            }
+
+            try {
+               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+            } catch (Throwable var9) {
+            }
+         } catch (Throwable var10) {
+         }
+
+         Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
+         if (worldToUse == null) {
+            setError(AmigoText.text("core.error.despawn.world_unavailable"));
+            return false;
+         } else if (rec.refObj == null) {
+            return true;
+         } else {
+            boolean queued = HytaleBridge.worldExecute(worldToUse, () -> {
+               try {
+                  Object componentStore = getComponentStoreFromWorld(worldToUse);
+                  if (componentStore == null) {
+                     setError(AmigoText.text("core.error.store.unavailable"));
+                     return;
+                  }
+
+                  try {
+                     if (rec.refObj instanceof Ref<EntityStore> npcRef) {
+                        Store<EntityStore> store = (Store<EntityStore>)componentStore;
+                        AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+                     }
+                  } catch (Throwable var7x) {
+                  }
+
+                  if (!doRemoveEntity(componentStore, rec.refObj)) {
+                     return;
+                  }
+
+                  this.finalizeRemove(ownerId, rec);
+               } catch (Throwable t) {
+                  setError(AmigoText.format("core.error.despawn.failed", t.getClass().getSimpleName(), t.getMessage()));
+               }
+            });
+            if (!queued) {
+               setError(AmigoText.format("core.error.world_execute.failed", HytaleBridge.getLastError()));
+               return false;
+            } else {
+               return true;
+            }
+         }
+      }
+   }
+
+   public boolean despawnStored(UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      } else {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            return false;
+         } else {
+            return rec.worldObj == null ? false : this.despawn(rec.worldObj, ownerId);
+         }
+      }
+   }
+
+   private void finalizeRemove(UUID ownerId, AmigoNpcManager.NpcRecord rec) {
+      if (ownerId != null && rec != null) {
+         try {
+            if (rec.refObj != null) {
+               this.amigoRefs.remove(rec.refObj);
+            }
+         } catch (Throwable var11) {
+         }
+
+         boolean doRespawn = rec.respawnRequested && rec.respawnWorldObj != null;
+         Object respawnWorld = rec.respawnWorldObj;
+         Object respawnSender = rec.respawnSenderObj;
+         rec.respawnRequested = false;
+         rec.respawnWorldObj = null;
+         rec.respawnSenderObj = null;
+         this.npcRefPorPlayer.remove(ownerId, rec);
+         if (doRespawn) {
+            long now = System.currentTimeMillis();
+            long at = rec.respawnAtMillis > 0L ? rec.respawnAtMillis : now + 1000L + ThreadLocalRandom.current().nextLong(1001L);
+            String msg = rec.respawnMessage;
+            this.pendingRespawns.put(ownerId, new PendingRespawn(respawnWorld, respawnSender, at, msg));
+         }
+      }
+   }
+
+   public SimpleItemContainer getOrLoadBackpack(UUID ownerId) {
+      if (ownerId == null) {
+         return new SimpleItemContainer((short)45);
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         if (rec.backpack == null) {
+            rec.backpack = AmigoPersistence.loadBackpack(ownerId);
+         }
+
+         return rec.backpack;
+      } else {
+         return AmigoPersistence.loadBackpack(ownerId);
+      }
+   }
+
+   public boolean isAmigoRef(Object refObj) {
+      return refObj != null && this.amigoRefs.containsKey(refObj);
+   }
+
+   public UUID getOwnerFromRef(Object refObj) {
+      return refObj == null ? null : this.amigoRefs.get(refObj);
+   }
+
+   public boolean isDowned(UUID ownerId) {
+      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      return rec != null && rec.downed;
+   }
+
+   public void markDowned(UUID ownerId) {
+      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         if (!rec.downed) {
+            rec.downed = true;
+            long now = System.currentTimeMillis();
+            rec.downedUntilMillis = now + 40000L;
+
+            try {
+               ActionTraceService.getShared().record(ownerId, "npc_state", "downed until=" + rec.downedUntilMillis);
+            } catch (Throwable var12) {
+            }
+
+            rec.deathDespawnAtMillis = now + 1200L;
+            rec.regenStartAtMillis = 0L;
+            rec.regenLastApplyMillis = 0L;
+            rec.combatUntilMillis = 0L;
+            rec.combatTargetRefObj = null;
+            rec.assistUntilMillis = 0L;
+            rec.assistTargetRefObj = null;
+            rec.chaseDisengaged = false;
+            rec.targetLostSinceMillis = 0L;
+            rec.targetStuckSinceMillis = 0L;
+            rec.lastTargetHorizontal = -1.0;
+            rec.lastTargetSampleMillis = 0L;
+
+            try {
+               if (rec.worldObj != null && rec.refObj instanceof Ref) {
+                  Object worldObj = rec.worldObj;
+                  HytaleBridge.worldExecute(worldObj, () -> {
+                     try {
                         Object storeObj = getComponentStoreFromWorld(worldObj);
-                        if (storeObj == null) return;
-                        @SuppressWarnings("unchecked")
-                        Store<EntityStore> store = (Store<EntityStore>) storeObj;
-                        @SuppressWarnings("unchecked")
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-                        updateNpcHud(store, npcRef, rec);
-                    } catch (Throwable ignored2) {}
-                });
-            }
-        } catch (Throwable ignored3) {}
-    }
+                        if (storeObj == null) {
+                           return;
+                        }
 
+                        Store<EntityStore> store = (Store<EntityStore>)storeObj;
+                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                        Object npcEntityObj = getComponentFromStore(store, npcRef, NPCEntity.getComponentType());
+                        if (npcEntityObj != null) {
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTarget", null);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", null);
+                           setRoleStateOnNpcEntity(npcEntityObj, npcRef, store, false);
+                        }
 
-    // =========================================================
-    // Progressão: XP total + level calculado + scaling de HP/DEF (cap lvl 100)
-    // =========================================================
+                        try {
+                           MovementStatesComponent ms = (MovementStatesComponent)store.getComponent(npcRef, MovementStatesComponent.getComponentType());
+                           if (ms != null) {
+                              MovementStates s = ms.getMovementStates();
+                              if (s == null) {
+                                 s = new MovementStates();
+                              }
 
-    /** Level calculado a partir do totalXp (cached no record quando possível). */
-    public int getNpcLevel(UUID ownerId) {
-        if (ownerId == null) return 1;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec != null) return Math.max(1, rec.npcLevelCached);
-        try {
-            long totalXp = AmigoPersistence.loadTotalXp(ownerId);
-            return XpProgression.levelFromTotalXp(totalXp);
-        } catch (Throwable ignored) {}
-        return 1;
-    }
-
-    /**
-     * Mitigação de dano recebida do NPC via DEF scaling.
-     * Implementação minimalista: como o multiplicador vai até 10x no lvl 100,
-     * o dano recebido é dividido por esse multiplicador.
-     */
-    public float mitigateIncomingDamage(UUID ownerId, float incomingAmount) {
-        if (ownerId == null) return incomingAmount;
-        float amount = Math.max(0f, incomingAmount);
-        try {
-            NpcRecord rec = npcRefPorPlayer.get(ownerId);
-            long totalXp = rec != null ? rec.totalXp : AmigoPersistence.loadTotalXp(ownerId);
-            int lvl = XpProgression.levelFromTotalXp(totalXp);
-            double mult = StatScaling.multiplier(lvl); // cap 100
-            if (mult <= 0.0) return amount;
-            return (float) (amount / mult);
-        } catch (Throwable ignored) {}
-        return amount;
-    }
-
-    private static volatile Integer DEF_STAT_INDEX = null;
-
-    /** Tenta resolver um índice de stat de DEF/ARMOR via reflection (best-effort). */
-    private static int resolveDefenseStatIndex() {
-        Integer cached = DEF_STAT_INDEX;
-        if (cached != null) return cached;
-        synchronized (AmigoNpcManager.class) {
-            cached = DEF_STAT_INDEX;
-            if (cached != null) return cached;
-
-            int idx = -1;
-            String[] candidates = new String[] {
-                    "getDefense", "getDefence", "getArmor", "getArmour",
-                    "getPhysicalDefense", "getPhysicalDefence", "getProtection",
-                    "getResistance", "getPhysicalResistance"
-            };
-
-            for (String name : candidates) {
-                try {
-                    Method m = DefaultEntityStatTypes.class.getMethod(name);
-                    Object out = m.invoke(null);
-                    if (out instanceof Integer) {
-                        idx = (Integer) out;
-                        break;
-                    }
-                } catch (Throwable ignored) {}
+                              s.onGround = true;
+                              s.idle = true;
+                              s.horizontalIdle = true;
+                              s.walking = false;
+                              s.running = false;
+                              s.sprinting = false;
+                              ms.setMovementStates(s);
+                              ms.setSentMovementStates(new MovementStates(s));
+                              store.putComponent(npcRef, MovementStatesComponent.getComponentType(), ms);
+                           }
+                        } catch (Throwable var8) {
+                        }
+                     } catch (Throwable var9x) {
+                     }
+                  });
+               }
+            } catch (Throwable var11) {
             }
 
-            DEF_STAT_INDEX = idx;
-            return idx;
-        }
-    }
+            try {
+               long before = rec.totalXp;
+               long after = XpProgression.applyDeathPenalty(before);
+               rec.totalXp = after;
+               rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
+               AmigoPersistence.saveTotalXp(ownerId, after);
+            } catch (Throwable var10) {
+            }
 
-    /**
-     * Captura baseHp/baseDef (1x) e aplica scaling de HP/DEF conforme level.
-     * healToFull=true: seta HP atual para o HP máximo escalado.
-     */
-    private void applyNpcScaling(Store<EntityStore> store,
-                                Ref<EntityStore> npcRef,
-                                UUID ownerId,
-                                NpcRecord rec,
-                                boolean healToFull) {
-        if (store == null || npcRef == null || ownerId == null || rec == null) return;
+            try {
+               if (rec.state == AmigoNpcManager.State.ACTIVE && rec.worldObj != null && rec.refObj instanceof Ref) {
+                  Object worldObj = rec.worldObj;
+                  HytaleBridge.worldExecute(worldObj, () -> {
+                     try {
+                        Object storeObj = getComponentStoreFromWorld(worldObj);
+                        if (storeObj == null) {
+                           return;
+                        }
 
-        try {
-            // garante tabelas
+                        Store<EntityStore> store = (Store<EntityStore>)storeObj;
+                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                        NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+                     } catch (Throwable var5x) {
+                     }
+                  });
+               }
+            } catch (Throwable var9) {
+            }
+         }
+      }
+   }
+
+   public NpcLevelProgressSnapshot getLevelProgressSnapshot(UUID ownerId) {
+      return NpcQueryService.getLevelProgressSnapshot(this.npcRefPorPlayer, ownerId);
+   }
+
+   public Color getZoneHudColor(UUID ownerId) {
+      return NpcQueryService.getZoneHudColor(this.npcRefPorPlayer, ownerId);
+   }
+
+   public int getZoneForHud(UUID ownerId) {
+      return NpcQueryService.getZoneForHud(this.npcRefPorPlayer, ownerId);
+   }
+
+   public String getZoneNameForHud(UUID ownerId) {
+      return NpcQueryService.getZoneNameForHud(this.npcRefPorPlayer, ownerId);
+   }
+
+   public int getNpcLevel(UUID ownerId) {
+      return NpcQueryService.getNpcLevel(this.npcRefPorPlayer, ownerId);
+   }
+
+   public long getNpcTotalXp(UUID ownerId) {
+      return NpcQueryService.getNpcTotalXp(this.npcRefPorPlayer, ownerId);
+   }
+
+   public boolean isInCombat(UUID ownerId, long nowMillis) {
+      return NpcQueryService.isInCombat(this.npcRefPorPlayer, ownerId, nowMillis);
+   }
+
+   public boolean addNpcXpViaApi(UUID ownerId, long amount, NpcXpSource source, NpcXpContext ctx) {
+      return NpcProgressionActionService.addNpcXpViaApi(
+         this.npcRefPorPlayer, ownerId, amount, source, ctx, AmigoNpcManager::getComponentStoreFromWorld, this::addNpcXp
+      );
+   }
+
+   public void requestRescale(UUID ownerId) {
+      NpcProgressionActionService.requestRescale(
+         this.npcRefPorPlayer, ownerId, AmigoNpcManager::getComponentStoreFromWorld, (store, npcRef, resolvedOwnerId, rec) -> {
+            this.applyNpcScaling(store, npcRef, resolvedOwnerId, rec, false);
+
+            try {
+               NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+            } catch (Throwable var6) {
+            }
+         }
+      );
+   }
+
+   public float mitigateIncomingDamage(UUID ownerId, float incomingAmount) {
+      try {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         long totalXp = rec != null ? rec.totalXp : AmigoPersistence.loadTotalXp(ownerId);
+         return NpcProgressionSupport.mitigateIncomingDamage(ownerId, totalXp, incomingAmount);
+      } catch (Throwable var6) {
+         return Math.max(0.0F, incomingAmount);
+      }
+   }
+
+   private void applyNpcScaling(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, boolean healToFull) {
+      if (store != null && npcRef != null && ownerId != null && rec != null) {
+         try {
             XpProgression.init();
-
-            EntityStatMap stats = store.ensureAndGetComponent(npcRef, EntityStatMap.getComponentType());
-            if (stats == null) return;
+            EntityStatMap stats = (EntityStatMap)store.ensureAndGetComponent(npcRef, EntityStatMap.getComponentType());
+            if (stats == null) {
+               return;
+            }
 
             int healthIdx = DefaultEntityStatTypes.getHealth();
-
-            // Captura baseHp (1x): usa o "max" atual como referência natural do lvl 1
             boolean updatedBases = false;
-
             if (rec.baseHp <= 0L) {
-                try {
-                    stats.maximizeStatValue(healthIdx);
-                } catch (Throwable ignored) {}
-                float base = 0f;
-                try {
-                    base = stats.get(healthIdx).get();
-                } catch (Throwable ignored) {}
-                long baseHp = Math.max(1L, Math.round(base));
-                rec.baseHp = baseHp;
-                AmigoPersistence.saveBaseHp(ownerId, baseHp);
-                updatedBases = true;
+               try {
+                  stats.maximizeStatValue(healthIdx);
+               } catch (Throwable var37) {
+               }
+
+               float base = 0.0F;
+
+               try {
+                  base = stats.get(healthIdx).get();
+               } catch (Throwable var36) {
+               }
+
+               long baseHp = Math.max(1L, Math.round(base));
+               rec.baseHp = baseHp;
+               AmigoPersistence.saveBaseHp(ownerId, baseHp);
+               updatedBases = true;
             }
 
             if (rec.baseDef < 0L) {
-                long baseDef = 1L;
-                int defIdx = resolveDefenseStatIndex();
-                if (defIdx >= 0) {
-                    try {
-                        stats.maximizeStatValue(defIdx);
-                        float defVal = stats.get(defIdx).get();
-                        baseDef = Math.max(0L, Math.round(defVal));
-                    } catch (Throwable ignored) {
-                        baseDef = 1L;
-                    }
-                }
-                rec.baseDef = baseDef;
-                AmigoPersistence.saveBaseDef(ownerId, baseDef);
-                updatedBases = true;
+               long baseDef = 1L;
+               int defIdx = NpcScalingSupport.resolveDefenseStatIndex();
+               if (defIdx >= 0) {
+                  try {
+                     stats.maximizeStatValue(defIdx);
+                     float defVal = stats.get(defIdx).get();
+                     baseDef = Math.max(0L, Math.round(defVal));
+                  } catch (Throwable ignored) {
+                     baseDef = 1L;
+                  }
+               }
+
+               rec.baseDef = baseDef;
+               AmigoPersistence.saveBaseDef(ownerId, baseDef);
+               updatedBases = true;
             }
 
-            // Level calculado
             int level = XpProgression.levelFromTotalXp(rec.totalXp);
             rec.npcLevelCached = Math.max(1, level);
+            long desiredMaxHp = StatScaling.scaledHp(rec.baseHp, level);
 
-            // Scaling (cap lvl 100)
-            long hpMax = StatScaling.scaledHp(rec.baseHp, level);
-            long defValScaled = StatScaling.scaledDef(rec.baseDef, level);
-
-            // Aplica HP: apenas ajusta o HP atual (o jogo pode ter um "max" interno,
-            // mas como nosso damage system lê o stat atual, isso já aumenta o pool.)
-            float curHp = 0f;
             try {
-                curHp = stats.get(healthIdx).get();
-            } catch (Throwable ignored) {}
+               if (NpcStatsConfigService.getShared().get().EnableNpcStats) {
+                  NpcStatsState st = NpcStatsService.getShared().load(ownerId);
+                  long extra = AttributeModifierService.getShared().extraMaxHealth(st);
+                  if (extra != 0L) {
+                     desiredMaxHp = Math.max(1L, desiredMaxHp + extra);
+                  }
+               }
+            } catch (Throwable var34) {
+            }
+
+            long defValScaled = StatScaling.scaledDef(rec.baseDef, level);
+            String HP_MAX_MOD_KEY = "amigonpc_hpmax";
+
+            try {
+               stats.removeModifier(healthIdx, "amigonpc_hpmax");
+            } catch (Throwable var33) {
+            }
+
+            try {
+               stats.update();
+            } catch (Throwable var32) {
+            }
+
+            long baseMaxHp = 1L;
+
+            try {
+               float baseMaxF = stats.get(healthIdx).getMax();
+               baseMaxHp = Math.max(1L, Math.round(baseMaxF));
+            } catch (Throwable ignored) {
+               baseMaxHp = 1L;
+            }
+
+            long deltaHp = desiredMaxHp - baseMaxHp;
+            if (deltaHp != 0L) {
+               float amt;
+               if (deltaHp > Long.MAX_VALUE) {
+                  amt = Float.MAX_VALUE;
+               } else if (deltaHp < Long.MIN_VALUE) {
+                  amt = -Float.MAX_VALUE;
+               } else {
+                  amt = (float)deltaHp;
+               }
+
+               try {
+                  stats.putModifier(healthIdx, "amigonpc_hpmax", new StaticModifier(ModifierTarget.MAX, CalculationType.ADDITIVE, amt));
+               } catch (Throwable var30) {
+               }
+            }
+
+            try {
+               stats.update();
+            } catch (Throwable var29) {
+            }
+
+            float maxHpNow = 1.0F;
+            float curHpNow = 1.0F;
+
+            try {
+               EntityStatValue v = stats.get(healthIdx);
+               maxHpNow = Math.max(1.0F, v.getMax());
+               curHpNow = Math.max(1.0F, v.get());
+            } catch (Throwable var28) {
+            }
 
             float newHp;
             if (healToFull) {
-                newHp = (float) hpMax;
+               newHp = maxHpNow;
             } else {
-                newHp = Math.min(curHp, (float) hpMax);
-                if (newHp <= 0f) newHp = 1f;
+               newHp = Math.min(curHpNow, maxHpNow);
+               if (newHp <= 0.0F) {
+                  newHp = 1.0F;
+               }
             }
 
-            stats.setStatValue(healthIdx, newHp);
+            try {
+               stats.setStatValue(healthIdx, newHp);
+            } catch (Throwable var27) {
+            }
 
-            // Aplica DEF em stat (se existir) como best-effort
-            int defIdx = resolveDefenseStatIndex();
+            int defIdx = NpcScalingSupport.resolveDefenseStatIndex();
             if (defIdx >= 0) {
-                try {
-                    stats.setStatValue(defIdx, (float) defValScaled);
-                } catch (Throwable ignored) {}
+               try {
+                  stats.setStatValue(defIdx, (float)defValScaled);
+               } catch (Throwable var26) {
+               }
             }
 
-            // persistência de totalXp (se for primeira vez, garantimos que exista)
             if (updatedBases) {
-                // nada extra
             }
 
-            // garante que a alteração vá para o store
             try {
-                store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
-            } catch (Throwable ignored) {}
+               store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+            } catch (Throwable var25) {
+            }
 
-            // HUD (nome acima do NPC): level + barra de XP (fica junto da barra de vida)
             try {
-                updateNpcHud(store, npcRef, rec);
-            } catch (Throwable ignored) {}
+               NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+            } catch (Throwable var24) {
+            }
+         } catch (Throwable var38) {
+         }
+      }
+   }
 
-        } catch (Throwable ignored) {}
-    }
+   private void addNpcXp(
+      Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, long gain, NpcXpSource source, NpcXpContext ctx
+   ) {
+      if (gain > 0L && ownerId != null && rec != null && store != null && npcRef != null) {
+         long before = rec.totalXp;
+         long after = before + gain;
+         if (after < before) {
+            after = Long.MAX_VALUE;
+         }
 
-    /**
-     * Ganha XP total do NPC (totalXp) e atualiza o level calculado.
-     * Por padrão não cura (apenas aplica clamp se necessário).
-     */
-    private void addNpcXp(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, NpcRecord rec, long gain) {
-        if (gain <= 0L || ownerId == null || rec == null || store == null || npcRef == null) return;
-
-        long before = rec.totalXp;
-        long after = before + gain;
-        if (after < before) after = Long.MAX_VALUE; // overflow protection
-
-        rec.totalXp = after;
-        AmigoPersistence.saveTotalXp(ownerId, after);
-
-        int newLevel = XpProgression.levelFromTotalXp(after);
-        if (newLevel != rec.npcLevelCached) {
+         rec.totalXp = after;
+         AmigoPersistence.saveTotalXp(ownerId, after);
+         int oldLevel = Math.max(1, XpProgression.levelFromTotalXp(before));
+         int newLevel = Math.max(1, XpProgression.levelFromTotalXp(after));
+         if (newLevel != oldLevel) {
             rec.npcLevelCached = newLevel;
-            // reaplica HP/DEF (cap lvl 100). Não cura aqui.
-            applyNpcScaling(store, npcRef, ownerId, rec, false);
-        }
-
-
-        // Mantém nível da espada sincronizado com o level calculado (HUD/combate usam nível da espada)
-        if (newLevel != rec.level) {
-            rec.level = SwordProgression.clampLevel(newLevel);
-            applySwordWeaponNow(store, npcRef, ownerId, rec, true);
-        }
-
-        // Atualiza HUD em toda mudança de XP (mesmo que o level não mude)
-        try {
-            updateNpcHud(store, npcRef, rec);
-        } catch (Throwable ignored) {}
-    }
-
-    /**
-     * HUD simples acima do NPC (DisplayName): level + barra de XP do level atual.
-     * Fica junto da barra de vida padrão do jogo.
-     */
-    private static void updateNpcHud(Store<EntityStore> store, Ref<EntityStore> npcRef, NpcRecord rec) {
-        if (store == null || npcRef == null || rec == null) return;
-
-        XpProgression.init();
-        long totalXp = Math.max(0L, rec.totalXp);
-
-        // Level exibido = nível da espada (combate/armas usam este nível)
-        int computedLevel = Math.max(1, XpProgression.levelFromTotalXp(totalXp));
-        int level = SwordProgression.clampLevel(rec.level);
-
-        // Mantém tudo sincronizado com o totalXp (fonte de verdade do XP)
-        if (level != computedLevel) {
-            level = computedLevel;
-            rec.level = computedLevel;
-        }
-        if (rec.npcLevelCached != computedLevel) {
-            rec.npcLevelCached = computedLevel;
-        }
-
-        long start = XpProgression.xpStartOfLevel(level);
-        long need = Math.max(1L, XpProgression.xpToNext(level));
-        long into = (start == Long.MAX_VALUE) ? 0L : Math.max(0L, totalXp - start);
-        if (into > need) into = need;
-
-        int segments = 12;
-        double p = Math.max(0.0, Math.min(1.0, (double) into / (double) need));
-        int filled = (int) Math.round(p * segments);
-        if (filled < 0) filled = 0;
-        if (filled > segments) filled = segments;
-
-        String bar = "[" + repeatChar('=', filled) + repeatChar('-', segments - filled) + "]";
-        String text = "Lv " + level + " " + bar + " " + into + "/" + need;
-
-        try {
-            Nameplate np = store.ensureAndGetComponent(npcRef, Nameplate.getComponentType());
-            np.setText(text);
-        } catch (Throwable ignored) {}
-    }
-
-    private static String repeatChar(char c, int n) {
-        if (n <= 0) return "";
-        StringBuilder sb = new StringBuilder(n);
-        for (int i = 0; i < n; i++) sb.append(c);
-        return sb.toString();
-    }
-
-
-    // =========================================================
-    // Progressão: nível de espada + troca automática de armas (corpo a corpo)
-    // =========================================================
-
-    /** Retorna o nível atual (carrega do disco se o NPC não estiver ativo). */
-    public int getSwordLevel(UUID ownerId) {
-        if (ownerId == null) return 1;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec != null) return SwordProgression.clampLevel(rec.level);
-
-        // fonte de verdade: totalXp -> level calculado
-        long xp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
-        return SwordProgression.clampLevel(XpProgression.levelFromTotalXp(xp));
-    }
-
-    /**
-     * Altera nível em +/- (usado por comandos admin e, futuramente, por XP).
-     * - salva sempre
-     * - se o NPC existir: equipa arma imediatamente e manda mensagem aleatória
-     */
-    public int changeSwordLevel(UUID ownerId, int delta, boolean announce) {
-        if (ownerId == null || delta == 0) return getSwordLevel(ownerId);
-
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        int oldLvl = (rec != null) ? SwordProgression.clampLevel(rec.level) : SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
-        int newLvl = SwordProgression.clampLevel(oldLvl + delta);
-        if (newLvl == oldLvl) return newLvl;
-
-        // atualiza memória
-        if (rec != null) {
-            rec.level = newLvl;
-        }
-
-        // determina arma e salva
-        String weaponId = SwordProgression.weaponIdForLevel(newLvl);
-        if (rec != null) {
-            rec.equippedWeaponId = weaponId;
-        }
-        AmigoPersistence.saveSwordState(ownerId, newLvl, weaponId);
-
-        // ✅ Mantém o totalXp consistente com o nível de espada (HUD/XP/armas)
-        XpProgression.init();
-        long newTotalXp = XpProgression.xpStartOfLevel(newLvl);
-        if (newTotalXp < 0L) newTotalXp = 0L;
-        if (rec != null) {
-            rec.totalXp = newTotalXp;
-            rec.npcLevelCached = newLvl;
-        }
-        AmigoPersistence.saveTotalXp(ownerId, newTotalXp);
-
-        // se NPC está ativo, equipa na hora (pode trocar em combate)
-        if (rec != null && rec.state == State.ACTIVE && rec.worldObj != null && rec.refObj != null) {
-            Object worldObj = rec.worldObj;
-
-            // Equipar
-            HytaleBridge.worldExecute(worldObj, () -> {
-                try {
-                    Object storeObj = getComponentStoreFromWorld(worldObj);
-                    if (storeObj == null) return;
-                    @SuppressWarnings("unchecked")
-                    Store<EntityStore> store = (Store<EntityStore>) storeObj;
-                    @SuppressWarnings("unchecked")
-                    Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-                    applySwordWeaponNow(store, npcRef, ownerId, rec, true);
-                    // reaplica scaling (HP/DEF) e HUD com base no novo nível/XP
-                    try { applyNpcScaling(store, npcRef, ownerId, rec, false); } catch (Throwable ignored2) {}
-                    try { updateNpcHud(store, npcRef, rec); } catch (Throwable ignored2) {}
-                } catch (Throwable ignored) {}
-            });
-
-            // Mensagens
-            if (announce) {
-                String line;
-                if (delta > 0 && SwordProgression.crossedAnyMilestone(oldLvl, newLvl)) {
-                    line = SwordMessages.pickEpic(newLvl);
-                } else if (delta > 0) {
-                    line = SwordMessages.pickUp(newLvl);
-                } else {
-                    line = SwordMessages.pickDown(newLvl);
-                }
-                sendToOwner(worldObj, ownerId, line);
+            this.applyNpcScaling(store, npcRef, ownerId, rec, false);
+            if (newLevel > oldLevel) {
+               long now = System.currentTimeMillis();
+               rec.levelUpFxPendingCount += newLevel - oldLevel;
+               rec.levelUpFxUntilMillis = now + 1000L;
+               rec.levelUpFxNextTickMillis = 0L;
             }
-        }
+         }
 
-        return newLvl;
-    }
+         if (newLevel != rec.level) {
+            rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(newLevel);
 
-    private void sendToOwner(Object worldObj, UUID ownerId, String text) {
-        if (worldObj == null || ownerId == null || text == null || text.isBlank()) return;
-        HytaleBridge.worldExecute(worldObj, () -> {
             try {
-                Object storeObj = getComponentStoreFromWorld(worldObj);
-                if (storeObj == null) return;
-                @SuppressWarnings("unchecked")
-                Store<EntityStore> store = (Store<EntityStore>) storeObj;
-
-                @SuppressWarnings("unchecked")
-                Ref<EntityStore> ownerRef = (Ref<EntityStore>) invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
-                if (ownerRef == null) return;
-
-                PlayerRef playerRef = store.getComponent(ownerRef, PlayerRef.getComponentType());
-                if (playerRef == null) return;
-
-                playerRef.sendMessage(Message.raw("§7[AmigoNPC] " + text));
-            } catch (Throwable ignored) {}
-        });
-    }
-
-    /**
-     * Equipar arma e atualizar persistência (idempotente).
-     *
-     * Importante: mesmo se rec.equippedWeaponId já estiver correto, precisamos garantir
-     * que o NPC realmente está com a arma na mão (hotbar slot 0), senão ele aparece desarmado.
-     *
-     * @param saveNow se true, persiste após equipar
-     */
-    private void applySwordWeaponNow(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, NpcRecord rec, boolean saveNow) {
-        if (store == null || npcRef == null || rec == null || ownerId == null) return;
-
-        int lvl = SwordProgression.clampLevel(rec.level);
-        String expected = SwordProgression.weaponIdForLevel(lvl);
-        if (expected == null || expected.isBlank()) return;
-
-        boolean slotOk = isHotbar0Item(store, npcRef, expected);
-
-        // Se já está correto no record e no slot 0, só persiste (se pedir) e sai
-        if (expected.equals(rec.equippedWeaponId) && slotOk) {
-            if (saveNow) {
-                AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+            } catch (Throwable var21) {
             }
-            return;
-        }
+         }
 
-        boolean equipped = equipWeaponInHotbar0(store, npcRef, expected);
-        if (equipped) {
-            rec.equippedWeaponId = expected;
-            if (saveNow) {
-                AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+         try {
+            NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+         } catch (Throwable var20) {
+         }
+
+         try {
+            LevelProgressHudService.getShared().requestImmediate(ownerId);
+         } catch (Throwable var19) {
+         }
+
+         try {
+            AmigoLvlGuiService.getShared().notifyNpcXpChanged(ownerId);
+         } catch (Throwable var18) {
+         }
+
+         try {
+            NpcXpSource src = source != null ? source : NpcXpSource.COMBAT_ASSIST;
+            NpcXpContext c = ctx != null ? ctx : NpcXpContext.now();
+            AmigoEventBus.post(new NpcExperienceGainedEvent(ownerId, gain, before, after, oldLevel, newLevel, src, c));
+            if (newLevel > oldLevel) {
+               AmigoEventBus.post(new NpcLevelUpEvent(ownerId, oldLevel, newLevel, after, src, c));
             }
-            debugEquip(rec, ownerId, "Equipado: " + expected + " (lvl " + lvl + ")");
-        } else {
-            debugEquip(rec, ownerId, "FALHA ao equipar '" + expected + "' (lvl " + lvl + "). Hotbar0=" + getHotbar0ItemId(store, npcRef));
-        }
-    }
+         } catch (Throwable var17) {
+         }
+      }
+   }
 
-    /** Lê o itemId do slot 0 da hotbar (ou null). */
-    private String getHotbar0ItemId(Store<EntityStore> store, Ref<EntityStore> npcRef) {
-        try {
-            InventoryComponent.Hotbar hotbarComponent =
-                    store.getComponent(npcRef, InventoryComponent.Hotbar.getComponentType());
-            if (hotbarComponent == null) return null;
+   public int getSwordLevel(UUID ownerId) {
+      return NpcSwordService.getSwordLevel(this.npcRefPorPlayer, ownerId);
+   }
 
-            ItemContainer hotbar = hotbarComponent.getInventory();
-            if (hotbar == null) return null;
+   public int changeSwordLevel(UUID ownerId, int delta, boolean announce) {
+      return NpcSwordService.changeSwordLevel(
+         this.npcRefPorPlayer,
+         ownerId,
+         delta,
+         announce,
+         AmigoNpcManager::getComponentStoreFromWorld,
+         this::applySwordWeaponNow,
+         (store, npcRef, resolvedOwnerId, rec) -> {
+            this.applyNpcScaling(store, npcRef, resolvedOwnerId, rec, false);
+            NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+         },
+         this::sendToOwner
+      );
+   }
 
-            ItemStack st = hotbar.getItemStack((short) 0);
-            if (st == null || st.isEmpty()) return null;
-            return st.getItemId();
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
+   private void sendToOwner(Object worldObj, UUID ownerId, String text) {
+      if (worldObj != null && ownerId != null && text != null && !text.isBlank()) {
+         HytaleBridge.worldExecute(worldObj, () -> {
+            try {
+               Object storeObj = getComponentStoreFromWorld(worldObj);
+               if (storeObj == null) {
+                  return;
+               }
 
-    private boolean isHotbar0Item(Store<EntityStore> store, Ref<EntityStore> npcRef, String itemId) {
-        if (itemId == null || itemId.isBlank()) return false;
-        String cur = getHotbar0ItemId(store, npcRef);
-        return itemId.equals(cur);
-    }
+               Store<EntityStore> store = (Store<EntityStore>)storeObj;
+               Ref<EntityStore> ownerRef = (Ref<EntityStore>)invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+               if (ownerRef == null) {
+                  return;
+               }
 
-    /**
-     * Define a arma no slot 0 da hotbar usando os componentes ECS atuais.
-     */
-    private boolean equipWeaponInHotbar0(Store<EntityStore> store, Ref<EntityStore> npcRef, String itemId) {
-        try {
-            InventoryComponent.Hotbar hotbarComponent =
-                    store.getComponent(npcRef, InventoryComponent.Hotbar.getComponentType());
+               Player player = (Player)store.getComponent(ownerRef, Player.getComponentType());
+               if (player == null) {
+                  return;
+               }
 
-            if (hotbarComponent == null) {
-                hotbarComponent = new InventoryComponent.Hotbar();
-                store.putComponent(npcRef, InventoryComponent.Hotbar.getComponentType(), hotbarComponent);
+               player.sendMessage(Message.raw(AmigoText.format("core.chat.prefix", text)));
+            } catch (Throwable var7) {
             }
+         });
+      }
+   }
 
-            InventoryComponent.Tool toolComponent =
-                    store.getComponent(npcRef, InventoryComponent.Tool.getComponentType());
-            if (toolComponent != null) {
-                toolComponent.setUsingToolsItem(false);
-                toolComponent.markDirty();
+   private static String resolveConfiguredOrLegacyMeleeWeaponId(AmigoNpcManager.NpcRecord rec) {
+      if (rec == null) {
+         return null;
+      }
+
+      String configured = rec.equippedWeaponId;
+      return configured != null && !configured.isBlank()
+         ? configured
+         : br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level));
+   }
+
+   private void applySwordWeaponNow(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, boolean saveNow) {
+      if (store != null && npcRef != null && rec != null && ownerId != null) {
+         int lvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         String expected = resolveConfiguredOrLegacyMeleeWeaponId(rec);
+         if (expected != null && !expected.isBlank()) {
+            boolean slotOk = NpcWeaponSupport.isHotbar0Item(store, npcRef, expected);
+            if (expected.equals(rec.equippedWeaponId) && slotOk) {
+               if (saveNow) {
+                  AmigoPersistence.saveSwordState(ownerId, lvl, rec.equippedWeaponId);
+               }
+            } else {
+               boolean equipped = NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, expected);
+               if (equipped) {
+                  rec.equippedWeaponId = expected;
+                  if (saveNow) {
+                     AmigoPersistence.saveSwordState(ownerId, lvl, rec.equippedWeaponId);
+                  }
+
+                  this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.success", expected, lvl));
+               } else {
+                  this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.failed", expected, lvl, NpcWeaponSupport.getHotbar0ItemId(store, npcRef)));
+               }
             }
+         }
+      }
+   }
 
-            ItemContainer hotbar = hotbarComponent.getInventory();
-            if (hotbar == null) return false;
+   private void debugEquip(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugEquip(rec, ownerId, msg, this::sendToOwner);
+   }
 
-            hotbar.setItemStackForSlot((short) 0, new ItemStack(itemId, 1));
+   private void debugCombat(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugCombat(rec, ownerId, msg, this::sendToOwner);
+   }
 
-            ItemStack st = hotbar.getItemStack((short) 0);
-            if (st == null || st.isEmpty()) {
-                return false;
-            }
+   private void debugAttack(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugAttack(rec, ownerId, msg, this::sendToOwner);
+   }
 
-            hotbarComponent.setActiveSlot((byte) 0, npcRef, store);
-            hotbarComponent.markDirty();
-            hotbarComponent.setOutdatedEquipment(true);
-            return true;
+   private void debugZones(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugZones(rec, ownerId, msg, this::sendToOwner);
+   }
 
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
+   private void debugMobLevel(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugMobLevel(rec, ownerId, msg, this::sendToOwner);
+   }
 
-    private void debugEquip(NpcRecord rec, UUID ownerId, String msg) {
-        if (rec == null || ownerId == null) return;
-        if (!rec.debugLogEnabled) return;
-        long now = System.currentTimeMillis();
-        if (now < rec.debugNextEquipMillis) return;
-        rec.debugNextEquipMillis = now + 1200L;
-        sendToOwner(rec.worldObj, ownerId, "DEBUG-EQUIP: " + msg);
-    }
+   public void debugDamage(UUID ownerId, String msg) {
+      NpcDebugLogSupport.debugDamage(this.npcRefPorPlayer, ownerId, msg, this::sendToOwner);
+   }
 
-    private void debugCombat(NpcRecord rec, UUID ownerId, String msg) {
-        if (rec == null || ownerId == null) return;
-        if (!rec.debugLogEnabled) return;
-        long now = System.currentTimeMillis();
-        if (now < rec.debugNextCombatMillis) return;
-        rec.debugNextCombatMillis = now + 900L;
-        sendToOwner(rec.worldObj, ownerId, "DEBUG-COMBAT: " + msg);
-    }
+   private static boolean refEq(Object a, Object b) {
+      if (a == b) {
+         return true;
+      }
 
-    private void debugAttack(NpcRecord rec, UUID ownerId, String msg) {
-        if (rec == null || ownerId == null) return;
-        if (!rec.debugLogEnabled) return;
-        long now = System.currentTimeMillis();
-        if (now < rec.debugNextAttackMillis) return;
-        rec.debugNextAttackMillis = now + 900L;
-        sendToOwner(rec.worldObj, ownerId, "DEBUG-ATTACK: " + msg);
-    }
-
-    // Best-effort: usa Item.itemLevel como base de dano (porque o damage real do jogo
-    // vem do pipeline interno de Interactions). Serve só para testes.
-    private static double getWeaponBaseDamage(String itemId) {
-        if (itemId == null || itemId.isBlank()) return 4.0;
-        try {
-            Item it = Item.getAssetMap().getAsset(itemId);
-            if (it == null) return 4.0;
-            int lvl = it.getItemLevel();
-            // escala simples e estável: itemLevel 0..?? -> dano 4..~15
-            return 4.0 + Math.max(0, lvl) * 0.9;
-        } catch (Throwable ignored) {
-            return 4.0;
-        }
-    }
-
-    private static boolean refEq(Object a, Object b) {
-        if (a == b) return true;
-        if (a == null || b == null) return false;
-        try {
+      if (a != null && b != null) {
+         try {
             return a.equals(b);
-        } catch (Throwable ignored) {
+         } catch (Throwable ignored) {
             return false;
-        }
-    }
+         }
+      } else {
+         return false;
+      }
+   }
 
-    // =========================================================
-    // Combate (etapa inicial)
-    // =========================================================
+   public void startCombat(UUID ownerId, Object attackerRefObj) {
+      NpcCombatStateSupport.startCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
+   }
 
-    /**
-     * Chamado por sistemas/eventos quando o dono sofre dano.
-     * Faz o NPC priorizar o agressor por alguns segundos (prioridade máxima sobre follow).
-     */
-    public void startCombat(UUID ownerId, Object attackerRefObj) {
-        if (ownerId == null || attackerRefObj == null) return;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) return;
-        if (rec.downed) return;
-        if (rec.refObj == null) return;
+   public void startNpcCombat(UUID ownerId, Object attackerRefObj) {
+      NpcCombatStateSupport.startNpcCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
+   }
 
-        // Evita auto-target esquisito
-        if (attackerRefObj == rec.refObj) return;
+   public void startAssist(UUID ownerId, Object targetRefObj) {
+      NpcCombatStateSupport.startAssist(this.npcRefPorPlayer.get(ownerId), ownerId, targetRefObj, this::debugCombat);
+   }
 
-        rec.combatTargetRefObj = attackerRefObj;
-        rec.combatUntilMillis = System.currentTimeMillis() + COMBAT_WINDOW_MILLIS;
+   public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore> store) {
+      if (ownerId != null && targetRefObj != null && store != null) {
+         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcLootStateSupport.recordCombatTag(rec, targetRefObj, store, 16);
+      }
+   }
 
-        // Ao entrar em combate real (alguém te atingiu), limpamos a assistência
-        rec.assistTargetRefObj = null;
-        rec.assistUntilMillis = 0L;
-        debugCombat(rec, ownerId, "startCombat: agressorRef=" + attackerRefObj + " (defender=" + (rec.defendeEnabled ? "ON" : "OFF") + ")");
-    }
+   private Object getActiveAssistTarget(AmigoNpcManager.NpcRecord rec, long now) {
+      return NpcCombatStateSupport.getActiveAssistTarget(rec, now);
+   }
 
-    /**
-     * Chamado quando o player dá dano em um alvo (primeiro ataque).
-     * Só vale se /amigo defender estiver ON e se não existir agressor ativo no momento.
-     */
+   private void clearAssist(AmigoNpcManager.NpcRecord rec) {
+      NpcCombatStateSupport.clearAssist(rec);
+   }
 
-    public void startAssist(UUID ownerId, Object targetRefObj) {
-        if (ownerId == null || targetRefObj == null) return;
-        NpcRecord rec = npcRefPorPlayer.get(ownerId);
-        if (rec == null) return;
-        if (!rec.defendeEnabled) return;
-        if (rec.downed) return;
-        if (rec.refObj == null) return;
-        if (targetRefObj == rec.refObj) return;
+   private static boolean isValidEntityRef(Object store, Object refObj) {
+      return NpcEntityQuerySupport.isValidEntityRef(store, refObj, AmigoNpcManager::getComponentFromStore);
+   }
 
-        long now = System.currentTimeMillis();
-        // Se alguem ja te atacou (agressor ativo), nao troca para assistencia
-        if (getActiveCombatTarget(rec, now) != null) return;
+   private static boolean isAliveEntityRef(Object store, Object refObj) {
+      return NpcEntityQuerySupport.isAliveEntityRef(store, refObj, AmigoNpcManager::getComponentFromStore);
+   }
 
-        // Mantem o primeiro alvo de assistencia ate acabar (nao troca a cada hit)
-        if (rec.assistTargetRefObj != null) return;
+   private static double getEntityHeight(Object store, Object refObj) {
+      return NpcEntityQuerySupport.getEntityHeight(store, refObj, AmigoNpcManager::getComponentFromStore);
+   }
 
-        rec.assistTargetRefObj = targetRefObj;
-        rec.assistUntilMillis = 0L; // sem timeout enquanto houver alvo
-        debugCombat(rec, ownerId, "startAssist: targetRef=" + targetRefObj);
-    }
+   private static double getEntityRadiusXZ(Object store, Object refObj) {
+      return NpcEntityQuerySupport.getEntityRadiusXZ(store, refObj, AmigoNpcManager::getComponentFromStore);
+   }
 
+   private static void tickAssistHousekeeping(AmigoNpcManager.NpcRecord rec, Object store, long now) {
+      NpcEntityQuerySupport.tickAssistHousekeeping(rec, store, now, 3000L, AmigoNpcManager::getComponentFromStore);
+   }
 
-/**
- * Registra um "combat tag" (alvo + posição + timestamp) para validar loot pós-combate.
- * Chamado quando o dono (via Assist) ou o NPC dão dano / matam.
- *
- * Regras:
- * - não salva em disco (é janela curta)
- * - mantém poucos registros (cap) para não crescer
- */
-@SuppressWarnings({"unchecked", "rawtypes"})
-public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore> store) {
-    if (ownerId == null || targetRefObj == null || store == null) return;
-    NpcRecord rec = npcRefPorPlayer.get(ownerId);
-    if (rec == null) return;
-    if (rec.refObj == null) return;
-    if (rec.downed) return;
-    if (!(targetRefObj instanceof Ref)) return;
+   private Object findNearestDefenderTarget(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d ownerPos) {
+      return NpcTargetAcquisitionSupport.findNearestDefenderTarget(store, rec, ownerRefObj, ownerPos, this.pvpEnabled, 12.0, 2.5, 35.0);
+   }
 
-    long now = System.currentTimeMillis();
-    rec.lastCombatTagMillis = now;
-    rec.wasInCombat = true;
+   private Object findNearestTargetNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Object excludeRefObj) {
+      return NpcTargetAcquisitionSupport.findNearestTargetNearNpc(store, rec, ownerRefObj, npcPos, excludeRefObj, this.pvpEnabled, 12.0, 2.5, 35.0);
+   }
 
+   private static boolean isAnyEnemyNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, double radius) {
+      return NpcTargetAcquisitionSupport.isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, radius, 2.5, 35.0);
+   }
 
-    try {
-        Ref<EntityStore> targetRef = (Ref<EntityStore>) targetRefObj;
-        TransformComponent tc = store.getComponent(targetRef, TransformComponent.getComponentType());
-        if (tc == null || tc.getPosition() == null) return;
+   private void clearCombatTagsAndLoot(AmigoNpcManager.NpcRecord rec) {
+      NpcLootStateSupport.clearCombatTagsAndLoot(rec);
+   }
 
-        Vector3d pos = tc.getPosition();
-        rec.lastBattleCenter = pos;
+   private static boolean isItemRefValid(Store<EntityStore> store, Object refObj) {
+      return NpcLootStateSupport.isItemRefValid(store, refObj);
+   }
 
-        synchronized (rec.combatTags) {
-            // Atualiza se já existe
-            CombatTag existing = null;
-            for (CombatTag t : rec.combatTags) {
-                if (t != null && refEq(t.targetRefObj, targetRefObj)) { existing = t; break; }
+   private static void lootChatAccAdd(AmigoNpcManager.NpcRecord rec, String itemId, int qty, long now) {
+      NpcLootStateSupport.lootChatAccAdd(rec, itemId, qty, now, 500L);
+   }
+
+   private void lootChatAccFlushIfDue(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object worldObj, long now) {
+      NpcLootStateSupport.lootChatAccFlushIfDue(rec, ownerId, worldObj, now, this::sendToOwner);
+   }
+
+   private boolean tryPickupGroundItemIntoBackpack(
+      Store<EntityStore> store, UUID ownerId, AmigoNpcManager.NpcRecord rec, SimpleItemContainer bag, Object itemRefObj
+   ) {
+      return NpcBackpackLootSupport.tryPickupGroundItemIntoBackpack(
+         store, ownerId, rec, bag, itemRefObj, this::maybeNotifyBackpackFull, AmigoNpcManager::lootChatAccAdd
+      );
+   }
+
+   private void refreshPendingLootFromCombatTags(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now) {
+      NpcLootStateSupport.refreshPendingLootFromCombatTags(store, rec, npcPos, ownerPos, now, 6.0, 512, AUTOLOOT_QUERY);
+   }
+
+   private static boolean containsRef(ArrayList<Object> list, Ref<EntityStore> ref) {
+      return NpcLootStateSupport.containsRef(list, ref);
+   }
+
+   private Object chooseNearestPendingLoot(AmigoNpcManager.NpcRecord rec, Store<EntityStore> store, Vector3d npcPos) {
+      return NpcLootStateSupport.chooseNearestPendingLoot(rec, store, npcPos);
+   }
+
+   private void tickCombatTaggedLooting(
+      Store<EntityStore> store,
+      UUID ownerId,
+      AmigoNpcManager.NpcRecord rec,
+      Object ownerRefObj,
+      Vector3d npcPos,
+      Vector3d ownerPos,
+      long now,
+      Object worldObj,
+      boolean inCombatOrAssistNow
+   ) {
+      if (store != null && ownerId != null && rec != null && npcPos != null) {
+         if (!rec.downed) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE) {
+               NpcCombatLootFlowSupport.PreLootAction preLootAction = NpcCombatLootFlowSupport.prepareCombatTaggedLooting(
+                  rec,
+                  ownerId,
+                  now,
+                  ownerPos,
+                  inCombatOrAssistNow,
+                  500L,
+                  25000L,
+                  25.0,
+                  () -> ownerRefObj != null && isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, 4.0)
+               );
+               if (preLootAction != NpcCombatLootFlowSupport.PreLootAction.RETURN) {
+                  if (preLootAction == NpcCombatLootFlowSupport.PreLootAction.CLEAR_AND_RETURN) {
+                     this.clearCombatTagsAndLoot(rec);
+                  } else {
+                     if (rec.backpack == null) {
+                        try {
+                           rec.backpack = this.getOrLoadBackpack(ownerId);
+                        } catch (Throwable var13) {
+                        }
+                     }
+
+                     SimpleItemContainer bag = rec.backpack;
+                     if (bag != null) {
+                        rec.lootPausedInventoryFull = false;
+                        if (NpcCombatLootTargetSupport.ensureLootTarget(
+                           store, rec, npcPos, ownerPos, now, this::refreshPendingLootFromCombatTags, this::chooseNearestPendingLoot
+                        )) {
+                           if (NpcCombatLootTargetSupport.validateLootTarget(store, rec, now, 12000L, 4000L, AmigoNpcManager::isItemRefValid)) {
+                              NpcCombatLootTargetSupport.steerNpcToLootTarget(
+                                 store,
+                                 rec,
+                                 NPCEntity.getComponentType(),
+                                 AmigoNpcManager::getComponentFromStore,
+                                 AmigoNpcManager::setLockedTargetOnNpcEntity,
+                                 AmigoNpcManager::setMarkedTargetOnNpcEntity,
+                                 AmigoNpcManager::setFlockState
+                              );
+                              NpcCombatLootTargetSupport.tryPickupLootTarget(
+                                 store, ownerId, rec, bag, npcPos, now, 5.0, 4000L, this::tryPickupGroundItemIntoBackpack
+                              );
+                           }
+                        }
+                     }
+                  }
+               }
             }
-            if (existing != null) {
-                existing.pos = pos;
-                existing.lastSeenMillis = now;
-            } else {
-                if (rec.combatTags.size() >= COMBAT_TAG_MAX) {
-                    rec.combatTags.remove(0);
-                }
-                rec.combatTags.add(new CombatTag(targetRefObj, pos, now));
-            }
-        }
-    } catch (Throwable ignored) {}
-}
-
-
-    /** Retorna o alvo de assistencia (se ativo), ou null. */
-    private Object getActiveAssistTarget(NpcRecord rec, long now) {
-        if (rec == null) return null;
-        return rec.assistTargetRefObj;
-    }
-
-    private void clearAssist(NpcRecord rec) {
-        if (rec == null) return;
-        rec.assistTargetRefObj = null;
-        rec.assistUntilMillis = 0L;
-    }
-
-    private static boolean isValidEntityRef(Object store, Object refObj) {
-        if (store == null || refObj == null) return false;
-        try {
-            Object tc = getComponentFromStore(store, refObj, TransformComponent.getComponentType());
-            return tc != null;
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    /**
-     * Considera "vivo" quando:
-     * - ainda tem TransformComponent
-     * - e (se houver EntityStatMap) health > 0
-     *
-     * Motivo: o corpo pode demorar a sumir e o NPC ficava "esperando" no alvo morto.
-     */
-    private static boolean isAliveEntityRef(Object store, Object refObj) {
-        if (!isValidEntityRef(store, refObj)) return false;
-        try {
-            // Se o motor já marcou como morto, não trate como vivo (evita ficar preso no cadáver)
-            try {
-                Object dc = getComponentFromStore(store, refObj, DeathComponent.getComponentType());
-                if (dc != null) return false;
-            } catch (Throwable ignored) {}
-
-            Object statsObj = getComponentFromStore(store, refObj, EntityStatMap.getComponentType());
-            if (!(statsObj instanceof EntityStatMap stats)) return true; // sem stats => assume vivo
-            try {
-                float hp = stats.get(DefaultEntityStatTypes.getHealth()).get();
-                return hp > 0f;
-            } catch (Throwable ignored) {
-                return true;
-            }
-        } catch (Throwable ignored) {
-            return true;
-        }
-    }
-
-    /** Altura do alvo (best-effort) via BoundingBox. Usado para tolerância vertical e reposicionamento. */
-    private static double getEntityHeight(Object store, Object refObj) {
-        if (store == null || refObj == null) return 1.8;
-        try {
-            Object bbObj = getComponentFromStore(store, refObj, BoundingBox.getComponentType());
-            if (bbObj instanceof BoundingBox bb) {
-                try {
-                    var box = bb.getBoundingBox();
-                    if (box != null) {
-                        double h = box.height();
-                        if (h > 0.05) return h;
-                    }
-                } catch (Throwable ignored) {}
-            }
-        } catch (Throwable ignored) {}
-        return 1.8;
-    }
-
-    /**
-     * Raio aproximado no plano XZ (best-effort) via BoundingBox.
-     * Importante: a distância centro-a-centro pode ser enganosa para mobs maiores,
-     * então subtrair o raio do alvo melhora o "alcance" real sem aumentar a espada.
-     */
-    private static double getEntityRadiusXZ(Object store, Object refObj) {
-        if (store == null || refObj == null) return 0.45;
-        try {
-            Object bbObj = getComponentFromStore(store, refObj, BoundingBox.getComponentType());
-            if (bbObj instanceof BoundingBox bb) {
-                Object box = null;
-                try { box = bb.getBoundingBox(); } catch (Throwable ignored) {}
-                if (box != null) {
-                    double w = readBoxDim(box, "width", "getWidth", "xSize", "getXSize");
-                    double d = readBoxDim(box, "depth", "getDepth", "zSize", "getZSize");
-                    if (w > 0.05 && d > 0.05) {
-                        double r = 0.5 * Math.max(w, d);
-                        return clamp(r, 0.20, 2.00);
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return 0.45;
-    }
-
-    private static double readBoxDim(Object box, String... methodNames) {
-        if (box == null || methodNames == null) return -1;
-        for (String name : methodNames) {
-            if (name == null || name.isBlank()) continue;
-            try {
-                java.lang.reflect.Method m = box.getClass().getMethod(name);
-                Object v = m.invoke(box);
-                if (v instanceof Number n) {
-                    double d = n.doubleValue();
-                    if (d > 0.0) return d;
-                }
-            } catch (Throwable ignored) {}
-        }
-        return -1;
-    }
-
-    private static double clamp(double v, double min, double max) {
-        return Math.max(min, Math.min(max, v));
-    }
-
-    private static void tickAssistHousekeeping(NpcRecord rec, Object store, long now) {
-        if (rec == null) return;
-
-        if (!rec.defendeEnabled) {
-            rec.assistTargetRefObj = null;
-            rec.assistUntilMillis = 0L;
-            return;
-        }
-
-        if (rec.assistTargetRefObj != null) {
-            if (!isAliveEntityRef(store, rec.assistTargetRefObj)) {
-                rec.assistTargetRefObj = null;
-                rec.assistUntilMillis = now + ASSIST_GRACE_MILLIS;
-            }
-            return;
-        }
-
-        // Sem alvo: termina apos 3s sem inimigos.
-        if (rec.assistUntilMillis > 0L && now > rec.assistUntilMillis) {
-            rec.assistUntilMillis = 0L;
-        }
-    }
-
-
-    /**
-     * Auto-alvo do Defender:
-     * - Se nao existe agressor e nao existe assist atual, tenta pegar a entidade viva mais proxima do dono
-     *   dentro de um raio fixo (horizontal) e tolerancia vertical.
-     * - Nao mira no dono, no proprio NPC, nem em players quando amigopvp estiver OFF.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private Object findNearestDefenderTarget(Store<EntityStore> store, NpcRecord rec, Object ownerRefObj, org.joml.Vector3d ownerPos) {
-        if (store == null || rec == null || ownerRefObj == null || ownerPos == null) return null;
-        if (!(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return null;
-
-        Ref<EntityStore> ownerRef = (Ref<EntityStore>) ownerRefObj;
-        Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-        final double r = DEFENDER_AUTO_ACQUIRE_RADIUS;
-        final double r2 = r * r;
-        final double maxDy = DEFENDER_AUTO_ACQUIRE_MAX_DY;
-
-        final Object[] bestRef = new Object[1];
-        final double[] bestD2 = new double[]{Double.POSITIVE_INFINITY};
-
-        try {
-            store.forEachChunk((chunk, cb) -> {
-                int sz;
-                try { sz = chunk.size(); } catch (Throwable t) { return; }
-
-                for (int i = 0; i < sz; i++) {
-                    Ref<EntityStore> ref;
-                    try { ref = (Ref<EntityStore>) chunk.getReferenceTo(i); } catch (Throwable t) { continue; }
-                    if (ref == null) continue;
-                    if (refEq(ref, ownerRef) || refEq(ref, npcRef)) continue;
-
-                    // Nao perseguir players quando PvP estiver OFF
-                    try {
-                        Player maybePlayer = (Player) chunk.getComponent(i, Player.getComponentType());
-                        if (maybePlayer != null && !pvpEnabled) continue;
-                    } catch (Throwable ignored) {}
-
-                    // Ignora entidades já marcadas como mortas (cadáver / death animation)
-                    try {
-                        DeathComponent dc = (DeathComponent) chunk.getComponent(i, DeathComponent.getComponentType());
-                        if (dc != null) continue;
-                    } catch (Throwable ignored) {}
-
-                    // Ignora entidades já marcadas como mortas (cadáver / death animation)
-                    try {
-                        DeathComponent dc = (DeathComponent) chunk.getComponent(i, DeathComponent.getComponentType());
-                        if (dc != null) continue;
-                    } catch (Throwable ignored) {}
-
-                    TransformComponent tc;
-                    try { tc = (TransformComponent) chunk.getComponent(i, TransformComponent.getComponentType()); } catch (Throwable t) { continue; }
-                    if (tc == null || tc.getPosition() == null) continue;
-
-                    var p = tc.getPosition();
-                    double dy = Math.abs(p.y() - ownerPos.y());
-                    if (dy > maxDy) continue;
-
-                    double dx = p.x() - ownerPos.x();
-                    double dz = p.z() - ownerPos.z();
-                    double d2 = dx * dx + dz * dz;
-                    if (d2 > r2) continue;
-
-                    // So entidades "vivas" (tem stats + vida > 0). Ajuda a nao mirar em projeteis/itens.
-                    try {
-                        EntityStatMap stats = (EntityStatMap) chunk.getComponent(i, EntityStatMap.getComponentType());
-                        if (stats == null) continue;
-                        var hp = stats.get(DefaultEntityStatTypes.getHealth());
-                        if (hp != null && hp.get() <= 0.0f) continue;
-                    } catch (Throwable ignored) {
-                        continue;
-                    }
-
-                    if (d2 < bestD2[0]) {
-                        bestD2[0] = d2;
-                        bestRef[0] = ref;
-                    }
-                }
-            });
-        } catch (Throwable ignored) {}
-
-        return bestRef[0];
-    }
-
-    /**
-     * Retarget (após a morte do alvo): procura o inimigo mais próximo do PRÓPRIO NPC.
-     * Motivo: evita o NPC ficar preso no cadáver que demora a sumir.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private Object findNearestTargetNearNpc(Store<EntityStore> store,
-                                           NpcRecord rec,
-                                           Object ownerRefObj,
-                                           org.joml.Vector3d npcPos,
-                                           Object excludeRefObj) {
-        if (store == null || rec == null || ownerRefObj == null || npcPos == null) return null;
-        if (!(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return null;
-
-        Ref<EntityStore> ownerRef = (Ref<EntityStore>) ownerRefObj;
-        Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-        final double r = DEFENDER_AUTO_ACQUIRE_RADIUS;
-        final double r2 = r * r;
-        final double maxDy = DEFENDER_AUTO_ACQUIRE_MAX_DY;
-
-        final Object[] bestRef = new Object[1];
-        final double[] bestD2 = new double[]{Double.POSITIVE_INFINITY};
-
-        try {
-            store.forEachChunk((chunk, cb) -> {
-                int sz;
-                try { sz = chunk.size(); } catch (Throwable t) { return; }
-
-                for (int i = 0; i < sz; i++) {
-                    Ref<EntityStore> ref;
-                    try { ref = (Ref<EntityStore>) chunk.getReferenceTo(i); } catch (Throwable t) { continue; }
-                    if (ref == null) continue;
-                    if (refEq(ref, ownerRef) || refEq(ref, npcRef)) continue;
-                    if (excludeRefObj instanceof Ref && refEq(ref, (Ref<EntityStore>) excludeRefObj)) continue;
-
-                    // Nao perseguir players quando PvP estiver OFF
-                    try {
-                        Player maybePlayer = (Player) chunk.getComponent(i, Player.getComponentType());
-                        if (maybePlayer != null && !pvpEnabled) continue;
-                    } catch (Throwable ignored) {}
-
-                    // Ignora entidades já marcadas como mortas (cadáver / death animation)
-                    try {
-                        DeathComponent dc = (DeathComponent) chunk.getComponent(i, DeathComponent.getComponentType());
-                        if (dc != null) continue;
-                    } catch (Throwable ignored) {}
-
-                    TransformComponent tc;
-                    try { tc = (TransformComponent) chunk.getComponent(i, TransformComponent.getComponentType()); } catch (Throwable t) { continue; }
-                    if (tc == null || tc.getPosition() == null) continue;
-
-                    var p = tc.getPosition();
-                    double dy = Math.abs(p.y() - npcPos.y());
-                    if (dy > maxDy) continue;
-
-                    double dx = p.x() - npcPos.x();
-                    double dz = p.z() - npcPos.z();
-                    double d2 = dx * dx + dz * dz;
-                    if (d2 > r2) continue;
-
-                    // So entidades vivas
-                    try {
-                        EntityStatMap stats = (EntityStatMap) chunk.getComponent(i, EntityStatMap.getComponentType());
-                        if (stats == null) continue;
-                        var hp = stats.get(DefaultEntityStatTypes.getHealth());
-                        if (hp != null && hp.get() <= 0.0f) continue;
-                    } catch (Throwable ignored) {
-                        continue;
-                    }
-
-                    if (d2 < bestD2[0]) {
-                        bestD2[0] = d2;
-                        bestRef[0] = ref;
-                    }
-                }
-            });
-        } catch (Throwable ignored) {}
-
-        return bestRef[0];
-    }
-
-    
-// =========================================================
-// Loot pós-combate (combat tag)
-// =========================================================
-
-private static boolean isAnyEnemyNearNpc(Store<EntityStore> store,
-                                        NpcRecord rec,
-                                        Object ownerRefObj,
-                                        Vector3d npcPos,
-                                        double radius) {
-    if (store == null || rec == null || ownerRefObj == null || npcPos == null) return false;
-    if (!(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return false;
-
-    @SuppressWarnings("unchecked")
-    Ref<EntityStore> ownerRef = (Ref<EntityStore>) ownerRefObj;
-    @SuppressWarnings("unchecked")
-    Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-    final double r2 = radius * radius;
-    final double maxDy = DEFENDER_AUTO_ACQUIRE_MAX_DY;
-
-    final boolean[] found = new boolean[]{false};
-
-    try {
-        store.forEachChunk((chunk, cb) -> {
-            if (found[0]) return;
-
-            int sz;
-            try { sz = chunk.size(); } catch (Throwable t) { return; }
-
-            for (int i = 0; i < sz; i++) {
-                Ref<EntityStore> ref;
-                try { ref = (Ref<EntityStore>) chunk.getReferenceTo(i); } catch (Throwable t) { continue; }
-                if (ref == null) continue;
-                if (refEq(ref, ownerRef) || refEq(ref, npcRef)) continue;
-
-                // Não perseguir players (mantém comportamento seguro; PvP entre NPCs é controlado em /amigopvp)
-                try {
-                    Player maybePlayer = (Player) chunk.getComponent(i, Player.getComponentType());
-                    if (maybePlayer != null) continue;
-                } catch (Throwable ignored) {}
-// Ignora entidades já marcadas como mortas (cadáver / death animation)
-                try {
-                    DeathComponent dc = (DeathComponent) chunk.getComponent(i, DeathComponent.getComponentType());
-                    if (dc != null) continue;
-                } catch (Throwable ignored) {}
-
-                TransformComponent tc;
-                try { tc = (TransformComponent) chunk.getComponent(i, TransformComponent.getComponentType()); } catch (Throwable t) { continue; }
-                if (tc == null || tc.getPosition() == null) continue;
-
-                var p = tc.getPosition();
-                double dy = Math.abs(p.y() - npcPos.y());
-                if (dy > maxDy) continue;
-
-                double dx = p.x() - npcPos.x();
-                double dz = p.z() - npcPos.z();
-                double d2 = dx * dx + dz * dz;
-                if (d2 > r2) continue;
-
-                // Só entidades vivas (tem stats + vida > 0).
-                try {
-                    EntityStatMap stats = (EntityStatMap) chunk.getComponent(i, EntityStatMap.getComponentType());
-                    if (stats == null) continue;
-                    var hp = stats.get(DefaultEntityStatTypes.getHealth());
-                    if (hp != null && hp.get() <= 0.0f) continue;
-                } catch (Throwable ignored) {
-                    continue;
-                }
-
-                found[0] = true;
-                return;
-            }
-        });
-    } catch (Throwable ignored) {}
-
-    return found[0];
-}
-
-private static double dist2(Vector3d a, Vector3d b) {
-    if (a == null || b == null) return Double.POSITIVE_INFINITY;
-    double dx = a.x() - b.x();
-    double dy = a.y() - b.y();
-    double dz = a.z() - b.z();
-    return dx*dx + dy*dy + dz*dz;
-}
-
-private void clearCombatTagsAndLoot(NpcRecord rec) {
-    if (rec == null) return;
-    synchronized (rec.combatTags) {
-        rec.combatTags.clear();
-    }
-    rec.pendingLootRefObjs.clear();
-    rec.lootTargetRefObj = null;
-    rec.lootTargetSinceMillis = 0L;
-    rec.lootingActive = false;
-    rec.lastCombatEndMillis = 0L;
-    rec.lastBattleCenter = null;
-}
-
-private static boolean isItemRefValid(Store<EntityStore> store, Object refObj) {
-    if (store == null || refObj == null) return false;
-    if (!(refObj instanceof Ref)) return false;
-    try {
-        @SuppressWarnings("unchecked")
-        Ref<EntityStore> r = (Ref<EntityStore>) refObj;
-        // Basta existir Transform + ItemComponent
-        TransformComponent tc = store.getComponent(r, TransformComponent.getComponentType());
-        ItemComponent ic = store.getComponent(r, ItemComponent.getComponentType());
-        return tc != null && tc.getPosition() != null && ic != null;
-    } catch (Throwable ignored) {}
-    return false;
-}
-
-
-/**
- * Acumula itens coletados para enviar um resumo no chat após um pequeno atraso,
- * reduzindo poluição no chat durante LOOTING.
- */
-private static void lootChatAccAdd(NpcRecord rec, String itemId, int qty, long now) {
-    if (rec == null || itemId == null || itemId.isBlank() || qty <= 0) return;
-    try {
-        Integer cur = rec.lootChatAcc.get(itemId);
-        rec.lootChatAcc.put(itemId, (cur == null ? 0 : cur) + qty);
-        rec.lootChatSendAtMillis = now + LOOT_CHAT_SUMMARY_DELAY_MS;
-    } catch (Throwable ignored) {}
-}
-
-/** Se o atraso expirou, envia o resumo do loot no chat e limpa o acumulador. */
-private void lootChatAccFlushIfDue(NpcRecord rec, UUID ownerId, Object worldObj, long now) {
-    if (rec == null || ownerId == null || worldObj == null) return;
-    long at = rec.lootChatSendAtMillis;
-    if (at <= 0L || now < at) return;
-
-    if (rec.lootChatAcc.isEmpty()) {
-        rec.lootChatSendAtMillis = 0L;
-        return;
-    }
-
-    try {
-        StringBuilder sb = new StringBuilder();
-        sb.append("AmigoNPC: Coletado ");
-        boolean first = true;
-        for (java.util.Map.Entry<String, Integer> en : rec.lootChatAcc.entrySet()) {
-            if (en == null) continue;
-            String id = en.getKey();
-            Integer q = en.getValue();
-            if (id == null || id.isBlank() || q == null || q <= 0) continue;
-            if (!first) sb.append(", ");
-            first = false;
-            sb.append(q).append(" ").append(id);
-            // evita mensagens gigantes
-            if (sb.length() > 180) break;
-        }
-        sb.append(".");
-        sendToOwner(worldObj, ownerId, sb.toString());
-    } catch (Throwable ignored) {
-        // não quebra tick por causa de chat
-    } finally {
-        rec.lootChatAcc.clear();
-        rec.lootChatSendAtMillis = 0L;
-    }
-}
-
-
-/**
- * Tenta inserir o stack de uma entidade item no chão na mochila do NPC.
- * Retorna true se inseriu algo (mesmo que parcial).
- * - Sem duplicação: só remove/atualiza o item do chão após inserir no inventário.
- */
-@SuppressWarnings({"unchecked", "rawtypes"})
-private boolean tryPickupGroundItemIntoBackpack(Store<EntityStore> store,
-                                               UUID ownerId,
-                                               NpcRecord rec,
-                                               SimpleItemContainer bag,
-                                               Object itemRefObj) {
-    if (store == null || ownerId == null || rec == null || bag == null || itemRefObj == null) return false;
-    if (!(itemRefObj instanceof Ref)) return false;
-
-    Ref<EntityStore> itemRef = (Ref<EntityStore>) itemRefObj;
-
-    ItemComponent ic;
-    try { ic = store.getComponent(itemRef, ItemComponent.getComponentType()); } catch (Throwable t) { return false; }
-    if (ic == null) return false;
-
-    ItemStack before;
-    try { before = ic.getItemStack(); } catch (Throwable t) { return false; }
-    if (before == null) return false;
-
-    int beforeQty;
-    try { beforeQty = before.getQuantity(); } catch (Throwable t) { return false; }
-    if (beforeQty <= 0) return false;
-
-    String itemId;
-    try { itemId = before.getItemId(); } catch (Throwable t) { itemId = null; }
-    if (itemId == null || itemId.isBlank()) itemId = "item";
-
-    try {
-        // Usa a lógica do container do jogo (respeita max stack e compatibilidade)
-        ItemStackTransaction tx = bag.addItemStack(before);
-        ItemStack rem = tx.getRemainder();
-
-        int remQty = 0;
-        try { if (rem != null) remQty = rem.getQuantity(); } catch (Throwable ignored) {}
-
-        int inserted = beforeQty - remQty;
-        if (inserted <= 0) {
-            // Se estiver totalmente cheio, abandona o looting e avisa (com cooldown)
-            if (isBackpackCompletelyFull(bag)) {
-                rec.lootPausedInventoryFull = true;
-                rec.lootingActive = false;
-                maybeNotifyBackpackFull(rec, ownerId, rec.worldObj, System.currentTimeMillis());
-            } else {
-            }
-            return false;
-        }
-
-        // Marca dirty (persistência)
-        rec.backpackDirty = true;
-        long now = System.currentTimeMillis();
-        if (rec.nextBackpackSaveMillis == 0L) rec.nextBackpackSaveMillis = now + 5_000L;
-
-        // Atualiza chão: remove se entrou tudo, senão ajusta quantidade restante
-        if (rem == null || remQty <= 0) {
-            store.removeEntity(itemRef, RemoveReason.REMOVE);
-        } else {
-            ic.setItemStack(rem);
-            store.putComponent(itemRef, ItemComponent.getComponentType(), ic);
-        }
-        // Resumo no chat após pequeno atraso (reduz poluição)
-        lootChatAccAdd(rec, itemId, inserted, now);
-        return true;
-    } catch (Throwable t) {
-    }
-
-    return false;
-}
-
-
-/**
- * Monta/atualiza a lista de itens pendentes para loot, procurando drops perto das combat tags.
- */
-@SuppressWarnings({"unchecked", "rawtypes"})
-private void refreshPendingLootFromCombatTags(Store<EntityStore> store,
-                                             NpcRecord rec,
-                                             Vector3d npcPos,
-                                             Vector3d ownerPos,
-                                             long now) {
-    if (store == null || rec == null) return;
-
-    // Prune do mapa de "ignorados por um tempo"
-    try {
-        rec.lootProcessedUntil.entrySet().removeIf(e -> e == null || e.getValue() == null || e.getValue() <= now);
-    } catch (Throwable ignored) {}
-
-    // Snapshot tags
-    java.util.ArrayList<CombatTag> tags = new java.util.ArrayList<>();
-    synchronized (rec.combatTags) { tags.addAll(rec.combatTags); }
-
-    if (tags.isEmpty()) return;
-
-    final double tagR2 = LOOT_TAG_SCAN_RADIUS * LOOT_TAG_SCAN_RADIUS;
-
-    // IMPORTANTE: iterar apenas sobre entidades que são Item drops (Transform + ItemComponent)
-    // para evitar tentar "loot" de entidades normais.
-    try {
-        store.forEachChunk(AUTOLOOT_QUERY, (chunkObj, cb) -> {
-            if (!(chunkObj instanceof com.hypixel.hytale.component.ArchetypeChunk<?> rawChunk)) return true;
-
-            com.hypixel.hytale.component.ArchetypeChunk<EntityStore> chunk;
-            try { chunk = (com.hypixel.hytale.component.ArchetypeChunk<EntityStore>) rawChunk; }
-            catch (Throwable t) { return true; }
-
-            int sz;
-            try { sz = chunk.size(); } catch (Throwable t) { return true; }
-
-            for (int i = 0; i < sz; i++) {
-                if (rec.pendingLootRefObjs.size() >= LOOT_PENDING_MAX) return true;
-
-                Ref<EntityStore> ref;
-                try { ref = (Ref<EntityStore>) chunk.getReferenceTo(i); } catch (Throwable t) { continue; }
-                if (ref == null) continue;
-
-                // Se já está pendente, não repete
-                if (containsRef(rec.pendingLootRefObjs, ref)) continue;
-
-                // Ignora se foi marcado como "não tentar agora"
-                Long until = rec.lootProcessedUntil.get(ref);
-                if (until != null && until > now) continue;
-
-                TransformComponent tc;
-                try { tc = (TransformComponent) chunk.getComponent(i, TransformComponent.getComponentType()); }
-                catch (Throwable t) { continue; }
-                if (tc == null || tc.getPosition() == null) continue;
-
-                Vector3d p = tc.getPosition();
-
-                boolean nearAnyTag = false;
-                for (CombatTag t : tags) {
-                    if (t == null || t.pos == null) continue;
-                    if (dist2(p, t.pos) <= tagR2) { nearAnyTag = true; break; }
-                }
-                if (!nearAnyTag) continue;
-
-                rec.pendingLootRefObjs.add(ref);
-            }
-
-            return true;
-        });
-    } catch (Throwable ignored) {}
-}
-
-private static boolean containsRef(java.util.ArrayList<Object> list, Ref<EntityStore> ref) {
-    if (list == null || ref == null) return false;
-    for (Object o : list) {
-        if (o instanceof Ref && refEq((Ref<EntityStore>) o, ref)) return true;
-    }
-    return false;
-}
-
-/**
- * Escolhe o item pendente mais próximo do NPC.
- */
-@SuppressWarnings({"unchecked", "rawtypes"})
-private Object chooseNearestPendingLoot(NpcRecord rec, Store<EntityStore> store, Vector3d npcPos) {
-    if (rec == null || store == null || npcPos == null) return null;
-    Object best = null;
-    double bestD2 = Double.POSITIVE_INFINITY;
-
-    // Limpa refs inválidos enquanto escolhe
-    for (int i = rec.pendingLootRefObjs.size() - 1; i >= 0; i--) {
-        Object r = rec.pendingLootRefObjs.get(i);
-        if (!isItemRefValid(store, r)) {
-            rec.pendingLootRefObjs.remove(i);
-            continue;
-        }
-
-        if (!(r instanceof Ref)) continue;
-        try {
-            TransformComponent tc = store.getComponent((Ref<EntityStore>) r, TransformComponent.getComponentType());
-            if (tc == null || tc.getPosition() == null) continue;
-            double d2 = dist2(tc.getPosition(), npcPos);
-            if (d2 < bestD2) { bestD2 = d2; best = r; }
-        } catch (Throwable ignored) {}
-    }
-    return best;
-}
-
-/**
- * Tick do LOOTING:
- * - só fora de combate/assist e só quando não há inimigo muito perto do NPC
- * - NPC corre até o item e só então insere na mochila
- */
-@SuppressWarnings({"unchecked", "rawtypes"})
-private void tickCombatTaggedLooting(Store<EntityStore> store,
-                                    UUID ownerId,
-                                    NpcRecord rec,
-                                    Object ownerRefObj,
-                                    Vector3d npcPos,
-                                    Vector3d ownerPos,
-                                    long now,
-                                    Object worldObj,
-                                    boolean inCombatOrAssistNow) {
-    if (store == null || ownerId == null || rec == null || npcPos == null) return;
-    if (rec.downed) return;
-    if (rec.state != State.ACTIVE) return;
-
-    // Se entrou em combate, pausa LOOTING imediatamente
-    if (inCombatOrAssistNow) {
-        rec.wasInCombat = true;
-        rec.lootingActive = false;
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        rec.pendingLootRefObjs.clear();
-        return;
-    }
-
-    // Transição: acabou o combate → inicia LOOTING (se houver tags)
-    if (rec.wasInCombat) {
-        rec.wasInCombat = false;
-        rec.lastCombatEndMillis = now;
-        // se não tiver tags, não inicia
-        boolean hasTags;
-        synchronized (rec.combatTags) { hasTags = !rec.combatTags.isEmpty(); }
-        rec.lootingActive = hasTags;
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        rec.pendingLootRefObjs.clear();
-    }
-
-    if (!rec.lootingActive) return;
-
-    // Limpa tags ao sair do local da batalha ou após timeout
-    if (rec.lastCombatEndMillis > 0L) {
-        boolean timeUp = (now - rec.lastCombatEndMillis) >= COMBAT_TAG_CLEAR_MS;
-        boolean distUp = false;
-        if (rec.lastBattleCenter != null && ownerPos != null) {
-            distUp = dist2(rec.lastBattleCenter, ownerPos) >= (COMBAT_TAG_CLEAR_DISTANCE * COMBAT_TAG_CLEAR_DISTANCE);
-        }
-        if (timeUp || distUp) {
-            clearCombatTagsAndLoot(rec);
-            return;
-        }
-    }
-
-    // Só entra/continua loot se não há inimigo muito perto do NPC
-    if (ownerRefObj != null && isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, LOOTING_NO_ENEMY_RADIUS)) {
-        // libera o Defender retomar (não bloqueia)
-        rec.lootingActive = false;
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        rec.pendingLootRefObjs.clear();
-        return;
-    }
-
-    // mochila carregada
-    if (rec.backpack == null) {
-        try { rec.backpack = getOrLoadBackpack(ownerId); } catch (Throwable ignored) {}
-    }
-    SimpleItemContainer bag = rec.backpack;
-    if (bag == null) return;
-    // Mochila cheia é tratada por item no momento do pickup (para permitir empilhar)
-    rec.lootPausedInventoryFull = false;
-    // Se não há target atual, tenta montar pendentes e escolher um
-    if (rec.lootTargetRefObj == null) {
-        if (rec.pendingLootRefObjs.isEmpty()) {
-            refreshPendingLootFromCombatTags(store, rec, npcPos, ownerPos, now);
-        }
-        Object chosen = chooseNearestPendingLoot(rec, store, npcPos);
-        if (chosen == null) {
-            // acabou o loot dessa luta
-            rec.lootingActive = false;
-            return;
-        }
-        rec.lootTargetRefObj = chosen;
-        rec.lootTargetSinceMillis = now;
-    }
-
-    // Se o target ficou inválido, troca
-    if (!isItemRefValid(store, rec.lootTargetRefObj)) {
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        return;
-    }
-
-    // Timeout para não ficar preso em item inalcançável
-    if (rec.lootTargetSinceMillis > 0L && (now - rec.lootTargetSinceMillis) > LOOT_TARGET_TIMEOUT_MS) {
-        rec.lootProcessedUntil.put(rec.lootTargetRefObj, now + LOOT_SKIP_RETRY_MS);
-        rec.lootTargetRefObj = null;
-        rec.lootTargetSinceMillis = 0L;
-        return;
-    }
-
-    // Faz o NPC correr até o item (LockedTarget)
-    try {
-        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
-        if (npcEntityObj != null) {
-            setLockedTargetOnNpcEntity(npcEntityObj, rec.lootTargetRefObj);
-            setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", null);
-            setFlockState(store, rec.refObj, "Run", "");
-        }
-    } catch (Throwable ignored) {}
-
-    // Se chegou perto do item, tenta pickup
-    try {
-        @SuppressWarnings("unchecked")
-        Ref<EntityStore> itemRef = (Ref<EntityStore>) rec.lootTargetRefObj;
-        TransformComponent itc = store.getComponent(itemRef, TransformComponent.getComponentType());
-        if (itc == null || itc.getPosition() == null) return;
-
-        Vector3d ip = itc.getPosition();
-        double dx = ip.x() - npcPos.x();
-        double dz = ip.z() - npcPos.z();
-        double h2 = dx*dx + dz*dz;
-        double dy = Math.abs(ip.y() - npcPos.y());
-        if (h2 <= (LOOT_PICKUP_DISTANCE * LOOT_PICKUP_DISTANCE) && dy <= 3.25) {
-            boolean inserted = tryPickupGroundItemIntoBackpack(store, ownerId, rec, bag, itemRef);
-
-            if (!inserted) {
-                // Não coube / erro: ignora esse item por um tempo e tenta outro
-                rec.lootProcessedUntil.put(itemRef, now + LOOT_SKIP_RETRY_MS);
-            }
-            // Remove da lista pendente (independente de sucesso) para evitar loop imediato
-            removeRefFromList(rec.pendingLootRefObjs, itemRef);
-
-            // troca alvo
-            rec.lootTargetRefObj = null;
-            rec.lootTargetSinceMillis = 0L;
-        }
-    } catch (Throwable ignored) {}
-}
-
-private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<EntityStore> ref) {
-    if (list == null || ref == null) return;
-    for (int i = list.size() - 1; i >= 0; i--) {
-        Object o = list.get(i);
-        if (o instanceof Ref && refEq((Ref<EntityStore>) o, ref)) {
-            list.remove(i);
-        }
-    }
-}
-
-// =========================================================
-    // Auto-loot (passivo)
-    // =========================================================
-
-    /**
-     * Coleta itens dropados num raio curto e insere na mochila do NPC.
-     * - Server-authoritative (usa a própria lógica do ItemContainer)
-     * - Não roda em combate/assist/Downed (checado no caller)
-     * - Sem duplicação: a entidade de item é consumida apenas na medida do que couber
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void tryAutoLoot(Store<EntityStore> store,
-                             UUID ownerId,
-                             NpcRecord rec,
-                             Vector3d npcPos,
-                             Vector3d ownerPos,
-                             long now,
-                             Object worldObj) {
-
-        // /autoloot OFF => não coleta nada.
-        if (rec == null || store == null || ownerId == null || npcPos == null) return;
-        if (!rec.autoLootEnabled) {
-            // garante que não fique preso em estados antigos
+         }
+      }
+   }
+
+   private void tryAutoLoot(
+      Store<EntityStore> store, UUID ownerId, AmigoNpcManager.NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now, Object worldObj
+   ) {
+      if (rec != null && store != null && ownerId != null && npcPos != null) {
+         if (!rec.autoLootEnabled) {
             endCombatTaggedLooting(rec);
-            return;
-        }
-
-        // Não coleta se estiver DOWNED
-        if (rec.downed) return;
-        if (rec.state != State.ACTIVE) return;
-
-        // /autoloot: raio fixo 4, sem throttling e sem limite por ciclo
-        final double radius = 4.0;
-        final double r2 = radius * radius;
-        final int maxPerScan = Integer.MAX_VALUE;
-
-        // mochila carregada (mesma do /loot)
-        if (rec.backpack == null) {
-            try {
-                rec.backpack = getOrLoadBackpack(ownerId);
-            } catch (Throwable ignored) {
+         } else if (!rec.downed) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE) {
+               NpcAutoLootSupport.ScanSetup scanSetup = NpcAutoLootSupport.prepareScan(rec, npcPos, now, 250L, 5.0, 8);
+               if (scanSetup != null) {
+                  double r2 = scanSetup.radiusSq;
+                  int maxPerScan = scanSetup.maxPerScan;
+                  double maxDyFinal = scanSetup.maxDy;
+                  Vector3d lootCenterPos = scanSetup.lootCenterPos;
+                  SimpleItemContainer bag = NpcAutoLootSupport.prepareBackpack(
+                     rec,
+                     ownerId,
+                     worldObj,
+                     now,
+                     this::getOrLoadBackpack,
+                     this::debugCombat,
+                     this::maybeNotifyBackpackFull,
+                     AmigoNpcManager::isBackpackCompletelyFull
+                  );
+                  if (bag != null) {
+                     NpcAutoLootSupport.ScanResult scanResult = NpcAutoLootSupport.scanNearbyDrops(
+                        store,
+                        ownerId,
+                        rec,
+                        bag,
+                        worldObj,
+                        now,
+                        lootCenterPos,
+                        ownerPos,
+                        r2,
+                        400.0,
+                        maxDyFinal,
+                        maxPerScan,
+                        400L,
+                        AUTOLOOT_QUERY,
+                        this::debugCombat,
+                        this::maybeNotifyBackpackFull,
+                        AmigoNpcManager::isBackpackCompletelyFull,
+                        AmigoNpcManager::lootChatAccAdd
+                     );
+                     NpcAutoLootSupport.finalizeScan(
+                        store,
+                        ownerId,
+                        rec,
+                        bag,
+                        now,
+                        worldObj,
+                        scanResult.removeLater,
+                        scanResult.updateLaterRef,
+                        scanResult.updateLaterComp,
+                        scanResult.pickedCount,
+                        this::debugCombat,
+                        this::lootChatAccFlushIfDue,
+                        AmigoNpcManager::doRemoveEntity
+                     );
+                  }
+               }
             }
-        }
-        SimpleItemContainer bag = rec.backpack;
-        if (bag == null) return;
+         }
+      }
+   }
 
-        // Se estava pausado por mochila cheia, só retoma quando houver espaço
-        if (rec.lootPausedInventoryFull) {
-            if (now < rec.nextLootFullRecheckMillis) return;
-            rec.nextLootFullRecheckMillis = now + 1_000L;
-            if (isBackpackCompletelyFull(bag)) {
-                maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
-                return;
-            }
-            rec.lootPausedInventoryFull = false;
-        }
+   private static boolean isBackpackCompletelyFull(SimpleItemContainer bag) {
+      return NpcBackpackLootSupport.isBackpackCompletelyFull(bag);
+   }
 
-        if (isBackpackCompletelyFull(bag)) {
-            rec.lootPausedInventoryFull = true;
-            rec.nextLootFullRecheckMillis = now + 1_000L;
-            maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
-            return;
-        }
+   private static double distSq(Vector3d a, Vector3d b) {
+      double dx = a.getX() - b.getX();
+      double dy = a.getY() - b.getY();
+      double dz = a.getZ() - b.getZ();
+      return dx * dx + dy * dy + dz * dz;
+   }
 
-        final int[] picked = new int[]{0};
-        final java.util.ArrayList<Ref<EntityStore>> removeLater = new java.util.ArrayList<>();
-        final java.util.ArrayList<Ref<EntityStore>> updateLaterRef = new java.util.ArrayList<>();
-        final java.util.ArrayList<ItemComponent> updateLaterComp = new java.util.ArrayList<>();
+   private void maybeNotifyBackpackFull(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object worldObj, long now) {
+      NpcBackpackLootSupport.maybeNotifyBackpackFull(rec, ownerId, worldObj, now, 30000L, this::sendToOwner);
+   }
 
-        try {
-            store.forEachChunk(AUTOLOOT_QUERY, (chunkObj, cb) -> {
-                // Preferir acesso direto ao ArchetypeChunk (mais confiável). Mantém fallback por reflexão.
-                com.hypixel.hytale.component.ArchetypeChunk<EntityStore> chunk = null;
-                if (chunkObj instanceof com.hypixel.hytale.component.ArchetypeChunk<?> rawChunk) {
-                    try { chunk = (com.hypixel.hytale.component.ArchetypeChunk<EntityStore>) rawChunk; } catch (Throwable ignored) { chunk = null; }
-                }
+   private Object getActiveCombatTarget(AmigoNpcManager.NpcRecord rec, long now) {
+      return NpcCombatStateSupport.getActiveCombatTarget(rec, now);
+   }
 
-                final int size;
-                try {
-                    size = (chunk != null) ? chunk.size() : chunkGetSize(chunkObj);
-                } catch (Throwable t) {
-                    return true;
-                }
+   private Object getActiveNpcCombatTarget(AmigoNpcManager.NpcRecord rec, long now) {
+      return NpcCombatStateSupport.getActiveNpcCombatTarget(rec, now);
+   }
 
-                for (int i = 0; i < size; i++) {
-                    if (picked[0] >= maxPerScan) break;
+   public void tickDowned() {
+      long now = System.currentTimeMillis();
 
-                    Ref<EntityStore> itemRef;
-                    try {
-                        itemRef = (chunk != null) ? (Ref<EntityStore>) chunk.getReferenceTo(i) : chunkGetEntity(chunkObj, i);
-                    } catch (Throwable t) {
-                        continue;
-                    }
-                    if (itemRef == null || !itemRef.isValid()) continue;
-
-                    TransformComponent tc;
-                    ItemComponent ic;
-                    try {
-                        tc = (chunk != null)
-                                ? (TransformComponent) chunk.getComponent(i, TransformComponent.getComponentType())
-                                : (TransformComponent) chunkGetComponent(chunkObj, i, TransformComponent.getComponentType());
-                        ic = (chunk != null)
-                                ? (ItemComponent) chunk.getComponent(i, ItemComponent.getComponentType())
-                                : (ItemComponent) chunkGetComponent(chunkObj, i, ItemComponent.getComponentType());
-                    } catch (Throwable t) {
-                        continue;
-                    }
-                    if (tc == null || ic == null) continue;
-
-                    Vector3d pos = tc.getPosition();
-                    if (pos == null) continue;
-                    if (distSq(pos, npcPos) > r2) continue;
-
-                    ItemStack before = ic.getItemStack();
-                    if (before == null) continue;
-
-                    int beforeQty;
-                    try {
-                        beforeQty = before.getQuantity();
-                    } catch (Throwable t) {
-                        continue;
-                    }
-                    if (beforeQty <= 0) continue;
-
-                    // inserir no inventário do NPC (server-authoritative)
-                    ItemStackTransaction tx;
-                    try {
-                        tx = bag.addItemStack(before);
-                    } catch (Throwable t) {
-                        tx = null;
-                    }
-
-                    ItemStack remainder = null;
-                    try {
-                        remainder = (tx != null) ? tx.getRemainder() : null;
-                    } catch (Throwable ignored) {
-                    }
-
-                    int remQty = 0;
-                    if (remainder != null) {
-                        try {
-                            remQty = remainder.getQuantity();
-                        } catch (Throwable ignored) {
-                            remQty = beforeQty;
-                        }
-                    }
-
-                    if (remainder != null && remQty >= beforeQty) {
-                        // não entrou nada
-                        if (isBackpackCompletelyFull(bag)) {
-                            rec.lootPausedInventoryFull = true;
-                            rec.nextLootFullRecheckMillis = now + 1_000L;
-                            maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
-                            return false; // pausa scan
-                        }
-                        continue;
-                    }
-
-                    int inserted = beforeQty - (remainder != null ? remQty : 0);
-                    if (inserted > 0) {
-                        String itemId;
-                        try {
-                            Object id = before.getItemId();
-                            itemId = (id != null) ? id.toString() : "item";
-                        } catch (Throwable t) {
-                            itemId = "item";
-                        }
-                        lootChatAccAdd(rec, itemId, inserted, now);
-                    }
-
-                    picked[0]++;
-                    rec.backpackDirty = true;
-                    rec.nextBackpackSaveMillis = Math.min(rec.nextBackpackSaveMillis, now + BACKPACK_SAVE_DEBOUNCE_MS);
-
-                    // remover do chão SOMENTE o que entrou
-                    if (remainder == null || remQty <= 0) {
-                        removeLater.add(itemRef);
-                    } else {
-                        try {
-                            ic.setItemStack(remainder);
-                            updateLaterRef.add(itemRef);
-                            updateLaterComp.add(ic);
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }
-                return true;
-            });
-        } catch (Throwable t) {
-            debugCombat(rec, ownerId, "AutoLoot forEachChunk falhou: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        }
-
-        // Aplica updates fora do loop do ECS
-        for (int i = 0; i < updateLaterRef.size(); i++) {
-            Ref<EntityStore> ref = updateLaterRef.get(i);
-            ItemComponent comp = updateLaterComp.get(i);
-            if (ref == null || !ref.isValid() || comp == null) continue;
-            try {
-                store.putComponent(ref, ItemComponent.getComponentType(), comp);
-            } catch (Throwable ignored) {
-            }
-        }
-
-        // Remove entidades de item totalmente coletadas
-        for (Ref<EntityStore> r : removeLater) {
-            if (r == null || !r.isValid()) continue;
-            try {
-                store.removeEntity(r, RemoveReason.REMOVE);
-            } catch (Throwable ignored) {
-                doRemoveEntity(store, r);
-            }
-        }
-
-        // Persistência do inventário
-        if (rec.backpackDirty && now >= rec.nextBackpackSaveMillis) {
-            try {
-                AmigoPersistence.saveBackpack(ownerId, bag);
-                rec.backpackDirty = false;
-            } catch (Throwable t) {
-                debugCombat(rec, ownerId, "Falha ao salvar mochila: " + t.getMessage());
-            }
-        }
-
-        // Flush do resumo no chat (0.5s)
-        lootChatAccFlushIfDue(rec, ownerId, worldObj, now);
-    }
-
-    private static boolean isBackpackCompletelyFull(SimpleItemContainer bag) {
-        if (bag == null) return true;
-        short cap;
-        try { cap = bag.getCapacity(); } catch (Throwable t) { return true; }
-        for (short slot = 0; slot < cap; slot++) {
-            ItemStack st;
-            try { st = bag.getItemStack(slot); } catch (Throwable t) { continue; }
-            if (st == null || st.isEmpty()) return false;
-
-            try {
-                Item item = st.getItem();
-                int max = (item != null) ? item.getMaxStack() : 1;
-                if (st.getQuantity() < max) return false;
-            } catch (Throwable ignored) {
-                // Se não conseguimos ler o max stack, não bloqueia o loot (evita falsa detecção de mochila cheia)
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static double distSq(Vector3d a, Vector3d b) {
-        double dx = a.x() - b.x();
-        double dy = a.y() - b.y();
-        double dz = a.z() - b.z();
-        return dx*dx + dy*dy + dz*dz;
-    }
-
-    // Compat: algumas builds não expõem o tipo concreto do "chunk" no classpath.
-    // Para manter compilação estável, acessamos por reflexão.
-    // OBS: a API real do chunk costuma ser size() + getReferenceTo(i).
-    private static int chunkGetSize(Object chunk) {
-        // Hytale ECS: ArchetypeChunk#size()
-        Object v = invokeNoArg(chunk, "size");
-        if (v == null) {
-            // fallback (algumas versões podem expor getSize())
-            v = invokeNoArg(chunk, "getSize");
-        }
-        if (v instanceof Integer i) return i;
-        if (v instanceof Short s) return s;
-        if (v instanceof Long l) return (int) (long) l;
-        return 0;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Ref<EntityStore> chunkGetEntity(Object chunk, int index) {
-        if (chunk == null) return null;
-        try {
-            // API mais comum: getReferenceTo(i)
-            java.lang.reflect.Method m = chunk.getClass().getMethod("getReferenceTo", int.class);
-            return (Ref<EntityStore>) m.invoke(chunk, index);
-        } catch (Throwable ignored) {
-        }
-        try {
-            for (java.lang.reflect.Method m : chunk.getClass().getMethods()) {
-                String name = m.getName();
-                if (!(name.equals("getReferenceTo") || name.equals("getEntity") || name.equals("getReference"))) continue;
-                if (m.getParameterCount() != 1) continue;
-                Class<?> p0 = m.getParameterTypes()[0];
-                if (!(p0 == int.class || p0 == Integer.class || p0 == short.class || p0 == Short.class)) continue;
-                Object idx = (p0 == short.class || p0 == Short.class) ? (short) index : index;
-                return (Ref<EntityStore>) m.invoke(chunk, idx);
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private static Object chunkGetComponent(Object chunk, int index, Object componentType) {
-        if (chunk == null || componentType == null) return null;
-        try {
-            for (java.lang.reflect.Method m : chunk.getClass().getMethods()) {
-                if (!m.getName().equals("getComponent")) continue;
-                if (m.getParameterCount() != 2) continue;
-                Class<?>[] p = m.getParameterTypes();
-                boolean firstIsIndex = (p[0] == int.class || p[0] == Integer.class || p[0] == short.class || p[0] == Short.class);
-                if (!firstIsIndex) continue;
-                Object idx = (p[0] == short.class || p[0] == Short.class) ? (short) index : index;
-                try {
-                    return m.invoke(chunk, idx, componentType);
-                } catch (Throwable ignored) {
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private void maybeNotifyBackpackFull(NpcRecord rec, UUID ownerId, Object worldObj, long now) {
-        if (rec == null || ownerId == null || worldObj == null) return;
-        if (now < rec.nextLootFullMsgMillis) return;
-        rec.nextLootFullMsgMillis = now + AUTOLOOT_FULL_MSG_COOLDOWN_MS;
-
-        // Mensagem simples (sem spam)
-        try {
-            sendToOwner(worldObj, ownerId, "Estou com o inventário cheio.");
-        } catch (Throwable ignored) {}
-    }
-
-    /** Retorna o Ref atual de combate (se ativo), ou null. */
-    private Object getActiveCombatTarget(NpcRecord rec, long now) {
-        if (rec == null) return null;
-        if (rec.combatTargetRefObj == null) return null;
-        if (rec.combatUntilMillis <= 0L) return null;
-        if (now > rec.combatUntilMillis) return null;
-        return rec.combatTargetRefObj;
-    }
-
-
-    /** Ticker (1s) chamado pelo plugin: revive automático quando o timer expirar. */
-    public void tickDowned() {
-        long now = System.currentTimeMillis();
-        for (Map.Entry<UUID, NpcRecord> e : npcRefPorPlayer.entrySet()) {
-            UUID owner = e.getKey();
-            NpcRecord rec = e.getValue();
-            if (rec == null) continue;
-            if (!rec.downed) continue;
-            if (rec.downedUntilMillis <= 0L) continue;
-
-            // Se o corpo sumiu (despawn por algum sistema), limpa o registro para evitar "NPC já existe"
-            // e permite respawn/revive correto.
-            if (rec.refObj != null && rec.worldObj != null) {
-                Object worldObj = rec.worldObj;
-                HytaleBridge.worldExecute(worldObj, () -> {
-                    try {
+      for (Entry<UUID, AmigoNpcManager.NpcRecord> e : this.npcRefPorPlayer.entrySet()) {
+         UUID owner = e.getKey();
+         AmigoNpcManager.NpcRecord rec = e.getValue();
+         if (rec != null && rec.downed && rec.downedUntilMillis > 0L) {
+            if (rec.deathDespawnAtMillis > 0L && now >= rec.deathDespawnAtMillis) {
+               rec.deathDespawnAtMillis = 0L;
+               if (rec.worldObj != null && rec.refObj != null) {
+                  Object worldObj = rec.worldObj;
+                  Object refToRemove = rec.refObj;
+                  HytaleBridge.worldExecute(worldObj, () -> {
+                     try {
                         Object storeObj = getComponentStoreFromWorld(worldObj);
-                        if (!(storeObj instanceof Store<?> rawStore)) return;
-                        @SuppressWarnings("unchecked")
-                        Store<EntityStore> store = (Store<EntityStore>) rawStore;
-
-                        Object npcTransform = getComponentFromStore(store, rec.refObj, TransformComponent.getComponentType());
-                        if (!(npcTransform instanceof TransformComponent)) {
-                            amigoRefs.remove(rec.refObj);
-                            npcRefPorPlayer.remove(owner, rec);
+                        if (storeObj == null) {
+                           return;
                         }
-                    } catch (Throwable ignored) {}
-                });
-            }
-            if (now < rec.downedUntilMillis) continue;
-            // Revive automático. Se o corpo tiver sumido, respawna um novo.
-            if (npcRefPorPlayer.get(owner) == rec) {
-                revive(owner, false);
-                // Se ainda está downed após tentar revive (ex.: entidade sumiu), faz respawn limpo.
-                NpcRecord still = npcRefPorPlayer.get(owner);
-                if (still == rec && rec.downed) {
-                    amigoRefs.remove(rec.refObj);
-                    npcRefPorPlayer.remove(owner, rec);
-                    spawn(rec.worldObj, owner, null);
-                }
-            }
-        }
-    }
 
-    /**
-     * Ticker (1s) chamado pelo plugin: mantém follow e aplica "teleporte" seguro
-     * quando distância passar dos limites (20 horizontal / 8 vertical).
-     */
-    public void tickFollow() {
-        // Processa respawns pendentes (teleport/troca de mundo do dono)
-        if (!pendingRespawns.isEmpty()) {
-            long now = System.currentTimeMillis();
-            java.util.Iterator<Map.Entry<UUID, PendingRespawn>> it = pendingRespawns.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<UUID, PendingRespawn> en = it.next();
-                UUID ownerId = en.getKey();
-                PendingRespawn pr = en.getValue();
-                if (pr == null || pr.worldObj == null) {
-                    it.remove();
-                    continue;
-                }
-                if (now < pr.atMillis) continue;
+                        if (rec.refObj != refToRemove) {
+                           return;
+                        }
 
-                // Evita respawn duplicado se alguém já deu /amigo spawn no meio
-                if (npcRefPorPlayer.containsKey(ownerId)) {
-                    it.remove();
-                    continue;
-                }
-
-                if (pr.message != null && !pr.message.isBlank()) {
-                    sendToOwner(pr.worldObj, ownerId, pr.message);
-                }
-                spawn(pr.worldObj, ownerId, pr.senderObj);
-                it.remove();
-            }
-        }
-
-    for (Map.Entry<UUID, NpcRecord> e : npcRefPorPlayer.entrySet()) {
-        UUID owner = e.getKey();
-        NpcRecord rec = e.getValue();
-        if (rec == null) continue;
-        if (rec.state != State.ACTIVE) continue;
-        if (rec.refObj == null || rec.worldObj == null) continue;
-        if (rec.downed) continue;
-
-        Object worldObj = rec.worldObj;
-
-        // Executa no contexto do mundo (thread-safe)
-        HytaleBridge.worldExecute(worldObj, () -> {
-            try {
-                Object storeObj = getComponentStoreFromWorld(worldObj);
-                if (!(storeObj instanceof Store<?> rawStore)) return;
-
-                @SuppressWarnings("unchecked")
-                Store<EntityStore> store = (Store<EntityStore>) rawStore;
-
-                Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
-                if (ownerRef == null) return;
-
-                Object ownerTransform = getComponentFromStore(store, ownerRef, TransformComponent.getComponentType());
-                Object npcTransform = getComponentFromStore(store, rec.refObj, TransformComponent.getComponentType());
-                // Se o NPC sumiu do mundo (despawn por algum sistema), limpa o registro para permitir /amigo spawn
-                if (!(npcTransform instanceof TransformComponent)) {
-                    amigoRefs.remove(rec.refObj);
-                    npcRefPorPlayer.remove(owner, rec);
-                    return;
-                }
-
-                // Segurança: se por algum motivo o HP do NPC chegou a 0 e ele não entrou em DOWNED,
-                // força o estado DOWNED para não continuar correndo/atacando sem vida.
-                try {
-                    @SuppressWarnings("unchecked")
-                    Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-                    EntityStatMap st = store.getComponent(npcRef, EntityStatMap.getComponentType());
-                    if (st != null) {
                         try {
-                            var hp = st.get(DefaultEntityStatTypes.getHealth());
-                            if (hp != null && hp.get() <= 0.0f) {
-                                markDowned(owner);
-                                return;
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                } catch (Throwable ignored) {}
-                if (!(ownerTransform instanceof TransformComponent)) return;
-
-                TransformComponent ot = (TransformComponent) ownerTransform;
-                TransformComponent nt = (TransformComponent) npcTransform;
-
-                var op = ot.getPosition();
-                var np = nt.getPosition();
-                if (op == null || np == null) return;
-
-                double dx = op.x() - np.x();
-                double dz = op.z() - np.z();
-                double dy = op.y() - np.y();
-
-                double horizontal = Math.sqrt(dx * dx + dz * dz);
-
-                // Se o NPC já voltou para perto do dono, libera novamente a aquisição de alvo.
-                if (rec.chaseDisengaged && horizontal <= CHASE_REACQUIRE_DISTANCE) {
-                    rec.chaseDisengaged = false;
-                }
-
-                // controle: tempo fora do raio de follow (25 blocos)
-                if (horizontal > 25.0) {
-                    if (rec.farSinceMillis == 0L) rec.farSinceMillis = System.currentTimeMillis();
-                } else {
-                    rec.farSinceMillis = 0L;
-                }
-
-                // Amostra de movimento real do NPC (anti-teleporte agressivo)
-                long now = System.currentTimeMillis();
-                if (rec.lastNpcMovedMillis == 0L) rec.lastNpcMovedMillis = now;
-                if (rec.lastSampleMillis == 0L) rec.lastSampleMillis = now;
-                if (rec.lastNpcPos == null) rec.lastNpcPos = np;
-                if (now - rec.lastSampleMillis >= 400L) {
-                    double mdx = np.x() - rec.lastNpcPos.x();
-                    double mdy = np.y() - rec.lastNpcPos.y();
-                    double mdz = np.z() - rec.lastNpcPos.z();
-                    double moved = Math.sqrt(mdx * mdx + mdy * mdy + mdz * mdz);
-                    if (moved > 0.25) rec.lastNpcMovedMillis = now;
-                    rec.lastNpcPos = np;
-                    rec.lastSampleMillis = now;
-                }
-
-                // Limpa animação de ataque antiga (best-effort)
-                clearExpiredAttackAnimation(store, rec.refObj, rec, now);
-
-                // Defender: por padrão OFF (sem ataques). Quando ON, escolhe alvo e persegue.
-                try {
-                    // Defender OFF: limpa qualquer alvo em memória e apenas segue.
-                    if (!rec.defendeEnabled) {
-                        rec.combatUntilMillis = 0L;
-                        rec.combatTargetRefObj = null;
-                        rec.assistUntilMillis = 0L;
-                        rec.assistTargetRefObj = null;
-                        rec.chaseDisengaged = false;
-                        rec.targetLostSinceMillis = 0L;
-                        rec.targetStuckSinceMillis = 0L;
-                        rec.lastTargetHorizontal = -1.0;
-                        rec.lastTargetSampleMillis = 0L;
-
-                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
-                        if (npcEntityObj != null) {
-                            setLockedTargetOnNpcEntity(npcEntityObj, ownerRef);
-                            setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", null);
-                        }
-                    } else {
-                        // expira combate por tempo
-                        if (rec.combatUntilMillis > 0L && now > rec.combatUntilMillis) {
-                            rec.combatUntilMillis = 0L;
-                            rec.combatTargetRefObj = null;
+                           doRemoveEntity(storeObj, refToRemove);
+                        } catch (Throwable var7x) {
                         }
 
-                        // se o agressor sumiu/morreu, encerra combate
-                        Object combatTarget = getActiveCombatTarget(rec, now);
-                        if (combatTarget != null && !isAliveEntityRef(store, combatTarget)) {
-                            rec.combatUntilMillis = 0L;
-                            rec.combatTargetRefObj = null;
-                            combatTarget = null;
+                        try {
+                           this.amigoRefs.remove(refToRemove);
+                        } catch (Throwable var6x) {
                         }
 
-                        // assistência: termina 3s após ficar sem alvo
-                        tickAssistHousekeeping(rec, store, now);
-
-                        // Auto-aquisicao: com Defender ON, se nao ha agressor nem assist atual, pega um alvo no raio.
-                        // Se estourou o limite de chase, aguarda voltar para perto do dono.
-                        if (!rec.chaseDisengaged && !rec.lootingActive && combatTarget == null && rec.assistTargetRefObj == null && rec.assistUntilMillis == 0L) {
-                            Object autoTarget = findNearestDefenderTarget(store, rec, ownerRef, op);
-                            if (autoTarget != null) {
-                                rec.assistTargetRefObj = autoTarget;
-                                rec.assistUntilMillis = 0L;
-                                debugCombat(rec, owner, "autoAssist: targetRef=" + autoTarget);
-                            }
-                        }
-
-
-                        Object desiredTarget = combatTarget;
-                        if (desiredTarget == null) {
-                            Object assistTarget = getActiveAssistTarget(rec, now);
-                            desiredTarget = (assistTarget != null) ? assistTarget : ownerRef;
-                        }
-
-                        boolean inCombatOrAssist = (desiredTarget != null && !refEq(desiredTarget, ownerRef));
-
-                        // Limite de perseguição: se o NPC se afastar demais do dono,
-                        // ele desiste do alvo e volta para o player. Isso evita o NPC
-                        // correr para longe e também ajuda o auto-loot voltar após o combate.
-                        if (inCombatOrAssist && horizontal > CHASE_MAX_DISTANCE) {
-                            // Cancela agressor/assist atual
-                            rec.combatUntilMillis = 0L;
-                            rec.combatTargetRefObj = null;
-                            rec.assistTargetRefObj = null;
-                            rec.chaseDisengaged = true;
-                            // Dá um pequeno grace para não retargetar imediatamente enquanto retorna
-                            rec.assistUntilMillis = now + ASSIST_GRACE_MILLIS;
-
-                            desiredTarget = ownerRef;
-                            inCombatOrAssist = false;
-
-                            rec.targetLostSinceMillis = 0L;
-                            rec.targetStuckSinceMillis = 0L;
-                            rec.lastTargetHorizontal = -1.0;
-                            rec.lastTargetSampleMillis = 0L;
-                        }
-
-                        // Se o alvo já está morto (HP zerou), não fique esperando o corpo sumir.
-                        // - Defender ON: retarget imediato para um alvo perto do próprio NPC.
-                        if (inCombatOrAssist && !isAliveEntityRef(store, desiredTarget)) {
-                            // limpa refs antigas
-                            if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
-                                rec.combatUntilMillis = 0L;
-                                rec.combatTargetRefObj = null;
-                                combatTarget = null;
-                            }
-                            if (rec.assistTargetRefObj != null && refEq(desiredTarget, rec.assistTargetRefObj)) {
-                                rec.assistTargetRefObj = null;
-                                rec.assistUntilMillis = now + ASSIST_GRACE_MILLIS;
-                            }
-
-                            Object rt = findNearestTargetNearNpc(store, rec, ownerRef, np, desiredTarget);
-                            if (rt != null) {
-                                rec.assistTargetRefObj = rt;
-                                rec.assistUntilMillis = 0L;
-                                desiredTarget = rt;
-                                inCombatOrAssist = true;
-
-                                // reseta trackers para não herdar "lost" do alvo anterior
-                                rec.targetLostSinceMillis = 0L;
-                                rec.targetStuckSinceMillis = 0L;
-                                rec.lastTargetHorizontal = -1.0;
-                                rec.lastTargetSampleMillis = 0L;
-
-                                debugCombat(rec, owner, "retargetOnDeath: targetRef=" + rt);
-                            } else {
-                                desiredTarget = ownerRef;
-                                inCombatOrAssist = false;
-                            }
-                        }
-
-                        // Target lost (A): se ficar longe demais / altura ruim / travado → limpa e volta a seguir.
-                        if (inCombatOrAssist) {
-                            try {
-                                if (desiredTarget instanceof Ref && rec.refObj instanceof Ref) {
-                                    Ref<EntityStore> tgtRef = (Ref<EntityStore>) desiredTarget;
-                                    Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-                                    TransformComponent npcT = store.getComponent(npcRef, TransformComponent.getComponentType());
-                                    TransformComponent tgtT = store.getComponent(tgtRef, TransformComponent.getComponentType());
-
-                                    if (npcT != null && tgtT != null && npcT.getPosition() != null && tgtT.getPosition() != null) {
-                                        var np2 = npcT.getPosition();
-                                        var tp2 = tgtT.getPosition();
-
-                                        double dx2 = tp2.x() - np2.x();
-                                        double dz2 = tp2.z() - np2.z();
-                                        double dy2 = tp2.y() - np2.y();
-                                        double h2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
-                                        double ady2 = Math.abs(dy2);
-
-                                        // Alvos altos (~2 blocos): relaxa o limite vertical e tenta reposicionar
-                                        double targetHeight = getEntityHeight(store, tgtRef);
-                                        boolean tallTarget = (targetHeight >= 1.9);
-                                        double allowedDy = tallTarget ? 3.0 : 1.5;
-
-                                        if (tallTarget && h2 < 0.90 && (now - rec.lastCombatNudgeMillis) > 900L) {
-                                            try {
-                                                double len = Math.sqrt(dx2 * dx2 + dz2 * dz2);
-                                                double nx = (len > 0.001) ? (-dx2 / len) : 1.0;
-                                                double nz = (len > 0.001) ? (-dz2 / len) : 0.0;
-                                                Vector3d npos = new Vector3d(np2.x() + nx * 0.80, np2.y(), np2.z() + nz * 0.80);
-                                                npcT.teleportPosition(npos);
-                                                rec.lastCombatNudgeMillis = now;
-                                            } catch (Throwable ignored) {}
-                                        }
-
-                                        boolean tooFar = (h2 > 20.0);
-                                        boolean tooHigh = (ady2 > allowedDy);
-
-                                        // Stuck: se não conseguir reduzir distância por ~2s
-                                        if (now - rec.lastTargetSampleMillis >= 350L) {
-                                            if (rec.lastTargetHorizontal >= 0 && h2 >= (rec.lastTargetHorizontal - 0.20)) {
-                                                if (rec.targetStuckSinceMillis == 0L) rec.targetStuckSinceMillis = now;
-                                            } else {
-                                                rec.targetStuckSinceMillis = 0L;
-                                            }
-                                            rec.lastTargetHorizontal = h2;
-                                            rec.lastTargetSampleMillis = now;
-                                        }
-                                        boolean stuckTooLong = (rec.targetStuckSinceMillis > 0L && (now - rec.targetStuckSinceMillis) > 2000L);
-
-                                        boolean lostCond = tooFar || tooHigh || stuckTooLong;
-                                        if (lostCond) {
-                                            if (rec.targetLostSinceMillis == 0L) rec.targetLostSinceMillis = now;
-                                        } else {
-                                            rec.targetLostSinceMillis = 0L;
-                                        }
-
-                                        // Renova janela de combate por sinais válidos (evita expirar enquanto persegue)
-                                        if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
-                                            boolean okToRenew = (!lostCond) && (h2 <= 25.0);
-                                            if (okToRenew) {
-                                                rec.combatUntilMillis = now + COMBAT_WINDOW_MILLIS;
-                                            }
-                                        }
-
-                                        // Se perdeu o target por ~2s → limpa alvo e volta a seguir (A)
-                                        if (rec.targetLostSinceMillis > 0L && (now - rec.targetLostSinceMillis) > 2000L) {
-                                            if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
-                                                rec.combatUntilMillis = 0L;
-                                                rec.combatTargetRefObj = null;
-                                                combatTarget = null;
-                                            } else {
-                                                // perdeu assist
-                                                rec.assistTargetRefObj = null;
-                                                rec.assistUntilMillis = now + ASSIST_GRACE_MILLIS;
-                                            }
-                                            rec.targetLostSinceMillis = 0L;
-                                            rec.targetStuckSinceMillis = 0L;
-                                            rec.lastTargetHorizontal = -1.0;
-                                            rec.lastTargetSampleMillis = 0L;
-                                            desiredTarget = ownerRef;
-                                            inCombatOrAssist = false;
-                                        }
-                                    }
-                                }
-                            } catch (Throwable ignored) {}
-                        } else {
-                            rec.targetLostSinceMillis = 0L;
-                            rec.targetStuckSinceMillis = 0L;
-                            rec.lastTargetHorizontal = -1.0;
-                            rec.lastTargetSampleMillis = 0L;
-                        }
-
-                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
-                        if (npcEntityObj != null) {
-                            // Em combate/assist: LockedTarget aponta para o alvo (perseguição em movimento).
-                            // Fora: LockedTarget volta a seguir o dono.
-                            setLockedTargetOnNpcEntity(npcEntityObj, inCombatOrAssist ? desiredTarget : ownerRef);
-                            setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", inCombatOrAssist ? desiredTarget : null);
-
-                            // Força estado para ajudar repath/velocidade/animações
-                            setFlockState(store, rec.refObj, inCombatOrAssist ? "Run" : "Walk", "");
-
-                            // Ataque corpo a corpo quando há alvo
-                            if (inCombatOrAssist) {
-                                tryMeleeAttack(store, rec, ownerRef, desiredTarget, now);
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-	// AUTOLOOT (/autoloot)
-	                // ON: coleta tudo num raio fixo, mesmo em combate.
-	                // OFF: não coleta nada.
-	                // Esta flag precisa existir fora do bloco try/catch acima.
-	                boolean inCombatOrAssistNow = rec.defendeEnabled && ((now < rec.combatUntilMillis) || (now < rec.assistUntilMillis));
-	                if (rec.autoLootEnabled) {
-                    // Loot pós-combate (combat tags): só fora de combate e quando não há inimigo muito perto.
-                    // (Durante combate/assist, essa rotina pausa automaticamente.)
-	                    tickCombatTaggedLooting(store, owner, rec, ownerRef, np, op, now, worldObj, inCombatOrAssistNow);
-
-                    // Auto-loot curto: coleta itens próximos no raio fixo.
-                    // Observação: o /autoloot ON permite coletar mesmo em combate.
-                    tryAutoLoot(store, owner, rec, np, op, now, worldObj);
-                } else {
-                    // /autoloot OFF: desliga qualquer looting.
-                    endCombatTaggedLooting(rec);
-                }
-
-// Teleporte de segurança (RESGATE) — só quando realmente "travou"/se perdeu.
-                // Evita teleporte quando o NPC está caminhando normalmente.
-                // Teleporte só como "resgate" (não como modo normal de follow)
-                // - Deixa o role fazer o Seek/Walk/Run.
-                // - Se o NPC ficar travado e MUITO longe, aí sim teleport.
-                boolean stalled = (now - rec.lastNpcMovedMillis) > 6000L;
-                boolean stalledShort = (now - rec.lastNpcMovedMillis) > 3500L;
-
-                // Seguimento (fora de combate): se ficar muito longe e travar, faz resgate mais cedo.
-	                boolean inCombatOrAssist = inCombatOrAssistNow;
-                boolean followSoft = (horizontal > 25.0) || (Math.abs(dy) > 12.0);
-                boolean followHard = (horizontal > 35.0) || (Math.abs(dy) > 18.0);
-
-                boolean farHard = (horizontal > 120.0) || (Math.abs(dy) > 30.0);
-                boolean farSoft = (horizontal > 70.0) || (Math.abs(dy) > 20.0);
-
-                boolean shouldRescue = false;
-                // Se ficar fora do raio de 25 blocos, faz resgate para perto.
-                // - Fora de combate: ~2.5s
-                // - Em combate (player fugiu): ~1.5s (para não ficar preso no mob)
-                if (rec.farSinceMillis > 0L) {
-                    long limit = inCombatOrAssist ? 1500L : 2500L;
-                    if ((now - rec.farSinceMillis) > limit) {
-                        shouldRescue = true;
-                    }
-                }
-                if (!inCombatOrAssist) {
-                    shouldRescue = shouldRescue || followHard || (followSoft && stalledShort);
-                }
-                // Resgate extremo sempre (mesmo em combate), para não perder o NPC.
-                if (!shouldRescue) {
-                    shouldRescue = farHard || (farSoft && stalled);
-                }
-
-                if (shouldRescue && (now - rec.lastTeleportMillis) > 3000L) {
-                    rec.lastTeleportMillis = now;
-
-                    // Se o player fugiu no meio do combate, limpamos o alvo e voltamos a seguir.
-                    if (inCombatOrAssist) {
-                        rec.combatUntilMillis = 0L;
-                        rec.combatTargetRefObj = null;
-                        rec.assistUntilMillis = 0L;
-                        rec.assistTargetRefObj = null;
-                        rec.targetLostSinceMillis = 0L;
-                        rec.targetStuckSinceMillis = 0L;
-                        rec.lastTargetHorizontal = -1.0;
-                        rec.lastTargetSampleMillis = 0L;
-                    }
-
-                    // Posiciona um pouco afastado do player (4~7 blocos), preferindo a direção de onde o NPC veio.
-                    double vx = np.x() - op.x();
-                    double vz = np.z() - op.z();
-                    double vlen = Math.sqrt(vx * vx + vz * vz);
-                    double ox = (vlen > 1.0e-6) ? (vx / vlen) : 1.0;
-                    double oz = (vlen > 1.0e-6) ? (vz / vlen) : 0.0;
-                    double dist = 6.0;
-                    nt.teleportPosition(new org.joml.Vector3d(
-                            op.x() + (ox * dist),
-                            op.y(),
-                            op.z() + (oz * dist)
-                    ));
-                }
-            } catch (Throwable ignored) {}
-        });
-    }
-}
-
-/**
-     * Ajusta flags de movimento do NPC para bater com o estado do dono e com a decisão de mover.
-     * Isso ajuda o modelo a escolher animações corretas (idle/walk/run) sem depender de nomes específicos.
-     */
-    private static void applyMovementAnimation(Store<EntityStore> store,
-                                               Ref<EntityStore> npcRef,
-                                               MovementStates ownerStates,
-                                               double ownerSpeed,
-                                               double npcSpeed,
-                                               boolean moving,
-                                               double distance) {
-        try {
-            MovementStatesComponent msComp = store.ensureAndGetComponent(npcRef, MovementStatesComponent.getComponentType());
-
-            // Copia estados do player como base (crouch/jump etc), mas decide andar/correr pelo estado real do NPC.
-            MovementStates s = (ownerStates != null) ? new MovementStates(ownerStates) : new MovementStates();
-
-            // Mantém coerência mínima
-            s.onGround = true;
-
-            // Se não está movendo, ou se a velocidade real é muito baixa, força idle
-            if (!moving || npcSpeed < 0.20) {
-                s.idle = true;
-                s.horizontalIdle = true;
-
-                s.walking = false;
-                s.running = false;
-                s.sprinting = false;
-            } else {
-                boolean ownerSprint = ownerStates != null && ownerStates.sprinting;
-                boolean ownerRun = ownerStates != null && (ownerStates.running || ownerStates.sprinting);
-
-                // Decide andar/correr baseado no contexto (espelha o player quando fizer sentido)
-                // Animação: só corre quando realmente precisa (ex.: ficou distante do dono)
-                boolean wantSprint = ownerSprint || ownerSpeed > 6.0 || distance > 35.0;
-                boolean wantRun = ownerRun || ownerSpeed > 4.2 || distance > 25.0;
-
-                // Se o NPC ainda não ganhou velocidade de verdade, evita "correndo parado"
-                if (npcSpeed < 1.2) {
-                    wantSprint = false;
-                    wantRun = false;
-                }
-
-                s.idle = false;
-                s.horizontalIdle = false;
-
-                s.walking = !wantRun && !wantSprint;
-                s.running = wantRun && !wantSprint;
-                s.sprinting = wantSprint;
+                        rec.refObj = null;
+                     } catch (Throwable var8x) {
+                     }
+                  });
+               }
             }
 
-            msComp.setMovementStates(s);
-            // Em algumas builds, o engine usa "sent" para rede; manter junto ajuda.
-            msComp.setSentMovementStates(new MovementStates(s));
-        } catch (Throwable ignored) {}
-    }
+            if (now >= rec.downedUntilMillis && rec.state != AmigoNpcManager.State.SPAWNING && rec.worldObj != null) {
+               Object worldObj = rec.worldObj;
+               rec.state = AmigoNpcManager.State.SPAWNING;
+               boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
+                  try {
+                     Object storeObj = getComponentStoreFromWorld(worldObj);
+                     if (storeObj == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                        return;
+                     }
 
+                     Object ownerPos = tryGetOwnerPositionFromWorldStore(worldObj, storeObj, owner);
+                     if (ownerPos == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                        return;
+                     }
 
-    /**
-     * Revive do NPC.
-     * @param manual se foi revive manual (penalidade menor – implementaremos depois)
-     */
-    public void revive(UUID ownerId, boolean manual) {
-        NpcRecord rec = ownerId == null ? null : npcRefPorPlayer.get(ownerId);
-        if (rec == null) return;
-        if (rec.refObj == null) return;
-        if (rec.worldObj == null) return;
+                     if (rec.refObj != null) {
+                        Object oldRef = rec.refObj;
 
-        rec.downed = false;
-        rec.downedUntilMillis = 0L;
+                        try {
+                           doRemoveEntity(storeObj, oldRef);
+                        } catch (Throwable var9x) {
+                        }
 
-        // XP já foi penalizado no momento em que o NPC entrou em DOWNED (markDowned).
-        // Aqui apenas restauramos HP/estado.
+                        try {
+                           this.amigoRefs.remove(oldRef);
+                        } catch (Throwable var8x) {
+                        }
 
-        HytaleBridge.worldExecute(rec.worldObj, () -> {
-            try {
-                Object componentStore = getComponentStoreFromWorld(rec.worldObj);
-                if (!(componentStore instanceof Store<?> rawStore)) return;
+                        rec.refObj = null;
+                     }
 
-                @SuppressWarnings("unchecked")
-                Store<EntityStore> store = (Store<EntityStore>) rawStore;
-                @SuppressWarnings("unchecked")
-                Ref<EntityStore> ref = (Ref<EntityStore>) rec.refObj;
-
-                // Garante stats/vida
-                EntityStatMap stats = store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
-                stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
-
-                // Aplica scaling de HP/DEF conforme level (cap lvl 100) e cura ao máximo
-                applyNpcScaling(store, ref, ownerId, rec, true);
-
-                // Garante componentes de animação (para o engine conseguir tocar hurt/death etc)
-                store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
-                store.ensureComponent(ref, MovementStatesComponent.getComponentType());
-                store.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
-
-            } catch (Throwable ignored) {
+                     this.spawnIntoExistingRecord(worldObj, storeObj, owner, null, rec);
+                     if (rec.refObj == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                     }
+                  } catch (Throwable ignored) {
+                     rec.state = AmigoNpcManager.State.ACTIVE;
+                  }
+               });
+               if (!queued) {
+                  rec.state = AmigoNpcManager.State.ACTIVE;
+               }
             }
-        });
-    }
+         }
+      }
+   }
 
-    // =========================================================
-    // Store / World helpers
-    // =========================================================
+   public void tickFollow() {
+      if (!this.pendingRespawns.isEmpty()) {
+         long now = System.currentTimeMillis();
+         Iterator<Entry<UUID, PendingRespawn>> it = this.pendingRespawns.entrySet().iterator();
 
-    private static Object getComponentStoreFromWorld(Object worldObj) {
-        Object entityStore = invokeNoArg(worldObj, "getEntityStore", "entityStore");
-        if (entityStore == null) return null;
-        return invokeNoArg(entityStore, "getStore", "store");
-    }
+         while (it.hasNext()) {
+            Entry<UUID, PendingRespawn> en = it.next();
+            UUID ownerId = en.getKey();
+            PendingRespawn pr = en.getValue();
+            if (pr == null || pr.worldObj == null) {
+               it.remove();
+            } else if (now >= pr.atMillis) {
+               if (this.npcRefPorPlayer.containsKey(ownerId)) {
+                  it.remove();
+               } else {
+                  if (pr.message != null && !pr.message.isBlank()) {
+                     this.sendToOwner(pr.worldObj, ownerId, pr.message);
+                  }
 
-    /**
-     * Pega a posição do player diretamente do Store entregue pela API de comandos.
-     */
-    private static Object tryGetPositionFromStore(Object componentStore, Object playerEntityRef) {
-        try {
-            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
-            Method getCt = tcClass.getMethod("getComponentType");
-            Object componentType = getCt.invoke(null);
-            if (componentType == null) return null;
+                  this.spawn(pr.worldObj, ownerId, pr.senderObj);
+                  it.remove();
+               }
+            }
+         }
+      }
 
-            Object tc = invokeStoreGetComponent(componentStore, playerEntityRef, componentType);
-            if (tc == null) return null;
-            return invokeNoArg(tc, "getPosition", "position");
-        } catch (Throwable ignored) {
+      for (Entry<UUID, AmigoNpcManager.NpcRecord> e : this.npcRefPorPlayer.entrySet()) {
+         UUID owner = e.getKey();
+         AmigoNpcManager.NpcRecord rec = e.getValue();
+         if (rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj != null && rec.worldObj != null && !rec.downed) {
+            Object worldObj = rec.worldObj;
+            HytaleBridge.worldExecute(
+               worldObj,
+               () -> {
+                  try {
+                     if (!(getComponentStoreFromWorld(worldObj) instanceof Store<?> rawStore)) {
+                        return;
+                     }
+
+                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
+                     Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
+                     if (ownerRef == null) {
+                        return;
+                     }
+
+                     Object ownerTransform = getComponentFromStore(store, ownerRef, TransformComponent.getComponentType());
+                     Object npcTransform = getComponentFromStore(store, rec.refObj, TransformComponent.getComponentType());
+                     if (!(npcTransform instanceof TransformComponent)) {
+                        this.amigoRefs.remove(rec.refObj);
+                        this.npcRefPorPlayer.remove(owner, rec);
+                        return;
+                     }
+
+                     try {
+                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                        EntityStatMap st = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                        if (st != null) {
+                           try {
+                              EntityStatValue hp = st.get(DefaultEntityStatTypes.getHealth());
+                              if (hp != null && hp.get() <= 0.0F) {
+                                 this.markDowned(owner);
+                                 return;
+                              }
+                           } catch (Throwable var26) {
+                           }
+                        }
+                     } catch (Throwable var27) {
+                     }
+
+                     if (!(ownerTransform instanceof TransformComponent ot)) {
+                        return;
+                     }
+
+                     TransformComponent nt = (TransformComponent)npcTransform;
+                     Vector3d op = ot.getPosition();
+                     Vector3d np = nt.getPosition();
+                     if (op == null || np == null) {
+                        return;
+                     }
+
+                     NpcFollowContextSupport.Context followContext = NpcFollowContextSupport.prepare(
+                        store,
+                        worldObj,
+                        ownerRef,
+                        rec,
+                        op,
+                        np,
+                        10.0,
+                        500L,
+                        AmigoNpcManager::hasCeilingAboveBestEffort,
+                        AmigoNpcManager::clearExpiredAttackAnimation,
+                        AmigoNpcManager::tickLevelUpFx,
+                        AmigoNpcManager::tickWardrobeRestore
+                     );
+                     long nowx = followContext.now;
+                     double horizontal = followContext.horizontal;
+                     double dy = followContext.dy;
+                     boolean ownerUnderground = followContext.ownerUnderground;
+                     boolean lootStickActiveNow = false;
+
+                     try {
+                        NpcFollowCombatSupport.tick(
+                           store,
+                           owner,
+                           rec,
+                           ownerRef,
+                           op,
+                           np,
+                           nowx,
+                           horizontal,
+                           ownerUnderground,
+                           lootStickActiveNow,
+                           "LockedTargetClose",
+                           30.0,
+                           3000L,
+                           3000L,
+                           35.0,
+                           AmigoNpcManager::getComponentFromStore,
+                           AmigoNpcManager::setMarkedTargetOnNpcEntity,
+                           AmigoNpcManager::setLockedTargetOnNpcEntity,
+                           AmigoNpcManager::setFlockState,
+                           AmigoNpcManager::isAliveEntityRef,
+                           AmigoNpcManager::tickAssistHousekeeping,
+                           this::findNearestDefenderTarget,
+                           this::findNearestTargetNearNpc,
+                           this::debugCombat,
+                           AmigoNpcManager::isAirborneTarget,
+                           AmigoNpcManager::getEntityHeight,
+                           this::updateCurrentTargetMobLevel,
+                           this::tryEquipDefaultBow,
+                           this::tryRangedAttack,
+                           this::applySwordWeaponNow,
+                           this::tryMeleeAttack
+                        );
+                     } catch (Throwable var25) {
+                     }
+
+                     boolean inCombatOrAssistNow = NpcFollowRecoveryLootSupport.tick(
+                        store,
+                        owner,
+                        rec,
+                        ownerRef,
+                        op,
+                        np,
+                        nowx,
+                        worldObj,
+                        3000L,
+                        this::tickSpawnFollowFx,
+                        this::tickAutoRegen,
+                        this::tickCombatTaggedLooting,
+                        this::tryAutoLoot,
+                        AmigoNpcManager::endCombatTaggedLooting
+                     );
+                     boolean inCombatOrAssist = inCombatOrAssistNow;
+                     NpcFollowRescueSupport.tryRescue(
+                        store,
+                        owner,
+                        rec,
+                        ownerRef,
+                        op,
+                        ot,
+                        nt,
+                        nowx,
+                        horizontal,
+                        dy,
+                        inCombatOrAssist,
+                        ownerUnderground,
+                        10.0,
+                        3000L,
+                        NPCEntity.getComponentType(),
+                        AmigoNpcManager::getComponentFromStore,
+                        AmigoNpcManager::setLockedTargetOnNpcEntity,
+                        AmigoNpcManager::setMarkedTargetOnNpcEntity,
+                        AmigoNpcManager::extractYawFromRotation,
+                        AmigoNpcManager::offsetInFrontOfYaw,
+                        AmigoNpcManager::coerceToVector3d,
+                        this::debugCombat
+                     );
+                  } catch (Throwable var28) {
+                  }
+               }
+            );
+         }
+      }
+   }
+
+   private static void applyMovementAnimation(
+      Store<EntityStore> store, Ref<EntityStore> npcRef, MovementStates ownerStates, double ownerSpeed, double npcSpeed, boolean moving, double distance
+   ) {
+      try {
+         MovementStatesComponent msComp = (MovementStatesComponent)store.ensureAndGetComponent(npcRef, MovementStatesComponent.getComponentType());
+         MovementStates s = ownerStates != null ? new MovementStates(ownerStates) : new MovementStates();
+         s.onGround = true;
+         if (moving && !(npcSpeed < 0.2)) {
+            boolean ownerSprint = ownerStates != null && ownerStates.sprinting;
+            boolean ownerRun = ownerStates != null && (ownerStates.running || ownerStates.sprinting);
+            boolean wantSprint = ownerSprint || ownerSpeed > 6.0 || distance > 35.0;
+            boolean wantRun = ownerRun || ownerSpeed > 4.2 || distance > 25.0;
+            if (npcSpeed < 1.2) {
+               wantSprint = false;
+               wantRun = false;
+            }
+
+            s.idle = false;
+            s.horizontalIdle = false;
+            s.walking = !wantRun && !wantSprint;
+            s.running = wantRun && !wantSprint;
+            s.sprinting = wantSprint;
+         } else {
+            s.idle = true;
+            s.horizontalIdle = true;
+            s.walking = false;
+            s.running = false;
+            s.sprinting = false;
+         }
+
+         msComp.setMovementStates(s);
+         msComp.setSentMovementStates(new MovementStates(s));
+      } catch (Throwable var16) {
+      }
+   }
+
+   public void revive(UUID ownerId, boolean manual) {
+      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         if (rec.refObj != null) {
+            if (rec.worldObj != null) {
+               rec.downed = false;
+               rec.downedUntilMillis = 0L;
+               HytaleBridge.worldExecute(rec.worldObj, () -> {
+                  try {
+                     if (!(getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> rawStore)) {
+                        return;
+                     }
+
+                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
+                     Ref<EntityStore> ref = (Ref<EntityStore>)rec.refObj;
+                     EntityStatMap stats = (EntityStatMap)store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
+                     stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+                     this.applyNpcScaling(store, ref, ownerId, rec, true);
+                     store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
+                     store.ensureComponent(ref, MovementStatesComponent.getComponentType());
+                     store.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
+                  } catch (Throwable var8) {
+                  }
+               });
+            }
+         }
+      }
+   }
+
+   private static Object getComponentStoreFromWorld(Object worldObj) {
+      Object entityStore = invokeNoArg(worldObj, "getEntityStore", "entityStore");
+      return entityStore == null ? null : invokeNoArg(entityStore, "getStore", "store");
+   }
+
+   private static Object tryGetPositionFromStore(Object componentStore, Object playerEntityRef) {
+      try {
+         Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+         Method getCt = tcClass.getMethod("getComponentType");
+         Object componentType = getCt.invoke(null);
+         if (componentType == null) {
             return null;
-        }
-    }
+         }
 
-    /**
-     * Pega a posição do dono via:
-     * world.getEntityRef(UUID) -> Store.getComponent(ref, TransformComponent.getComponentType()).getPosition()
-     */
-    private static Object tryGetOwnerPositionFromWorldStore(Object worldObj, Object componentStore, UUID ownerId) {
-        try {
-            Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
-            if (ref == null) return null;
+         Object tc = invokeStoreGetComponent(componentStore, playerEntityRef, componentType);
+         return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
 
-            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
-            Method getCt = tcClass.getMethod("getComponentType");
-            Object componentType = getCt.invoke(null);
-            if (componentType == null) return null;
-
-            Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
-            if (tc == null) return null;
-
-            return invokeNoArg(tc, "getPosition", "position");
-        } catch (Throwable ignored) {
+   private static Object tryGetOwnerPositionFromWorldStore(Object worldObj, Object componentStore, UUID ownerId) {
+      try {
+         Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+         if (ref == null) {
             return null;
-        }
-    }
+         }
 
-    private static Object invokeStoreGetComponent(Object store, Object ref, Object componentType) {
-        try {
-            for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("getComponent")) continue;
-                if (m.getParameterCount() != 2) continue;
-                return m.invoke(store, ref, componentType);
+         Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+         Method getCt = tcClass.getMethod("getComponentType");
+         Object componentType = getCt.invoke(null);
+         if (componentType == null) {
+            return null;
+         }
+
+         Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
+         return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
+
+   private static Object invokeStoreGetComponent(Object store, Object ref, Object componentType) {
+      try {
+         for (Method m : store.getClass().getMethods()) {
+            if (m.getName().equals("getComponent") && m.getParameterCount() == 2) {
+               return m.invoke(store, ref, componentType);
             }
-        } catch (Throwable ignored) {}
-        return null;
-    }
+         }
+      } catch (Throwable var7) {
+      }
 
-    /**
-     * Helper compat: busca componente no Store via reflection (Store.getComponent(ref, componentType)).
-     */
-    private static Object getComponentFromStore(Object store, Object ref, Object componentTypeObj) {
-        return invokeStoreGetComponent(store, ref, componentTypeObj);
-    }
+      return null;
+   }
 
+   private static Object getComponentFromStore(Object store, Object ref, Object componentTypeObj) {
+      return invokeStoreGetComponent(store, ref, componentTypeObj);
+   }
 
-    // =========================================================
-    // spawnNPC + Pair/ref extraction
-    // =========================================================
-
-    private static Object invokeSpawnNPC(Object npcPlugin, Object store, String npcType, String groupType, Object pos, Object rot) {
-        try {
-            for (Method m : npcPlugin.getClass().getMethods()) {
-                if (!m.getName().equals("spawnNPC")) continue;
-                if (m.getParameterCount() != 5) continue;
-                try {
-                    return m.invoke(npcPlugin, store, npcType, groupType, pos, rot);
-                } catch (IllegalArgumentException ignoredTryOtherOverload) {}
+   private static Object invokeSpawnNPC(Object npcPlugin, Object store, String npcType, String groupType, Object pos, Object rot) {
+      try {
+         for (Method m : npcPlugin.getClass().getMethods()) {
+            if (m.getName().equals("spawnNPC") && m.getParameterCount() == 5) {
+               try {
+                  return m.invoke(npcPlugin, store, npcType, groupType, pos, rot);
+               } catch (IllegalArgumentException var11) {
+               }
             }
-        } catch (Throwable ignored) {}
-        return null;
-    }
+         }
+      } catch (Throwable var12) {
+      }
 
-    private static int getNpcRoleIndex(Object npcPlugin, String roleName) {
-        try {
-            Method m = npcPlugin.getClass().getMethod("getIndex", String.class);
-            Object r = m.invoke(npcPlugin, roleName);
-            return (r instanceof Integer) ? (Integer) r : ((Number) r).intValue();
-        } catch (Throwable ignored) {
-            return -1;
-        }
-    }
+      return null;
+   }
 
-    /**
-     * Em algumas builds/modloaders, o nome do role pode ser registrado com o caminho relativo
-     * (ex.: "_Core/Tests/Magic_Lantern"). Então tentamos alguns formatos comuns.
-     */
-        private static int getNpcRoleIndexWithFallbacks(Object npcPlugin, String roleName) {
-        if (roleName == null || roleName.isBlank()) return -1;
+   private static int getNpcRoleIndex(Object npcPlugin, String roleName) {
+      try {
+         Method m = npcPlugin.getClass().getMethod("getIndex", String.class);
+         Object r = m.invoke(npcPlugin, roleName);
+         return r instanceof Integer ? (Integer)r : ((Number)r).intValue();
+      } catch (Throwable ignored) {
+         return -1;
+      }
+   }
 
-        // O ID pode variar conforme como o builder registra (apenas nome, ou caminho relativo).
-        String rn = roleName;
-
-        String[] candidates = new String[] {
+   private static int getNpcRoleIndexWithFallbacks(Object npcPlugin, String roleName) {
+      if (roleName != null && !roleName.isBlank()) {
+         String rn = roleName;
+         String[] candidates = new String[]{
             rn,
             rn.endsWith(".json") ? rn.substring(0, rn.length() - 5) : rn,
             "_Core/" + rn,
@@ -3622,985 +2629,2051 @@ private static void removeRefFromList(java.util.ArrayList<Object> list, Ref<Enti
             "Server/NPC/Roles/" + rn,
             "Server/NPC/Roles/_Core/" + rn,
             "Server/NPC/Roles/_Core/AmigoNPC/" + rn
-        };
+         };
 
-        for (String c : candidates) {
-            if (c == null || c.isBlank()) continue;
-            // remove extensão se alguém passar com .json
-            String key = c.endsWith(".json") ? c.substring(0, c.length() - 5) : c;
-            int idx = getNpcRoleIndex(npcPlugin, key);
-            if (idx >= 0) return idx;
-        }
-
-        return -1;
-    }
-
-
-    private static Object invokeSpawnEntity(Object npcPlugin, Object store, int roleIndex, Object pos, Object rot, Object model, Object ownerRef) {
-        try {
-            // assinatura: spawnEntity(Store, int, Vector3d, Vector3f, Model, TriConsumer, TriConsumer)
-            for (Method m : npcPlugin.getClass().getMethods()) {
-                if (!m.getName().equals("spawnEntity")) continue;
-                if (m.getParameterCount() != 7) continue;
-                try {
-                    Object pre = buildPreAddToWorldTriConsumer();
-                    Object post = buildPostSpawnTriConsumer(ownerRef);
-                    return m.invoke(npcPlugin, store, roleIndex, pos, rot, model, pre, post);
-                } catch (IllegalArgumentException ignoredTryOtherOverload) {
-                }
+         for (String c : candidates) {
+            if (c != null && !c.isBlank()) {
+               String key = c.endsWith(".json") ? c.substring(0, c.length() - 5) : c;
+               int idx = getNpcRoleIndex(npcPlugin, key);
+               if (idx >= 0) {
+                  return idx;
+               }
             }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
+         }
 
-    /**
-     * Pós-spawn: fixa o alvo do role no dono (LockedTarget), pra usar Sensor Type=Target no role.
-     * Assinatura esperada: TriConsumer<NPCEntity, Ref<EntityStore>, Store<EntityStore>>
-     */
-    private static Object buildPostSpawnTriConsumer(Object ownerRef) {
-        if (ownerRef == null) return buildNoopTriConsumer();
-        try {
-            Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
-            return java.lang.reflect.Proxy.newProxyInstance(
-                    tri.getClassLoader(),
-                    new Class<?>[]{tri},
-                    (proxy, method, args) -> {
-                        try {
-                            if (args != null && args.length >= 1 && args[0] != null) {
-                                Object npcEntity = args[0];
-                                setLockedTargetOnNpcEntity(npcEntity, ownerRef);
-                            }
-                        } catch (Throwable ignored) {}
-                        return null;
-                    }
-            );
-        } catch (Throwable ignored) {
-            return buildNoopTriConsumer();
-        }
-    }
+         return -1;
+      } else {
+         return -1;
+      }
+   }
 
-    /**
-     * Tenta fixar o marked target "LockedTarget" no role do NPC.
-     * Implementado por reflexão para aguentar variações de build.
-     */
-        private static void setMarkedTargetOnNpcEntity(Object npcEntity, String slot, Object targetRef) {
-        if (npcEntity == null || slot == null) {
-            return;
-        }
+   private static Object invokeSpawnEntity(Object npcPlugin, Object store, int roleIndex, Object pos, Object rot, Object model, Object ownerRef) {
+      try {
+         for (Method m : npcPlugin.getClass().getMethods()) {
+            if (m.getName().equals("spawnEntity") && m.getParameterCount() == 7) {
+               try {
+                  Object pre = buildPreAddToWorldTriConsumer();
+                  Object post = buildPostSpawnTriConsumer(ownerRef);
+                  return m.invoke(npcPlugin, store, roleIndex, pos, rot, model, pre, post);
+               } catch (IllegalArgumentException var13) {
+               }
+            }
+         }
+      } catch (Throwable var14) {
+      }
 
-        try {
+      return null;
+   }
+
+   private static Object buildPostSpawnTriConsumer(Object ownerRef) {
+      if (ownerRef == null) {
+         return buildNoopTriConsumer();
+      }
+
+      try {
+         Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
+         return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> {
+            try {
+               if (args != null && args.length >= 1 && args[0] != null) {
+                  Object npcEntity = args[0];
+                  setLockedTargetOnNpcEntity(npcEntity, ownerRef);
+               }
+            } catch (Throwable var5) {
+            }
+
+            return null;
+         });
+      } catch (Throwable ignored) {
+         return buildNoopTriConsumer();
+      }
+   }
+
+   private static void setMarkedTargetOnNpcEntity(Object npcEntity, String slot, Object targetRef) {
+      if (npcEntity != null && slot != null) {
+         try {
             Object role = invokeNoArg(npcEntity, "getRole", "role");
             if (role == null) {
-                return;
+               return;
             }
 
-            // Tentativas direto no NPCEntity (algumas builds não usam setMarkedTarget no role)
             if (invokeTwoArgs(npcEntity, "onFlockSetTarget", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
+
             if (invokeTwoArgs(npcEntity, "onFlockSetMarkedTarget", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
+
             if (invokeTwoArgs(npcEntity, "onFlockSetMarkedEntity", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
 
-            // A API pode expor nomes diferentes (setMarkedTarget / setMarkedEntity / markEntity).
             if (invokeTwoArgs(role, "setMarkedTarget", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
+
             if (invokeTwoArgs(role, "setMarkedEntity", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
+
             if (invokeTwoArgs(role, "markEntity", String.class, Object.class, slot, targetRef)) {
-                return;
+               return;
             }
 
-            // Se targetRef for null, tentamos limpar o slot.
             if (targetRef == null) {
-                // Alguns builds expõem APIs diferentes para limpar/altera slots de alvo.
-                // Aqui é best-effort: tentamos várias assinaturas sem depender de retorno boolean.
-                invokeOneArg(npcEntity, "onFlockClearTarget", String.class, slot);
-                invokeOneArg(npcEntity, "onFlockRemoveTarget", String.class, slot);
-                invokeOneArg(role, "clearMarkedTarget", String.class, slot);
-                invokeOneArg(role, "removeMarkedTarget", String.class, slot);
-                invokeOneArg(role, "clearMarkedEntity", String.class, slot);
-                invokeOneArg(role, "removeMarkedEntity", String.class, slot);
-                invokeOneArg(role, "unmarkEntity", String.class, slot);
+               invokeOneArg(npcEntity, "onFlockClearTarget", String.class, slot);
+               invokeOneArg(npcEntity, "onFlockRemoveTarget", String.class, slot);
+               invokeOneArg(role, "clearMarkedTarget", String.class, slot);
+               invokeOneArg(role, "removeMarkedTarget", String.class, slot);
+               invokeOneArg(role, "clearMarkedEntity", String.class, slot);
+               invokeOneArg(role, "removeMarkedEntity", String.class, slot);
+               invokeOneArg(role, "unmarkEntity", String.class, slot);
             }
-        } catch (Throwable ignored) {
-            // best-effort
-        }
-    }
+         } catch (Throwable var4) {
+         }
+      }
+   }
 
-    private static void setLockedTargetOnNpcEntity(Object npcEntity, Object ownerRef) {
-        if (npcEntity == null || ownerRef == null) {
-            return;
-        }
-        setMarkedTargetOnNpcEntity(npcEntity, "LockedTarget", ownerRef);
-    }
+   private void updateCurrentTargetMobLevel(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object desiredTargetRefObj) {
+      if (store != null && rec != null) {
+         if (desiredTargetRefObj instanceof Ref && rec.refObj instanceof Ref) {
+            try {
+               Ref<EntityStore> tgtRef = (Ref<EntityStore>)desiredTargetRefObj;
+               String instanceId = null;
 
+               try {
+                  if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
+                     instanceId = s;
+                  }
+               } catch (Throwable var8) {
+               }
 
-    /**
-     * Troca o State do Role para permitir seguir com distância diferente em combate.
-     * - Idle (fora de combate)
-     * - Combat (em combate/assist)
-     *
-     * Implementado por reflexão para aguentar variações de build.
-     */
-    private static void setRoleStateOnNpcEntity(Object npcEntity, Object npcRefObj, Object storeObj, boolean combat) {
-        if (npcEntity == null || npcRefObj == null || storeObj == null) return;
-        final String state = combat ? "Combat" : "Idle";
-        final String sub = "Default";
-        try {
+               MobLevelVarianceCalculator.Result r = ZoneMobService.getShared().computeMobLevel(store, tgtRef, rec.worldObj, rec.zoneRawId, 0, 0, instanceId);
+               rec.currentTargetMobLevel = r.finalLevel();
+               rec.currentTargetMobUuid = null;
+               if (rec.currentTargetMobLevel > 0) {
+                  int inferred = ZoneModel.inferZoneForMobLevel(rec.currentTargetMobLevel);
+                  rec.zoneInferredId = inferred;
+                  rec.zoneInferredFromMobLevel = rec.currentTargetMobLevel;
+                  rec.zoneInferredAtMillis = System.currentTimeMillis();
+               }
+
+               this.debugMobLevel(
+                  rec,
+                  rec.ownerId,
+                  AmigoText.format(
+                     "core.debug.moblevel.zone_result",
+                     rec.zoneRawId,
+                     rec.zoneInferredId,
+                     rec.currentTargetMobLevel,
+                     r.baseLevel(),
+                     r.offset(),
+                     r.finalLevel(),
+                     r.maxLevelCap(),
+                     r.cacheHit()
+                  )
+               );
+            } catch (Throwable ignored) {
+               rec.currentTargetMobLevel = 0;
+               rec.currentTargetMobUuid = null;
+            }
+         } else {
+            rec.currentTargetMobLevel = 0;
+            rec.currentTargetMobUuid = null;
+         }
+      }
+   }
+
+   private static void setLockedTargetOnNpcEntity(Object npcEntity, Object ownerRef) {
+      if (npcEntity != null && ownerRef != null) {
+         setMarkedTargetOnNpcEntity(npcEntity, "LockedTarget", ownerRef);
+      }
+   }
+
+   private static void setRoleStateOnNpcEntity(Object npcEntity, Object npcRefObj, Object storeObj, boolean combat) {
+      if (npcEntity != null && npcRefObj != null && storeObj != null) {
+         String state = combat ? "Combat" : "Idle";
+         String sub = "Default";
+
+         try {
             Object role = invokeNoArg(npcEntity, "getRole", "role");
-            if (role == null) return;
+            if (role == null) {
+               return;
+            }
 
             Object stateSupport = invokeNoArg(role, "getStateSupport", "stateSupport");
-            if (stateSupport == null) return;
+            if (stateSupport == null) {
+               return;
+            }
 
-            // Preferência: StateSupport.setState(Ref, String, String, ComponentAccessor)
             for (Method m : stateSupport.getClass().getMethods()) {
-                if (!m.getName().equals("setState")) continue;
-                if (m.getParameterCount() != 4) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p.length != 4) continue;
-                if (p[1] != String.class) continue;
-                if (p[2] != String.class) continue;
-                try {
-                    m.invoke(stateSupport, npcRefObj, state, sub, storeObj);
-                    return;
-                } catch (IllegalArgumentException ignoredTryOther) {
-                    // tenta outras assinaturas
-                }
+               if (m.getName().equals("setState") && m.getParameterCount() == 4) {
+                  Class<?>[] p = m.getParameterTypes();
+                  if (p.length == 4 && p[1] == String.class && p[2] == String.class) {
+                     try {
+                        m.invoke(stateSupport, npcRefObj, state, "Default", storeObj);
+                        return;
+                     } catch (IllegalArgumentException var14) {
+                     }
+                  }
+               }
             }
 
-            // Fallback: tentar flockSetState(ref, state, sub, accessor)
             for (Method m : stateSupport.getClass().getMethods()) {
-                if (!m.getName().equals("flockSetState")) continue;
-                if (m.getParameterCount() != 4) continue;
-                try {
-                    m.invoke(stateSupport, npcRefObj, state, sub, storeObj);
-                    return;
-                } catch (Throwable ignored) {}
+               if (m.getName().equals("flockSetState") && m.getParameterCount() == 4) {
+                  try {
+                     m.invoke(stateSupport, npcRefObj, state, "Default", storeObj);
+                     return;
+                  } catch (Throwable var15) {
+                  }
+               }
             }
-        } catch (Throwable ignored) {
-        }
-    }
+         } catch (Throwable var16) {
+         }
+      }
+   }
 
-    /**
-    * Compat: algumas versões do mod tentavam alternar "Walk/Run" via um helper.
-    * No role atual (Amigo_Follow.json) isso já é controlado por RelativeSpeed no Seek,
-    * então aqui fazemos apenas best-effort/no-op para não quebrar compilação.
-    */
-    private static void setFlockState(Store<EntityStore> store, Object npcRefObj, String state, String subState) {
-        // Intencionalmente vazio (best-effort). Mantido para compatibilidade.
-        // Se no futuro quisermos alternar controladores/velocidade via API, fazemos por reflexão aqui.
-    }
+   private static void setFlockState(Store<EntityStore> store, Object npcRefObj, String state, String subState) {
+   }
 
-    /**
-     * Ataque corpo a corpo simples e robusto: dispara dano PHYSICAL usando o pipeline oficial (DamageSystems).
-     *
-     * Por que isso é necessário?
-     * - Nosso Role custom (Amigo_Follow) só faz Seek/Follow; ele não contém Action=Attack.
-     * - Então 'LockedTarget' sozinho faz o NPC perseguir o alvo, mas não bater.
-     *
-     * Regras:
-     * - Só ataca quando existir alvo diferente do owner.
-     * - Se defender OFF: só ataca agressor ativo (combatTarget).
-     * - Se defender ON: ataca agressor, senão ataca assistTarget.
-     * - Respeita cooldown e bloqueia PvP (player alvo) quando amigopvp estiver OFF.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void tryMeleeAttack(Store<EntityStore> store, NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
-        try {
-            if (store == null || rec == null) return;
-            if (rec.downed) return;
-            if (targetRefObj == null || ownerRefObj == null) return;
-            if (targetRefObj == ownerRefObj) return;
+   private static String resolveDefaultBowId() {
+      String cached = RESOLVED_BOW_ID;
+      if (cached != null) {
+         return cached.isBlank() ? null : cached;
+      }
 
-            // Só ataca quando /amigo defender está ON
-            if (!rec.defendeEnabled) return;
+      String found = null;
+      String[] candidates = new String[]{
+         "Weapon_Shortbow_Onyxium",
+         "Weapon_Shortbow",
+         "Weapon_Bow_Crude",
+         "Weapon_Bow_Wood",
+         "Weapon_Bow_Iron",
+         "Weapon_Bow_Steel",
+         "Weapon_Bow_Mithril",
+         "Weapon_Bow_Thorium",
+         "Weapon_Bow_Onyxium",
+         "Weapon_Bow",
+         "Weapon_Ranged_Bow"
+      };
 
-            boolean isAggressor = (rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj));
-            boolean isAssist = (rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj));
-            if (!isAggressor && !isAssist) return;
-
-            // Cooldown por estilo: agressivo (agressor) ~650ms; defensivo (assistência) ~850ms
-            long cd = isAggressor ? 650L : MELEE_COOLDOWN_MILLIS;
-            if (now - rec.lastMeleeAttackMillis < cd) return;
-
-            UUID ownerId = rec.ownerId;
-
-            if (!(targetRefObj instanceof Ref)) return;
-            if (!(rec.refObj instanceof Ref)) return;
-
-            Ref<EntityStore> targetRef = (Ref<EntityStore>) targetRefObj;
-            Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-            // PvP: não bater em players se amigopvp estiver OFF
+      try {
+         for (String id : candidates) {
             try {
-                Player maybePlayer = store.getComponent(targetRef, Player.getComponentType());
-                if (maybePlayer != null && !pvpEnabled) {
-                    debugAttack(rec, ownerId, "Bloqueado PvP (alvo é player). Arma=" + rec.equippedWeaponId);
-                    return;
-                }
-            } catch (Throwable ignored) {}
-
-            TransformComponent npcT = store.getComponent(npcRef, TransformComponent.getComponentType());
-            TransformComponent tgtT = store.getComponent(targetRef, TransformComponent.getComponentType());
-            if (npcT == null || tgtT == null) {
-                debugAttack(rec, ownerId, "Sem TransformComponent (npcT=" + (npcT!=null) + ", tgtT=" + (tgtT!=null) + ").");
-                return;
+               if (id != null && !id.isBlank()) {
+                  Item it = (Item)Item.getAssetMap().getAsset(id);
+                  if (it != null) {
+                     found = id;
+                     break;
+                  }
+               }
+            } catch (Throwable var8) {
             }
+         }
+      } catch (Throwable var9) {
+      }
 
-            var np = npcT.getPosition();
-            var tp = tgtT.getPosition();
-            if (np == null || tp == null) {
-                debugAttack(rec, ownerId, "Sem posição (np=" + (np!=null) + ", tp=" + (tp!=null) + ").");
-                return;
-            }
+      RESOLVED_BOW_ID = found == null ? "" : found;
+      return found;
+   }
 
-            double dx = tp.x() - np.x();
-            double dz = tp.z() - np.z();
-            double dy = tp.y() - np.y();
-            double horizontal = Math.sqrt(dx*dx + dz*dz);
+   private static boolean isAirborneTarget(Store<EntityStore> store, Ref<EntityStore> targetRef, Vector3d npcPos) {
+      try {
+         if (store != null && targetRef != null && npcPos != null) {
+            TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
+            if (tgtT != null && tgtT.getPosition() != null) {
+               Vector3d tp = tgtT.getPosition();
+               double dy = tp.getY() - npcPos.getY();
+               double dyAbs = Math.abs(dy);
+               MovementStatesComponent ms = (MovementStatesComponent)store.getComponent(targetRef, MovementStatesComponent.getComponentType());
+               if (ms != null) {
+                  MovementStates s = ms.getMovementStates();
+                  if (s != null) {
+                     if (!s.flying && !s.gliding) {
+                        if (!s.onGround) {
+                           if (dyAbs >= 1.2) {
+                              return true;
+                           }
 
-            // Pode atacar com tolerância vertical baseada na altura do alvo (mobs ~2 blocos ou mais)
-            double targetHeight = getEntityHeight(store, targetRef);
-            boolean tallTarget = (targetHeight >= 1.9);
-            double allowedDy = tallTarget ? 3.0 : 1.5;
-
-            // Alcance de espada (tuning): usa distância efetiva até a "borda" do alvo
-            // (centro-a-centro é enganoso para mobs maiores e gerava "Fora do alcance" mesmo colado)
-            double targetRadius = getEntityRadiusXZ(store, targetRef);
-            double effectiveH = Math.max(0.0, horizontal - targetRadius);
-            double reach = 2.6;
-            if (effectiveH > reach) {
-                debugAttack(rec, ownerId, String.format(
-                        "Fora do alcance: h=%.2f eff=%.2f r=%.2f dy=%.2f arma=%s",
-                        horizontal, effectiveH, targetRadius, dy, String.valueOf(rec.equippedWeaponId)));
-                return;
-            }
-            if (Math.abs(dy) > allowedDy) {
-                debugAttack(rec, ownerId, String.format("Diferença de altura alta: h=%.2f dy=%.2f allowedDy=%.2f arma=%s", horizontal, dy, allowedDy, String.valueOf(rec.equippedWeaponId)));
-                return;
-            }
-
-            // Dano: base da arma (best-effort via Item.itemLevel) + bônus leve da perícia
-            String weaponId = rec.equippedWeaponId;
-            if (weaponId == null || weaponId.isBlank()) {
-                weaponId = SwordProgression.weaponIdForLevel(rec.level);
-            }
-            double base = getWeaponBaseDamage(weaponId);
-            float amount = (float) Math.min(20.0, base + (rec.level * 0.03));
-
-            // ✅ Balanceamento do dano por nível da perícia (espadas):
-            // lvl 1..30  => 1/3 do poder
-            // lvl 31..60 => 1/2 do poder
-            // lvl 61+    => normal
-            int swordLvl = SwordProgression.clampLevel(rec.level);
-            if (swordLvl <= 30) {
-                amount = amount / 3.0f;
-            } else if (swordLvl <= 60) {
-                amount = amount / 2.0f;
-            }
-
-            // HP do alvo (best-effort) p/ detectar kill e dar XP ao NPC
-            float hpBefore = -1f;
-            try {
-                EntityStatMap tgtStats = store.getComponent(targetRef, EntityStatMap.getComponentType());
-                if (tgtStats != null) {
-                    hpBefore = tgtStats.get(DefaultEntityStatTypes.getHealth()).get();
-                }
-            } catch (Throwable ignored) {
-            }
-
-
-// Combat tag (anti-roubo do loot): registra alvo e posição do combate
-recordCombatTag(ownerId, targetRefObj, store);
-
-            Damage damage = new Damage(new Damage.EntitySource(npcRef), DamageCause.PHYSICAL, amount);
-            DamageSystems.executeDamage(targetRef, (ComponentAccessor) store, damage);
-
-            // Best-effort: tenta fazer o inimigo também mirar no NPC (assim como mira no player)
-            pulseAggroToNpc(store, targetRefObj, npcRef, rec, now);
-
-            boolean killed = false;
-            try {
-                EntityStatMap tgtStats2 = store.getComponent(targetRef, EntityStatMap.getComponentType());
-                if (tgtStats2 != null && hpBefore > 0f) {
-                    float hpAfter = tgtStats2.get(DefaultEntityStatTypes.getHealth()).get();
-                    killed = hpAfter <= 0f;
-                }
-            } catch (Throwable ignored) {
-            }
-
-            long xpGain = killed ? XP_PER_KILL : XP_PER_HIT;
-            if (xpGain > 0L) {
-                addNpcXp(store, npcRef, ownerId, rec, xpGain);
-            }
-
-            if (killed) {
-                // Mensagem no chat (o sendToOwner já aplica o prefixo [AmigoNPC])
-                sendToOwner(rec.worldObj, ownerId, "Recebi " + xpGain + " de xp.");
-
-                // Defender ON: retarget imediato para outro alvo perto do NPC, sem esperar o corpo sumir
-                tryRetargetAfterKill(store, rec, ownerRefObj, npcRef, targetRefObj, now);
-            }
-
-            debugAttack(rec, ownerId, String.format("HIT! dmg=%.2f arma=%s h=%.2f dy=%.2f", amount, String.valueOf(rec.equippedWeaponId), horizontal, dy));
-
-            // Animação de ataque correspondente à arma (best-effort)
-            playWeaponAttackAnimation(store, npcRef, rec, weaponId, now);
-
-            rec.lastMeleeAttackMillis = now;
-
-            // Sinal de combate: hit renova janela do agressor
-            if (isAggressor) {
-                rec.combatUntilMillis = now + COMBAT_WINDOW_MILLIS;
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /**
-     * Best-effort: tenta fazer o inimigo atacar também o NPC (e não só o player), marcando o NPC como alvo.
-     * Não é perfeito (depende da IA do mob), mas ajuda a "dividir aggro".
-     */
-    private void pulseAggroToNpc(Store<EntityStore> store, Object targetRefObj, Object npcRefObj, NpcRecord rec, long now) {
-        try {
-            if (store == null || targetRefObj == null || npcRefObj == null || rec == null) return;
-            if (now - rec.lastAggroPulseMillis < 900L) return; // rate-limit
-            rec.lastAggroPulseMillis = now;
-
-            Object mobNpcEntityObj = getComponentFromStore(store, targetRefObj, NPCEntity.getComponentType());
-            if (mobNpcEntityObj == null) return;
-
-            // Não mexe em PvP de player aqui; isso é só para mobs/NPCs.
-            setMarkedTargetOnNpcEntity(mobNpcEntityObj, "CombatTarget", npcRefObj);
-            try {
-                setLockedTargetOnNpcEntity(mobNpcEntityObj, npcRefObj);
-            } catch (Throwable ignored) {}
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /**
-     * Defender ON: após kill do NPC, pega imediatamente outro alvo próximo do NPC.
-     * Evita ficar "parado" esperando o corpo do mob sumir.
-     */
-    private void tryRetargetAfterKill(Store<EntityStore> store, NpcRecord rec, Object ownerRefObj, Object npcRefObj, Object deadRefObj, long now) {
-        try {
-            if (store == null || rec == null || !rec.defendeEnabled) return;
-            if (!(npcRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) return;
-
-            @SuppressWarnings("unchecked")
-            Ref<EntityStore> npcRef = (Ref<EntityStore>) rec.refObj;
-
-            TransformComponent nt = store.getComponent(npcRef, TransformComponent.getComponentType());
-            if (nt == null || nt.getPosition() == null) return;
-
-            Object next = findNearestTargetNearNpc(store, rec, ownerRefObj, nt.getPosition(), deadRefObj);
-            if (next == null) return;
-
-            // limpa agressor se for o que morreu
-            if (rec.combatTargetRefObj != null && refEq(deadRefObj, rec.combatTargetRefObj)) {
-                rec.combatUntilMillis = 0L;
-                rec.combatTargetRefObj = null;
-            }
-
-            rec.assistTargetRefObj = next;
-            rec.assistUntilMillis = 0L;
-
-            Object npcEntityObj = getComponentFromStore(store, npcRefObj, NPCEntity.getComponentType());
-            if (npcEntityObj != null) {
-                setLockedTargetOnNpcEntity(npcEntityObj, next);
-                setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", next);
-                setFlockState(store, rec.refObj, "Run", "");
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /**
-     * Toca uma animação de ataque baseada na arma atual do NPC (best-effort).
-     *
-     * Fonte de verdade: ItemPlayerAnimations apontado pelo Item (playerAnimationsId).
-     * Se não encontrar, não toca nada (evita travar animação errada).
-     */
-    private static void playWeaponAttackAnimation(Store<EntityStore> store, Ref<EntityStore> npcRef, NpcRecord rec, String weaponId, long now) {
-        try {
-            if (store == null || npcRef == null || rec == null) return;
-
-            // 1) Tenta tocar swing/attack usando ItemPlayerAnimations (padrão do player).
-            // Aqui o "animationId" é a CHAVE (ex.: "attack"), não o id thirdPerson.
-            String itemAnimsId = null;
-            ItemPlayerAnimations ipa = null;
-            try {
-                if (weaponId != null && !weaponId.isBlank()) {
-                    Item it = Item.getAssetMap().getAsset(weaponId);
-                    if (it != null) {
-                        boolean usePlayerAnims = false;
-                        try { usePlayerAnims = it.getUsePlayerAnimations(); } catch (Throwable ignored) {}
-                        try { itemAnimsId = it.getPlayerAnimationsId(); } catch (Throwable ignored) {}
-                        if ((itemAnimsId == null || itemAnimsId.isBlank()) && usePlayerAnims) {
-                            try { itemAnimsId = ItemPlayerAnimations.DEFAULT_ID; } catch (Throwable ignored) {}
+                           if (s.jumping || s.falling) {
+                              return true;
+                           }
                         }
-                    }
-                }
-            } catch (Throwable ignored) {}
 
-            if (itemAnimsId == null || itemAnimsId.isBlank()) {
-                try { itemAnimsId = ItemPlayerAnimations.DEFAULT_ID; } catch (Throwable ignored) { itemAnimsId = null; }
+                        return false;
+                     }
+
+                     return true;
+                  }
+               }
+
+               return dyAbs >= 2.0;
+            } else {
+               return false;
             }
+         } else {
+            return false;
+         }
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
+   private void aimNpcAtTarget(Store<EntityStore> store, Ref<EntityStore> npcRef, Ref<EntityStore> targetRef) {
+      if (store != null && npcRef != null && targetRef != null) {
+         TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+         TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
+         if (npcT != null && tgtT != null) {
+            Vector3d np = npcT.getPosition();
+            Vector3d tp = tgtT.getPosition();
+            if (np != null && tp != null) {
+               double npcH = Math.max(1.2, getEntityHeight(store, npcRef));
+               double tgtH = Math.max(0.6, getEntityHeight(store, targetRef));
+               double eyeY = np.getY() + npcH * 0.85;
+               double aimY = tp.getY() + tgtH * 0.55;
+               double dx = tp.getX() - np.getX();
+               double dz = tp.getZ() - np.getZ();
+               double dy = aimY - eyeY;
+               double h = Math.sqrt(dx * dx + dz * dz);
+               if (!(h < 1.0E-4)) {
+                  float yaw = (float)Math.toDegrees(Math.atan2(-dx, -dz));
+                  float pitch = (float)(-Math.toDegrees(Math.atan2(dy, h)));
+                  Object rot = invokeNoArg(npcT, "getRotation", "rotation");
+                  if (rot == null) {
+                     rot = newVector3f(0.0F, 0.0F, 0.0F);
+                  }
+
+                  if (rot != null) {
+                     boolean ok = false;
+
+                     try {
+                        invokeOneArg(rot, "setYaw", float.class, yaw);
+                        invokeOneArg(rot, "setPitch", float.class, pitch);
+                        ok = true;
+                     } catch (Throwable var31) {
+                     }
+
+                     if (!ok) {
+                        try {
+                           invokeOneArg(rot, "setX", float.class, pitch);
+                           invokeOneArg(rot, "setY", float.class, yaw);
+                        } catch (Throwable var30) {
+                        }
+                     }
+
+                     try {
+                        invokeTeleportRotation(npcT, rot);
+                     } catch (Throwable var29) {
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   private static void invokeTeleportRotation(Object transformComponent, Object rotationObj) {
+      if (transformComponent != null && rotationObj != null) {
+         Class<?> rc = rotationObj.getClass();
+
+         try {
+            Method m = transformComponent.getClass().getMethod("teleportRotation", rc);
+            m.invoke(transformComponent, rotationObj);
+         } catch (Throwable var5) {
+            try {
+               Method m = transformComponent.getClass().getMethod("setRotation", rc);
+               m.invoke(transformComponent, rotationObj);
+            } catch (Throwable var4) {
+            }
+         }
+      }
+   }
+
+   private void tryEquipDefaultBow(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, long now) {
+      try {
+         if (store == null || rec == null) {
+            return;
+         }
+
+         if (!(rec.refObj instanceof Ref)) {
+            return;
+         }
+
+         String bowId = resolveDefaultBowId();
+         if (bowId == null || bowId.isBlank()) {
+            return;
+         }
+
+         rec.rangedBowItemId = bowId;
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+         if (NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
+            if (rec.rangedBowReadyAtMillis <= 0L) {
+               rec.rangedBowReadyAtMillis = now;
+            }
+
+            return;
+         }
+
+         boolean ok = NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, bowId);
+         if (ok) {
+            rec.rangedBowReadyAtMillis = now + 900L;
+         }
+      } catch (Throwable var8) {
+      }
+   }
+
+   private void tryRangedAttack(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
+      try {
+         if (store == null || rec == null) {
+            return;
+         }
+
+         if (rec.downed) {
+            return;
+         }
+
+         if (targetRefObj == null || ownerRefObj == null) {
+            return;
+         }
+
+         if (targetRefObj == ownerRefObj) {
+            return;
+         }
+
+         boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
+         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
+         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
+         boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
+         if (!rec.defendeEnabled) {
+            if (!isAggressor) {
+               return;
+            }
+         } else if (!isAggressor && !isAssist) {
+            return;
+         }
+
+         if (now - rec.lastRangedAttackMillis < 1150L) {
+            return;
+         }
+
+         if (rec.rangedBowReadyAtMillis > 0L && now < rec.rangedBowReadyAtMillis) {
+            return;
+         }
+
+         if (!(targetRefObj instanceof Ref)) {
+            return;
+         }
+
+         if (!(rec.refObj instanceof Ref)) {
+            return;
+         }
+
+         Ref<EntityStore> targetRef = (Ref<EntityStore>)targetRefObj;
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+         String bowId = rec.rangedBowItemId;
+         if (bowId == null || bowId.isBlank()) {
+            bowId = resolveDefaultBowId();
+         }
+
+         if (bowId == null || bowId.isBlank()) {
+            return;
+         }
+
+         if (!NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
+            rec.rangedBowReadyAtMillis = Math.max(rec.rangedBowReadyAtMillis, now + 200L);
+            return;
+         }
+
+         String bowIdCheck = rec.rangedBowItemId != null && !rec.rangedBowItemId.isBlank() ? rec.rangedBowItemId : resolveDefaultBowId();
+         if (bowIdCheck != null && !bowIdCheck.isBlank() && !NpcWeaponSupport.isHotbar0Item(store, npcRef, bowIdCheck)) {
+            this.tryEquipDefaultBow(store, rec, now);
+            return;
+         }
+
+         try {
+            Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
+            if (maybePlayer != null && !this.pvpEnabled) {
+               return;
+            }
+         } catch (Throwable var58) {
+         }
+
+         TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+         TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
+         if (npcT == null || tgtT == null) {
+            return;
+         }
+
+         Vector3d np = npcT.getPosition();
+         Vector3d tp = tgtT.getPosition();
+         if (np == null || tp == null) {
+            return;
+         }
+
+         if (!isAirborneTarget(store, targetRef, np)) {
+            return;
+         }
+
+         double dx = tp.getX() - np.getX();
+         double dz = tp.getZ() - np.getZ();
+         double dy = tp.getY() - np.getY();
+         double dyAbs = Math.abs(dy);
+         double horizontal = Math.sqrt(dx * dx + dz * dz);
+         if (horizontal > 20.0) {
+            return;
+         }
+
+         if (dyAbs > 35.0) {
+            return;
+         }
+
+         try {
+            this.aimNpcAtTarget(store, npcRef, targetRef);
+         } catch (Throwable var57) {
+         }
+
+         String weaponId = resolveConfiguredOrLegacyMeleeWeaponId(rec);
+         double base = NpcWeaponSupport.getWeaponBaseDamage(weaponId);
+         float amount = (float)(base + rec.level * 0.03);
+         int swordLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         if (swordLvl <= 30) {
+            amount /= 3.0F;
+         } else if (swordLvl <= 60) {
+            amount /= 2.0F;
+         }
+
+         try {
+            amount = AttributeModifierService.getShared().applyOutgoingDamageMods(rec.ownerId, amount, Math.max(1, rec.npcLevelCached));
+         } catch (Throwable var56) {
+         }
+
+         amount = Math.min(24.0F, amount * 1.2F);
+         float hpBefore = -1.0F;
+
+         try {
+            EntityStatMap tgtStats = (EntityStatMap)store.getComponent(targetRef, EntityStatMap.getComponentType());
+            if (tgtStats != null) {
+               hpBefore = tgtStats.get(DefaultEntityStatTypes.getHealth()).get();
+            }
+         } catch (Throwable var55) {
+         }
+
+         this.recordCombatTag(rec.ownerId, targetRefObj, store);
+
+         try {
+            playWeaponAttackAnimation(store, npcRef, rec, bowId, now);
+         } catch (Throwable var54) {
+         }
+
+         try {
+            if (npcT != null && npcT.getPosition() != null) {
+               playSfx3d(store, npcT.getPosition(), "SFX_Bow_T2_Shoot", 10.0F, 12.0F);
+            }
+         } catch (Throwable var53) {
+         }
+
+         Damage damage = new Damage(new EntitySource(npcRef), DamageCause.PHYSICAL, amount);
+         DamageSystems.executeDamage(targetRef, store, damage);
+
+         try {
+            this.debugAttack(
+               rec,
+               rec.ownerId,
+               AmigoText.format(
+                  "core.debug.attack.ranged_hit",
+                  String.format(Locale.ROOT, "%.2f", amount),
+                  String.valueOf(bowId),
+                  String.format(Locale.ROOT, "%.2f", horizontal),
+                  String.format(Locale.ROOT, "%.2f", dy)
+               )
+            );
+         } catch (Throwable var52) {
+         }
+
+         this.pulseAggroToNpc(store, targetRefObj, npcRef, rec, now);
+         rec.lastRangedAttackMillis = now;
+         boolean killed = false;
+
+         try {
+            EntityStatMap tgtStats2 = (EntityStatMap)store.getComponent(targetRef, EntityStatMap.getComponentType());
+            if (tgtStats2 != null && hpBefore > 0.0F) {
+               float hpAfter = tgtStats2.get(DefaultEntityStatTypes.getHealth()).get();
+               killed = hpAfter <= 0.0F;
+            }
+         } catch (Throwable var51) {
+         }
+
+         int mobLevelForCtx = rec.currentTargetMobLevel;
+         long xpGain;
+         if (killed) {
+            int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
+            int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
+            mobLevelForCtx = mobLevel;
+            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+            xpGain = coerceStage1XpGainToLong(rec, xpD);
 
             try {
-                if (itemAnimsId != null && !itemAnimsId.isBlank()) {
-                    ipa = ItemPlayerAnimations.getAssetMap().getAsset(itemAnimsId);
-                }
-            } catch (Throwable ignored) {
-                ipa = null;
+               if (AmigoZonesConfigService.get().debugLog) {
+                  double baseXp = RpgStage1Formulas.calculateBaseXPFromMonsterLevel(mobLevel, RPG_STAGE1_CFG);
+                  double diffMult = RpgStage1Formulas.calculateLevelDiffMultiplier(npcLevel, mobLevel, RPG_STAGE1_CFG);
+                  this.debugMobLevel(
+                     rec,
+                     rec.ownerId,
+                     AmigoText.format(
+                        "core.debug.moblevel.xp_kill",
+                        npcLevel,
+                        mobLevel,
+                        String.format(Locale.ROOT, "%.2f", baseXp),
+                        String.format(Locale.ROOT, "%.2f", diffMult),
+                        String.format(Locale.ROOT, "%.2f", RPG_STAGE1_CFG.getRateExp()),
+                        xpGain
+                     )
+                  );
+               }
+            } catch (Throwable var50) {
             }
+         } else {
+            xpGain = 0L;
+         }
 
-            String key = null;
+         if (xpGain > 0L) {
+            NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
+            String wn = null;
+
             try {
-                if (ipa != null) {
-                    key = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
-                }
-            } catch (Throwable ignored) {
-                key = null;
+               if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
+                  wn = s;
+               }
+            } catch (Throwable var49) {
             }
 
-            if (key == null || key.isBlank()) {
-                // fallback seguro (chave comum)
-                key = "attack";
+            int zid = this.getZoneForHud(rec.ownerId);
+            String mobId = rec.currentTargetMobUuid != null ? rec.currentTargetMobUuid.toString() : null;
+            NpcXpContext xpCtx = new NpcXpContext(wn, wn, null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
+            this.addNpcXp(store, npcRef, rec.ownerId, rec, xpGain, xpSrc, xpCtx);
+         }
+
+         if (killed) {
+            if (rec.autoLootEnabled) {
+               rec.autoLootStickUntilMillis = Math.max(rec.autoLootStickUntilMillis, now + 900L);
+               rec.autoLootStickDeadRefObj = targetRefObj;
+
+               try {
+                  if (targetRefObj instanceof Ref<EntityStore> tgtRef3) {
+                     TransformComponent tgtT3 = (TransformComponent)store.getComponent(tgtRef3, TransformComponent.getComponentType());
+                     if (tgtT3 != null && tgtT3.getPosition() != null) {
+                        rec.autoLootStickAnchorPos = tgtT3.getPosition();
+                     }
+                  }
+
+                  if (rec.autoLootStickAnchorPos == null && npcT != null && npcT.getPosition() != null) {
+                     rec.autoLootStickAnchorPos = npcT.getPosition();
+                  }
+               } catch (Throwable var48) {
+               }
             }
 
-            boolean played = false;
+            this.sendToOwner(rec.worldObj, rec.ownerId, AmigoText.format("core.npc.xp.received", xpGain));
+            this.tryRetargetAfterKill(store, rec, ownerRefObj, npcRef, targetRefObj, now);
+         }
+      } catch (Throwable var59) {
+      }
+   }
+
+   private void tryMeleeAttack(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
+      try {
+         if (store == null || rec == null) {
+            return;
+         }
+
+         if (rec.downed) {
+            return;
+         }
+
+         if (targetRefObj == null || ownerRefObj == null) {
+            return;
+         }
+
+         if (targetRefObj == ownerRefObj) {
+            return;
+         }
+
+         boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
+         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
+         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
+         boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
+         if (!rec.defendeEnabled) {
+            if (!isAggressor) {
+               return;
+            }
+         } else if (!isAggressor && !isAssist) {
+            return;
+         }
+
+         long cd = isAggressor ? 650L : 850L;
+         if (now - rec.lastMeleeAttackMillis < cd) {
+            return;
+         }
+
+         UUID ownerId = rec.ownerId;
+         if (!(targetRefObj instanceof Ref)) {
+            return;
+         }
+
+         if (!(rec.refObj instanceof Ref)) {
+            return;
+         }
+
+         Ref<EntityStore> targetRef = (Ref<EntityStore>)targetRefObj;
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+
+         try {
+            Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
+            if (maybePlayer != null && !this.pvpEnabled) {
+               this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.pvp_blocked", rec.equippedWeaponId));
+               return;
+            }
+         } catch (Throwable var62) {
+         }
+
+         TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+         TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
+         if (npcT == null || tgtT == null) {
+            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.missing_transform", npcT != null, tgtT != null));
+            return;
+         }
+
+         Vector3d np = npcT.getPosition();
+         Vector3d tp = tgtT.getPosition();
+         if (np == null || tp == null) {
+            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.missing_position", np != null, tp != null));
+            return;
+         }
+
+         double dx = tp.getX() - np.getX();
+         double dz = tp.getZ() - np.getZ();
+         double dy = tp.getY() - np.getY();
+         double horizontal = Math.sqrt(dx * dx + dz * dz);
+         double targetHeight = getEntityHeight(store, targetRef);
+         boolean tallTarget = targetHeight >= 1.9;
+         double allowedDy = tallTarget ? 3.0 : 2.0;
+         double targetRadius = getEntityRadiusXZ(store, targetRef);
+         double effectiveH = Math.max(0.0, horizontal - targetRadius);
+         double reach = 2.6;
+         if (effectiveH > reach) {
+            this.debugAttack(
+               rec,
+               ownerId,
+               AmigoText.format(
+                  "core.debug.attack.out_of_range",
+                  String.format(Locale.ROOT, "%.2f", horizontal),
+                  String.format(Locale.ROOT, "%.2f", effectiveH),
+                  String.format(Locale.ROOT, "%.2f", targetRadius),
+                  String.format(Locale.ROOT, "%.2f", dy),
+                  String.valueOf(rec.equippedWeaponId)
+               )
+            );
+            return;
+         }
+
+         if (Math.abs(dy) > allowedDy) {
+            this.debugAttack(
+               rec,
+               ownerId,
+               AmigoText.format(
+                  "core.debug.attack.high_vertical_diff",
+                  String.format(Locale.ROOT, "%.2f", horizontal),
+                  String.format(Locale.ROOT, "%.2f", dy),
+                  String.format(Locale.ROOT, "%.2f", allowedDy),
+                  String.valueOf(rec.equippedWeaponId)
+               )
+            );
+            return;
+         }
+
+         String weaponId = resolveConfiguredOrLegacyMeleeWeaponId(rec);
+         double base = NpcWeaponSupport.getWeaponBaseDamage(weaponId);
+         float amount = (float)Math.min(20.0, base + rec.level * 0.03);
+         int swordLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         if (swordLvl <= 30) {
+            amount /= 3.0F;
+         } else if (swordLvl <= 60) {
+            amount /= 2.0F;
+         }
+
+         try {
+            amount = AttributeModifierService.getShared().applyOutgoingDamageMods(rec.ownerId, amount, Math.max(1, rec.npcLevelCached));
+         } catch (Throwable var61) {
+         }
+
+         float hpBefore = -1.0F;
+
+         try {
+            EntityStatMap tgtStats = (EntityStatMap)store.getComponent(targetRef, EntityStatMap.getComponentType());
+            if (tgtStats != null) {
+               hpBefore = tgtStats.get(DefaultEntityStatTypes.getHealth()).get();
+            }
+         } catch (Throwable var60) {
+         }
+
+         this.recordCombatTag(ownerId, targetRefObj, store);
+         Damage damage = new Damage(new EntitySource(npcRef), DamageCause.PHYSICAL, amount);
+
+         try {
+            Particles particles = new Particles(null, new WorldParticle[]{new WorldParticle("Impact_Sword_Basic", null, 1.0F, null, null)}, 64.0);
+            damage.putMetaObject(Damage.IMPACT_PARTICLES, particles);
+         } catch (Throwable var59) {
+         }
+
+         try {
+            if (tgtT != null && tgtT.getPosition() != null) {
+               playSfx3d(store, tgtT.getPosition(), "SFX_Longsword_Special_Impact", 10.0F, 12.0F);
+            }
+         } catch (Throwable var58) {
+         }
+
+         DamageSystems.executeDamage(targetRef, store, damage);
+         this.pulseAggroToNpc(store, targetRefObj, npcRef, rec, now);
+         boolean killed = false;
+
+         try {
+            EntityStatMap tgtStats2 = (EntityStatMap)store.getComponent(targetRef, EntityStatMap.getComponentType());
+            if (tgtStats2 != null && hpBefore > 0.0F) {
+               float hpAfter = tgtStats2.get(DefaultEntityStatTypes.getHealth()).get();
+               killed = hpAfter <= 0.0F;
+            }
+         } catch (Throwable var57) {
+         }
+
+         int mobLevelForCtx = rec.currentTargetMobLevel;
+         long xpGain;
+         if (killed) {
+            int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
+            int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
+            mobLevelForCtx = mobLevel;
+            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+            xpGain = coerceStage1XpGainToLong(rec, xpD);
+         } else {
+            xpGain = 0L;
+         }
+
+         if (xpGain > 0L) {
+            NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
+            String wn = null;
+
             try {
-                if (itemAnimsId != null && !itemAnimsId.isBlank()) {
-                    AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, itemAnimsId, key, (ComponentAccessor) store);
-                    played = true;
-                } else {
-                    // overload sem itemAnimationsId
-                    AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, key, (ComponentAccessor) store);
-                    played = true;
-                }
-            } catch (Throwable ignored) {
-                played = false;
+               if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
+                  wn = s;
+               }
+            } catch (Throwable var56) {
             }
 
-            if (played) {
-                rec.lastAttackAnimId = key;
-                rec.clearAttackAnimAtMillis = now + 650L;
-                return;
+            int zid = this.getZoneForHud(ownerId);
+            String mobId = rec.currentTargetMobUuid != null ? rec.currentTargetMobUuid.toString() : null;
+            NpcXpContext xpCtx = new NpcXpContext(wn, wn, null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
+            this.addNpcXp(store, npcRef, ownerId, rec, xpGain, xpSrc, xpCtx);
+         }
+
+         if (killed) {
+            if (rec.autoLootEnabled) {
+               rec.autoLootStickUntilMillis = Math.max(rec.autoLootStickUntilMillis, now + 900L);
+               rec.autoLootStickDeadRefObj = targetRefObj;
+
+               try {
+                  if (tgtT != null && tgtT.getPosition() != null) {
+                     rec.autoLootStickAnchorPos = tgtT.getPosition();
+                  }
+
+                  if (rec.autoLootStickAnchorPos == null && npcT != null && npcT.getPosition() != null) {
+                     rec.autoLootStickAnchorPos = npcT.getPosition();
+                  }
+               } catch (Throwable var55) {
+               }
             }
 
-            // 2) Fallback (best-effort): tenta uma animação de ataque do próprio modelo (ex.: Wraith)
+            this.sendToOwner(rec.worldObj, ownerId, AmigoText.format("core.npc.xp.received", xpGain));
+            this.tryRetargetAfterKill(store, rec, ownerRefObj, npcRef, targetRefObj, now);
+         }
+
+         this.debugAttack(
+            rec,
+            ownerId,
+            AmigoText.format(
+               "core.debug.attack.hit",
+               String.format(Locale.ROOT, "%.2f", amount),
+               String.valueOf(rec.equippedWeaponId),
+               String.format(Locale.ROOT, "%.2f", horizontal),
+               String.format(Locale.ROOT, "%.2f", dy)
+            )
+         );
+         playWeaponAttackAnimation(store, npcRef, rec, weaponId, now);
+         rec.lastMeleeAttackMillis = now;
+         if (isAggressor) {
+            rec.combatUntilMillis = now + 3000L;
+         }
+      } catch (Throwable var63) {
+      }
+   }
+
+   private void pulseAggroToNpc(Store<EntityStore> store, Object targetRefObj, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+      try {
+         if (store == null || targetRefObj == null || npcRefObj == null || rec == null) {
+            return;
+         }
+
+         if (now - rec.lastAggroPulseMillis < 900L) {
+            return;
+         }
+
+         rec.lastAggroPulseMillis = now;
+         Object mobNpcEntityObj = getComponentFromStore(store, targetRefObj, NPCEntity.getComponentType());
+         if (mobNpcEntityObj == null) {
+            return;
+         }
+
+         setMarkedTargetOnNpcEntity(mobNpcEntityObj, "CombatTarget", npcRefObj);
+
+         try {
+            setLockedTargetOnNpcEntity(mobNpcEntityObj, npcRefObj);
+         } catch (Throwable var9) {
+         }
+      } catch (Throwable var10) {
+      }
+   }
+
+   private void tryRetargetAfterKill(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object npcRefObj, Object deadRefObj, long now) {
+      try {
+         if (store == null || rec == null || !rec.defendeEnabled) {
+            return;
+         }
+
+         if (!(npcRefObj instanceof Ref) || !(rec.refObj instanceof Ref<EntityStore> npcRef)) {
+            return;
+         }
+
+         TransformComponent nt = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+         if (nt == null || nt.getPosition() == null) {
+            return;
+         }
+
+         Object next = this.findNearestTargetNearNpc(store, rec, ownerRefObj, nt.getPosition(), deadRefObj);
+         if (next == null) {
+            return;
+         }
+
+         if (rec.combatTargetRefObj != null && refEq(deadRefObj, rec.combatTargetRefObj)) {
+            rec.combatUntilMillis = 0L;
+            rec.combatTargetRefObj = null;
+         }
+
+         rec.assistTargetRefObj = next;
+         rec.assistUntilMillis = 0L;
+         Object npcEntityObj = getComponentFromStore(store, npcRefObj, NPCEntity.getComponentType());
+         if (npcEntityObj != null) {
+            setLockedTargetOnNpcEntity(npcEntityObj, next);
+            setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", next);
+            setFlockState(store, rec.refObj, "Run", "");
+         }
+      } catch (Throwable var12) {
+      }
+   }
+
+   private static void playWeaponAttackAnimation(Store<EntityStore> store, Ref<EntityStore> npcRef, AmigoNpcManager.NpcRecord rec, String weaponId, long now) {
+      try {
+         if (store == null || npcRef == null || rec == null) {
+            return;
+         }
+
+         String itemAnimsId = null;
+         ItemPlayerAnimations ipa = null;
+
+         try {
+            if (weaponId != null && !weaponId.isBlank()) {
+               Item it = (Item)Item.getAssetMap().getAsset(weaponId);
+               if (it != null) {
+                  boolean usePlayerAnims = false;
+
+                  try {
+                     usePlayerAnims = it.getUsePlayerAnimations();
+                  } catch (Throwable var16) {
+                  }
+
+                  try {
+                     itemAnimsId = it.getPlayerAnimationsId();
+                  } catch (Throwable var15) {
+                  }
+
+                  if ((itemAnimsId == null || itemAnimsId.isBlank()) && usePlayerAnims) {
+                     try {
+                        itemAnimsId = "Default";
+                     } catch (Throwable var14) {
+                     }
+                  }
+               }
+            }
+         } catch (Throwable var21) {
+         }
+
+         if (itemAnimsId == null || itemAnimsId.isBlank()) {
             try {
-                AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, "attack", true, (ComponentAccessor) store);
-                rec.lastAttackAnimId = "attack";
-                rec.clearAttackAnimAtMillis = now + 650L;
+               itemAnimsId = "Default";
             } catch (Throwable ignored) {
+               itemAnimsId = null;
+            }
+         }
+
+         try {
+            if (itemAnimsId != null && !itemAnimsId.isBlank()) {
+               ipa = (ItemPlayerAnimations)ItemPlayerAnimations.getAssetMap().getAsset(itemAnimsId);
+            }
+         } catch (Throwable ignored) {
+            ipa = null;
+         }
+
+         String key = null;
+
+         try {
+            if (ipa != null) {
+               boolean isBow = false;
+
+               try {
+                  if (weaponId != null) {
+                     String lw = weaponId.toLowerCase(Locale.ROOT);
+                     isBow = lw.contains("bow") || lw.contains("shortbow");
+                  }
+               } catch (Throwable var19) {
+               }
+
+               if (isBow) {
+                  key = pickBowKeyFromPlayerAnimations(ipa.getAnimations());
+               }
+
+               if (key == null || key.isBlank()) {
+                  key = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
+               }
+            }
+         } catch (Throwable ignored) {
+            key = null;
+         }
+
+         if (key == null || key.isBlank()) {
+            boolean isBow = false;
+
+            try {
+               if (weaponId != null) {
+                  String lw = weaponId.toLowerCase(Locale.ROOT);
+                  isBow = lw.contains("bow") || lw.contains("shortbow");
+               }
+            } catch (Throwable var18) {
             }
 
-        } catch (Throwable ignored) {
-        }
-    }
+            key = isBow ? "shoot" : "attack";
+         }
 
-    /** Limpa a animação de ataque anterior (somente se ainda estiver ativa no slot Action). */
-    @SuppressWarnings("unchecked")
-    private static void clearExpiredAttackAnimation(Store<EntityStore> store, Object npcRefObj, NpcRecord rec, long now) {
-        try {
-            if (store == null || rec == null) return;
-            if (rec.clearAttackAnimAtMillis <= 0L) return;
-            if (now < rec.clearAttackAnimAtMillis) return;
+         boolean played = false;
 
-            String last = rec.lastAttackAnimId;
-            rec.clearAttackAnimAtMillis = 0L;
-            rec.lastAttackAnimId = null;
-            if (last == null || last.isBlank()) return;
-            if (!(npcRefObj instanceof Ref)) return;
-
-            Ref<EntityStore> npcRef = (Ref<EntityStore>) npcRefObj;
-            ActiveAnimationComponent anim = store.getComponent(npcRef, ActiveAnimationComponent.getComponentType());
-            if (anim == null) return;
-
-            String[] active = anim.getActiveAnimations();
-            int idx = -1;
-            try { idx = AnimationSlot.Action.getValue(); } catch (Throwable ignored) {}
-            String current = (active != null && idx >= 0 && idx < active.length) ? active[idx] : null;
-
-            // Só limpa se ainda for exatamente a animação que nós colocamos (não cortar hurt/death)
-            if (last.equals(current)) {
-                try {
-                    AnimationUtils.stopAnimation(npcRef, AnimationSlot.Action, (ComponentAccessor) store);
-                } catch (Throwable ignored) {
-                    anim.setPlayingAnimation(AnimationSlot.Action, null);
-                }
+         try {
+            if (itemAnimsId != null && !itemAnimsId.isBlank()) {
+               AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, itemAnimsId, key, store);
+               played = true;
+            } else {
+               AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, key, store);
+               played = true;
             }
-        } catch (Throwable ignored) {
-        }
-    }
+         } catch (Throwable ignored) {
+            played = false;
+         }
 
-    /** Resolve a chave de animação de ataque para um itemId (cache + heurística de keys). */
-    private static String resolveWeaponAttackAnimId(String weaponId, boolean moving) {
-        if (weaponId == null || weaponId.isBlank()) return null;
-        String cacheKey = weaponId + (moving ? "|m" : "|s");
-        if (WEAPON_ATTACK_ANIM_CACHE.containsKey(cacheKey)) {
+         if (played) {
+            rec.lastAttackAnimId = key;
+            rec.clearAttackAnimAtMillis = now + 650L;
+            return;
+         }
+
+         try {
+            AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, "attack", true, store);
+            rec.lastAttackAnimId = "attack";
+            rec.clearAttackAnimAtMillis = now + 650L;
+         } catch (Throwable var11) {
+         }
+      } catch (Throwable var22) {
+      }
+   }
+
+   private static void clearExpiredAttackAnimation(Store<EntityStore> store, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+      try {
+         if (store == null || rec == null) {
+            return;
+         }
+
+         if (rec.clearAttackAnimAtMillis <= 0L) {
+            return;
+         }
+
+         if (now < rec.clearAttackAnimAtMillis) {
+            return;
+         }
+
+         String last = rec.lastAttackAnimId;
+         rec.clearAttackAnimAtMillis = 0L;
+         rec.lastAttackAnimId = null;
+         if (last == null || last.isBlank()) {
+            return;
+         }
+
+         if (!(npcRefObj instanceof Ref<EntityStore> npcRef)) {
+            return;
+         }
+
+         ActiveAnimationComponent anim = (ActiveAnimationComponent)store.getComponent(npcRef, ActiveAnimationComponent.getComponentType());
+         if (anim == null) {
+            return;
+         }
+
+         String[] active = anim.getActiveAnimations();
+         int idx = -1;
+
+         try {
+            idx = AnimationSlot.Action.getValue();
+         } catch (Throwable var13) {
+         }
+
+         String current = active != null && idx >= 0 && idx < active.length ? active[idx] : null;
+         if (last.equals(current)) {
+            try {
+               AnimationUtils.stopAnimation(npcRef, AnimationSlot.Action, store);
+            } catch (Throwable ignored) {
+               anim.setPlayingAnimation(AnimationSlot.Action, null);
+            }
+         }
+      } catch (Throwable var14) {
+      }
+   }
+
+   private static void tickLevelUpFx(Store<EntityStore> store, Object ownerRefObj, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+      if (store != null && rec != null && npcRefObj instanceof Ref) {
+         if (rec.levelUpFxPendingCount <= 0) {
+            rec.levelUpFxUntilMillis = 0L;
+            rec.levelUpFxNextTickMillis = 0L;
+         } else if (rec.levelUpFxUntilMillis > 0L && now > rec.levelUpFxUntilMillis) {
+            rec.levelUpFxPendingCount = 0;
+            rec.levelUpFxUntilMillis = 0L;
+            rec.levelUpFxNextTickMillis = 0L;
+         } else if (rec.levelUpFxNextTickMillis <= 0L || now >= rec.levelUpFxNextTickMillis) {
+            try {
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefObj;
+               TransformComponent tc = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+               if (tc == null || tc.getPosition() == null) {
+                  return;
+               }
+
+               spawnParticleToOwner(store, null, tc.getPosition(), "POTION_MORPH_BURST");
+               rec.levelUpFxPendingCount = Math.max(0, rec.levelUpFxPendingCount - 1);
+               if (rec.levelUpFxPendingCount > 0) {
+                  rec.levelUpFxNextTickMillis = now + 200L;
+                  if (rec.levelUpFxUntilMillis <= 0L) {
+                     rec.levelUpFxUntilMillis = now + 1000L;
+                  }
+               } else {
+                  rec.levelUpFxUntilMillis = 0L;
+                  rec.levelUpFxNextTickMillis = 0L;
+               }
+            } catch (Throwable var8) {
+            }
+         }
+      }
+   }
+
+   private static String resolveWeaponAttackAnimId(String weaponId, boolean moving) {
+      if (weaponId != null && !weaponId.isBlank()) {
+         String cacheKey = weaponId + (moving ? "|m" : "|s");
+         if (WEAPON_ATTACK_ANIM_CACHE.containsKey(cacheKey)) {
             String v = WEAPON_ATTACK_ANIM_CACHE.get(cacheKey);
-            return (v == null || v.isBlank()) ? null : v;
-        }
+            return v != null && !v.isBlank() ? v : null;
+         }
 
-        String foundKey = null;
-        try {
-            Item it = Item.getAssetMap().getAsset(weaponId);
+         String foundKey = null;
+
+         try {
+            Item it = (Item)Item.getAssetMap().getAsset(weaponId);
             String animsId = null;
             boolean usePlayerAnims = false;
             if (it != null) {
-                try { usePlayerAnims = it.getUsePlayerAnimations(); } catch (Throwable ignored) {}
-                try { animsId = it.getPlayerAnimationsId(); } catch (Throwable ignored) {}
+               try {
+                  usePlayerAnims = it.getUsePlayerAnimations();
+               } catch (Throwable var10) {
+               }
+
+               try {
+                  animsId = it.getPlayerAnimationsId();
+               } catch (Throwable var9) {
+               }
             }
+
             if ((animsId == null || animsId.isBlank()) && usePlayerAnims) {
-                try { animsId = ItemPlayerAnimations.DEFAULT_ID; } catch (Throwable ignored) {}
+               try {
+                  animsId = "Default";
+               } catch (Throwable var8) {
+               }
             }
+
             if (animsId != null && !animsId.isBlank()) {
-                ItemPlayerAnimations ipa = ItemPlayerAnimations.getAssetMap().getAsset(animsId);
-                if (ipa != null) {
-                    foundKey = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
-                }
+               ItemPlayerAnimations ipa = (ItemPlayerAnimations)ItemPlayerAnimations.getAssetMap().getAsset(animsId);
+               if (ipa != null) {
+                  foundKey = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
+               }
             }
-        } catch (Throwable ignored) {
-        }
+         } catch (Throwable var11) {
+         }
 
-        WEAPON_ATTACK_ANIM_CACHE.put(cacheKey, foundKey == null ? "" : foundKey);
-        return foundKey;
-    }
+         WEAPON_ATTACK_ANIM_CACHE.put(cacheKey, foundKey == null ? "" : foundKey);
+         return foundKey;
+      } else {
+         return null;
+      }
+   }
 
-    /**
-     * Heurística para achar a CHAVE de ataque dentro do mapa de ItemPlayerAnimations.
-     * Preferimos keys com 'attack'/'melee'/'swing' etc.
-     */
-    private static String pickAttackKeyFromPlayerAnimations(java.util.Map<String, ItemAnimation> map) {
-        try {
-            if (map == null || map.isEmpty()) return null;
+   private static String pickAttackKeyFromPlayerAnimations(Map<String, ItemAnimation> map) {
+      try {
+         if (map != null && !map.isEmpty()) {
+            String[] prefer = new String[]{"attack", "primary", "primary_attack", "melee", "melee_attack", "swing", "hit", "strike", "slash", "stab", "chop"};
 
-            String[] prefer = {
-                    "attack", "primary", "primary_attack", "melee", "melee_attack", "swing", "hit", "strike", "slash", "stab", "chop"
-            };
-
-            // 1) match exato (ignore-case)
             for (String p : prefer) {
-                for (String k : map.keySet()) {
-                    if (k != null && k.equalsIgnoreCase(p)) {
-                        return k;
-                    }
-                }
+               for (String k : map.keySet()) {
+                  if (k != null && k.equalsIgnoreCase(p)) {
+                     return k;
+                  }
+               }
             }
 
-            // 2) match parcial (contains)
             for (String k : map.keySet()) {
-                if (k == null) continue;
-                String lk = k.toLowerCase(Locale.ROOT);
-                if (lk.contains("attack") || lk.contains("melee") || lk.contains("swing") || lk.contains("hit") || lk.contains("strike")) {
-                    return k;
-                }
+               if (k != null) {
+                  String lk = k.toLowerCase(Locale.ROOT);
+                  if (lk.contains("attack") || lk.contains("melee") || lk.contains("swing") || lk.contains("hit") || lk.contains("strike")) {
+                     return k;
+                  }
+               }
             }
 
-            // 3) fallback: primeira key
             for (String k : map.keySet()) {
-                if (k != null && !k.isBlank()) return k;
+               if (k != null && !k.isBlank()) {
+                  return k;
+               }
             }
 
             return null;
-        } catch (Throwable ignored) {
+         } else {
             return null;
-        }
-    }
+         }
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
 
-private static Object buildNoopTriConsumer() {
-        try {
-            // com.hypixel.hytale.function.consumer.TriConsumer
-            Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
-            // Proxy com invoke vazio
-            return java.lang.reflect.Proxy.newProxyInstance(
-                    tri.getClassLoader(),
-                    new Class<?>[]{tri},
-                    (proxy, method, args) -> null
-            );
-        } catch (Throwable ignored) {
+   private static String pickBowKeyFromPlayerAnimations(Map<String, ItemAnimation> map) {
+      try {
+         if (map != null && !map.isEmpty()) {
+            String[] prefer = new String[]{"shoot", "fire", "release", "use", "primary", "primary_use", "charge", "draw", "aim", "bow", "bow_shoot", "ranged"};
+
+            for (String p : prefer) {
+               for (String k : map.keySet()) {
+                  if (k != null && k.equalsIgnoreCase(p)) {
+                     return k;
+                  }
+               }
+            }
+
+            for (String k : map.keySet()) {
+               if (k != null) {
+                  String lk = k.toLowerCase(Locale.ROOT);
+                  if (lk.contains("shoot")
+                     || lk.contains("fire")
+                     || lk.contains("use")
+                     || lk.contains("charge")
+                     || lk.contains("draw")
+                     || lk.contains("aim")
+                     || lk.contains("bow")
+                     || lk.contains("ranged")) {
+                     return k;
+                  }
+               }
+            }
+
             return null;
-        }
-    }
-
-    /**
-     * Pré-add: garante componentes mínimos para dano/vida/animações.
-     * Assinatura esperada: TriConsumer<NPCEntity, Holder<EntityStore>, Store<EntityStore>>
-     */
-    @SuppressWarnings({"rawtypes","unchecked"})
-    private static Object buildPreAddToWorldTriConsumer() {
-        try {
-            Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
-            return java.lang.reflect.Proxy.newProxyInstance(
-                    tri.getClassLoader(),
-                    new Class<?>[]{tri},
-                    (proxy, method, args) -> {
-                        if (args != null && args.length >= 2 && args[1] instanceof com.hypixel.hytale.component.Holder holder) {
-                            try {
-                                // Vida (EntityStats)
-                                holder.ensureComponent(EntityStatMap.getComponentType());
-                                EntityStatMap stats = (EntityStatMap) holder.ensureAndGetComponent(EntityStatMap.getComponentType());
-                                stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
-
-                                // Animação de hit/death
-                                holder.ensureComponent(ActiveAnimationComponent.getComponentType());
-                                holder.ensureComponent(MovementStatesComponent.getComponentType());
-                                holder.putComponent(RespondToHit.getComponentType(), RespondToHit.INSTANCE);
-                            } catch (Throwable ignored) {
-                            }
-                        }
-                        return null;
-                    }
-            );
-        } catch (Throwable ignored) {
-            return buildNoopTriConsumer();
-        }
-    }
-
-    private static Object buildModelFromAssetId(String modelId, float scale) {
-        try {
-            // ModelAsset.getAssetMap().getAsset(modelId)
-            Class<?> modelAssetClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset");
-            Method getAssetMap = modelAssetClass.getMethod("getAssetMap");
-            Object assetMap = getAssetMap.invoke(null);
-            if (assetMap == null) return null;
-
-            Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
-            Object asset = getAsset.invoke(assetMap, modelId);
-            if (asset == null) return null;
-
-            // Model.createScaledModel(ModelAsset, float)
-            Class<?> modelClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.Model");
-            Method create = modelClass.getMethod("createScaledModel", modelAssetClass, float.class);
-            return create.invoke(null, asset, scale);
-
-        } catch (Throwable ignored) {
+         } else {
             return null;
-        }
-    }
+         }
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
 
-    private static boolean looksLikeRef(Object o) {
-        if (o == null) return false;
-        String n = o.getClass().getName();
-        return n.endsWith(".Ref") || n.endsWith("Ref") || n.contains(".Ref");
-    }
+   private static Object buildNoopTriConsumer() {
+      try {
+         Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
+         return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> null);
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
 
-    private static Object extractRefFromPair(Object pair) {
-        if (pair == null) return null;
-        String[] methods = { "getLeft", "getFirst", "getKey", "left", "first", "key" };
-        for (String mname : methods) {
+   private static Object buildPreAddToWorldTriConsumer() {
+      try {
+         Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
+         return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> {
+            if (args != null && args.length >= 2 && args[1] instanceof Holder holder) {
+               try {
+                  holder.ensureComponent(EntityStatMap.getComponentType());
+                  EntityStatMap stats = (EntityStatMap)holder.ensureAndGetComponent(EntityStatMap.getComponentType());
+                  stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+                  holder.ensureComponent(ActiveAnimationComponent.getComponentType());
+                  holder.ensureComponent(MovementStatesComponent.getComponentType());
+                  holder.putComponent(RespondToHit.getComponentType(), RespondToHit.INSTANCE);
+               } catch (Throwable var5) {
+               }
+            }
+
+            return null;
+         });
+      } catch (Throwable ignored) {
+         return buildNoopTriConsumer();
+      }
+   }
+
+   private static boolean hasSavedWardrobeCosmetics(UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      }
+
+      try {
+         return AmigoWardrobePersistence.hasSavedCosmetics(ownerId);
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
+   private static Object buildPreferredSpawnModel(UUID ownerId, Object storeObj, Object ownerRefObj, String modelId, float scale) {
+      if (modelId != null && !modelId.isBlank()) {
+         Object model = buildModelFromAssetId(modelId, scale);
+         if (model != null) {
+            return model;
+         }
+      }
+
+      return buildModelFromAssetId("PlayerTestModel_V", scale <= 0.0F ? 1.0F : scale);
+   }
+
+   private static Object buildModelFromAssetId(String modelId, float scale) {
+      try {
+         Class<?> modelAssetClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset");
+         Method getAssetMap = modelAssetClass.getMethod("getAssetMap");
+         Object assetMap = getAssetMap.invoke(null);
+         if (assetMap == null) {
+            return null;
+         }
+
+         Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
+         Object asset = getAsset.invoke(assetMap, modelId);
+         if (asset == null) {
+            return null;
+         }
+
+         Class<?> modelClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.Model");
+         Method create = modelClass.getMethod("createScaledModel", modelAssetClass, float.class);
+         return create.invoke(null, asset, scale);
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
+
+   private static boolean looksLikeRef(Object o) {
+      if (o == null) {
+         return false;
+      }
+
+      String n = o.getClass().getName();
+      return n.endsWith(".Ref") || n.endsWith("Ref") || n.contains(".Ref");
+   }
+
+   private static Object extractRefFromPair(Object pair) {
+      if (pair == null) {
+         return null;
+      }
+
+      String[] methods = new String[]{"getLeft", "getFirst", "getKey", "left", "first", "key"};
+
+      for (String mname : methods) {
+         try {
+            Method m = pair.getClass().getMethod(mname);
+            Object v = m.invoke(pair);
+            if (v != null) {
+               return v;
+            }
+         } catch (Throwable var8) {
+         }
+      }
+
+      return null;
+   }
+
+   private static boolean doRemoveEntity(Object componentStore, Object savedRefOrPair) {
+      Object ref = savedRefOrPair;
+      if (!looksLikeRef(ref)) {
+         Object extracted = extractRefFromPair(ref);
+         if (extracted != null) {
+            ref = extracted;
+         }
+      }
+
+      Object removeReason = getRemoveReasonBestEffort();
+      if (removeReason == null) {
+         setError(AmigoText.text("core.error.remove_reason.unavailable"));
+         return false;
+      } else if (!tryInvokeRemoveEntity(componentStore, ref, removeReason)) {
+         setError(AmigoText.text("core.error.remove_entity.incompatible"));
+         return false;
+      } else {
+         return true;
+      }
+   }
+
+   private static Object getRemoveReasonBestEffort() {
+      String[] enumCandidates = new String[]{"com.hypixel.hytale.component.RemoveReason", "com.hypixel.hytale.component.Store$RemoveReason"};
+
+      for (String cn : enumCandidates) {
+         Object r = getEnumConstantAny(cn, "DESPAWN", "COMMAND", "PLUGIN", "CUSTOM", "REMOVE", "SPAWN");
+         if (r != null) {
+            return r;
+         }
+
+         Object first = getFirstEnumValue(cn);
+         if (first != null) {
+            return first;
+         }
+      }
+
+      return null;
+   }
+
+   private static Object getEnumConstantAny(String enumClassName, String... names) {
+      try {
+         Class<?> enumClass = Class.forName(enumClassName);
+         if (!enumClass.isEnum()) {
+            return null;
+         }
+
+         Class<? extends Enum> e = (Class<? extends Enum>)enumClass;
+
+         for (String n : names) {
             try {
-                Method m = pair.getClass().getMethod(mname);
-                Object v = m.invoke(pair);
-                if (v != null) return v;
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    // =========================================================
-    // RemoveEntity helpers (Store.removeEntity(ref, reason))
-    // =========================================================
-
-    private static boolean doRemoveEntity(Object componentStore, Object savedRefOrPair) {
-        Object ref = savedRefOrPair;
-
-        if (!looksLikeRef(ref)) {
-            Object extracted = extractRefFromPair(ref);
-            if (extracted != null) ref = extracted;
-        }
-
-        Object removeReason = getRemoveReasonBestEffort();
-        if (removeReason == null) {
-            setError("Não encontrei RemoveReason nesta build.");
-            return false;
-        }
-
-        if (!tryInvokeRemoveEntity(componentStore, ref, removeReason)) {
-            setError("Não achei Store.removeEntity(ref, reason) compatível nesta build.");
-            return false;
-        }
-
-        return true;
-    }
-
-    private static Object getRemoveReasonBestEffort() {
-        String[] enumCandidates = {
-                "com.hypixel.hytale.component.RemoveReason",
-                "com.hypixel.hytale.component.Store$RemoveReason"
-        };
-        for (String cn : enumCandidates) {
-            Object r = getEnumConstantAny(cn, "DESPAWN", "COMMAND", "PLUGIN", "CUSTOM", "REMOVE", "SPAWN");
-            if (r != null) return r;
-
-            Object first = getFirstEnumValue(cn);
-            if (first != null) return first;
-        }
-        return null;
-    }
-
-    private static Object getEnumConstantAny(String enumClassName, String... names) {
-        try {
-            Class<?> enumClass = Class.forName(enumClassName);
-            if (!enumClass.isEnum()) return null;
-            @SuppressWarnings("unchecked")
-            Class<? extends Enum> e = (Class<? extends Enum>) enumClass;
-
-            for (String n : names) {
-                try { return Enum.valueOf(e, n); }
-                catch (IllegalArgumentException ignored) {}
+               return Enum.valueOf(e, n);
+            } catch (IllegalArgumentException var9) {
             }
-        } catch (Throwable ignored) {}
-        return null;
-    }
+         }
+      } catch (Throwable var10) {
+      }
 
-    private static Object getFirstEnumValue(String enumClassName) {
-        try {
-            Class<?> enumClass = Class.forName(enumClassName);
-            if (!enumClass.isEnum()) return null;
-            Object[] vals = enumClass.getEnumConstants();
-            return (vals != null && vals.length > 0) ? vals[0] : null;
-        } catch (Throwable ignored) {}
-        return null;
-    }
+      return null;
+   }
 
-    private static boolean tryInvokeRemoveEntity(Object store, Object ref, Object reason) {
-        try {
-            for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("removeEntity")) continue;
-                if (m.getParameterCount() != 2) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p[1].isInstance(reason)) {
-                    m.invoke(store, ref, reason);
-                    return true;
-                }
+   private static Object getFirstEnumValue(String enumClassName) {
+      try {
+         Class<?> enumClass = Class.forName(enumClassName);
+         if (!enumClass.isEnum()) {
+            return null;
+         }
+
+         Object[] vals = enumClass.getEnumConstants();
+         return vals != null && vals.length > 0 ? vals[0] : null;
+      } catch (Throwable var3) {
+         return null;
+      }
+   }
+
+   private static boolean tryInvokeRemoveEntity(Object store, Object ref, Object reason) {
+      try {
+         for (Method m : store.getClass().getMethods()) {
+            if (m.getName().equals("removeEntity") && m.getParameterCount() == 2) {
+               Class<?>[] p = m.getParameterTypes();
+               if (p[1].isInstance(reason)) {
+                  m.invoke(store, ref, reason);
+                  return true;
+               }
             }
-        } catch (Throwable ignored) {}
-        return false;
-    }
+         }
+      } catch (Throwable var8) {
+      }
 
-    // =========================================================
-    // Position helpers
-    // =========================================================
+      return false;
+   }
 
-    private static Object tryGetSenderPosition(Object senderObj) {
-        if (senderObj == null) return null;
+   private static Object tryGetSenderPosition(Object senderObj) {
+      if (senderObj == null) {
+         return null;
+      }
 
-        Object p = invokeNoArg(senderObj, "getPosition", "position");
-        if (p != null) return p;
+      Object p = invokeNoArg(senderObj, "getPosition", "position");
+      if (p != null) {
+         return p;
+      }
 
-        Object transform = invokeNoArg(senderObj, "getTransform", "transform");
-        if (transform != null) {
-            Object p2 = invokeNoArg(transform, "getPosition", "position");
-            if (p2 != null) return p2;
-        }
+      Object transform = invokeNoArg(senderObj, "getTransform", "transform");
+      if (transform != null) {
+         Object p2 = invokeNoArg(transform, "getPosition", "position");
+         if (p2 != null) {
+            return p2;
+         }
+      }
 
-        return null;
-    }
+      return null;
+   }
 
-    private static Object coerceToVector3d(Object maybe) {
-        if (maybe == null) return null;
+   private static Float tryGetSenderYaw(Object senderObj) {
+      if (senderObj == null) {
+         return null;
+      }
 
-        if (hasXYZ(maybe)) return maybe;
+      try {
+         Object transform = invokeNoArg(senderObj, "getTransformComponent", "getTransform", "transform", "transformComponent");
+         if (transform != null) {
+            Object rot = invokeNoArg(transform, "getRotation", "rotation");
+            Float y = extractYawFromRotation(rot);
+            if (y != null) {
+               return y;
+            }
+         }
+      } catch (Throwable var4) {
+      }
 
-        Object pos = invokeNoArg(maybe, "getPosition", "position");
-        if (pos != null && hasXYZ(pos)) return pos;
+      return null;
+   }
 
-        return null;
-    }
+   private static Float tryGetOwnerYawFromWorldStore(Object worldObj, Object componentStore, UUID ownerId) {
+      if (worldObj != null && componentStore != null && ownerId != null) {
+         try {
+            Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+            if (ref == null) {
+               return null;
+            }
 
-    private static boolean hasXYZ(Object v) {
-        if (v == null) return false;
+            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+            Method getCt = tcClass.getMethod("getComponentType");
+            Object componentType = getCt.invoke(null);
+            if (componentType == null) {
+               return null;
+            }
 
-        if (hasMethod(v, "getX") && hasMethod(v, "getY") && hasMethod(v, "getZ")) return true;
-        if (hasMethod(v, "x") && hasMethod(v, "y") && hasMethod(v, "z")) return true;
+            Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
+            if (tc == null) {
+               return null;
+            }
 
-        return hasField(v, "x") && hasField(v, "y") && hasField(v, "z");
-    }
+            Object rot = invokeNoArg(tc, "getRotation", "rotation");
+            return extractYawFromRotation(rot);
+         } catch (Throwable var9) {
+            return null;
+         }
+      } else {
+         return null;
+      }
+   }
 
-    private static boolean hasMethod(Object v, String name) {
-        try {
-            v.getClass().getMethod(name);
+   private static Float extractYawFromRotation(Object rot) {
+      if (rot == null) {
+         return null;
+      }
+
+      try {
+         Object v = invokeNoArg(rot, "getYaw");
+         if (v instanceof Number) {
+            return ((Number)v).floatValue();
+         }
+      } catch (Throwable var6) {
+      }
+
+      try {
+         Object v = invokeNoArg(rot, "getY", "y");
+         if (v instanceof Number) {
+            return ((Number)v).floatValue();
+         }
+      } catch (Throwable var5) {
+      }
+
+      try {
+         Field f = rot.getClass().getField("y");
+         Object v = f.get(rot);
+         if (v instanceof Number) {
+            return ((Number)v).floatValue();
+         }
+      } catch (Throwable var4) {
+      }
+
+      try {
+         Field f = rot.getClass().getDeclaredField("y");
+         f.setAccessible(true);
+         Object v = f.get(rot);
+         if (v instanceof Number) {
+            return ((Number)v).floatValue();
+         }
+      } catch (Throwable var3) {
+      }
+
+      return null;
+   }
+
+   private static Object offsetInFrontOfYaw(Object posVec3d, Float yawDegOrNull, double dist) {
+      Object pos = coerceToVector3d(posVec3d);
+      if (pos == null) {
+         return posVec3d;
+      }
+
+      if (yawDegOrNull == null) {
+         return offsetVector3d(pos, dist, 0.0, 0.0);
+      }
+
+      double yaw = Math.toRadians(yawDegOrNull.floatValue());
+      double ox = -Math.sin(yaw) * dist;
+      double oz = -Math.cos(yaw) * dist;
+      return offsetVector3d(pos, ox, 0.0, oz);
+   }
+
+   private static boolean hasCeilingAboveBestEffort(Store<EntityStore> store, Vector3d ownerPos) {
+      try {
+         if (store == null || ownerPos == null) {
+            return false;
+         }
+
+         EntityStore es = (EntityStore)store.getExternalData();
+         if (es == null) {
+            return false;
+         }
+
+         World world = es.getWorld();
+         if (world == null) {
+            return false;
+         }
+
+         int x = (int)Math.floor(ownerPos.getX());
+         int z = (int)Math.floor(ownerPos.getZ());
+         int y = (int)Math.floor(ownerPos.getY());
+         int startY = y + 2;
+
+         for (int i = 0; i < 12; i++) {
+            int blockId = world.getBlock(x, startY + i, z);
+            if (blockId != 0) {
+               return true;
+            }
+         }
+      } catch (Throwable var10) {
+      }
+
+      return false;
+   }
+
+   private static void spawnParticleToOwner(Store<EntityStore> store, Object ownerRefObj, Vector3d pos, String particleId) {
+      try {
+         if (store == null || pos == null || particleId == null || particleId.isBlank()) {
+            return;
+         }
+
+         if (ownerRefObj instanceof Ref) {
+            List<Ref<EntityStore>> viewers = Collections.singletonList((Ref<EntityStore>)ownerRefObj);
+            ParticleUtil.spawnParticleEffect(particleId, pos, viewers, store);
+            return;
+         }
+
+         ParticleUtil.spawnParticleEffect(particleId, pos, store);
+      } catch (Throwable var5) {
+      }
+   }
+
+   private static void playNpcSpawnFx(Store<EntityStore> store, Ref<EntityStore> npcRef, Object ownerRefObj) {
+      try {
+         if (store == null || npcRef == null) {
+            return;
+         }
+
+         TransformComponent tc = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+         if (tc == null || tc.getPosition() == null) {
+            return;
+         }
+
+         Vector3d p = tc.getPosition();
+
+         try {
+            spawnParticleToOwner(store, ownerRefObj, p, "PlayerSpawn_Spawn");
+         } catch (Throwable var6) {
+         }
+
+         playSfx3d(store, p, "SFX_DIVINE_RESPAWN", 10.0F, -9.0F);
+      } catch (Throwable var7) {
+      }
+   }
+
+   private static void playSfx3d(Store<EntityStore> store, Vector3d pos, String soundId, float volumeDb, float pitchSt) {
+      try {
+         if (store == null || pos == null || soundId == null || soundId.isBlank()) {
+            return;
+         }
+
+         int idx = soundIndex(soundId);
+         if (idx == 0) {
+            return;
+         }
+
+         SoundUtil.playSoundEvent3d(idx, SoundCategory.SFX, pos.getX(), pos.getY(), pos.getZ(), dbToGain(volumeDb), stToPitch(pitchSt), store);
+      } catch (Throwable var6) {
+      }
+   }
+
+   private static int soundIndex(String id) {
+      try {
+         return SoundEvent.getAssetMap().getIndexOrDefault(id, 0);
+      } catch (Throwable ignored) {
+         return 0;
+      }
+   }
+
+   private static float dbToGain(float db) {
+      return (float)Math.pow(10.0, db / 20.0);
+   }
+
+   private static float stToPitch(float st) {
+      return (float)Math.pow(2.0, st / 12.0);
+   }
+
+   private static Object coerceToVector3d(Object maybe) {
+      if (maybe == null) {
+         return null;
+      }
+
+      if (hasXYZ(maybe)) {
+         return maybe;
+      }
+
+      Object pos = invokeNoArg(maybe, "getPosition", "position");
+      return pos != null && hasXYZ(pos) ? pos : null;
+   }
+
+   private static boolean hasXYZ(Object v) {
+      if (v == null) {
+         return false;
+      } else if (hasMethod(v, "getX") && hasMethod(v, "getY") && hasMethod(v, "getZ")) {
+         return true;
+      } else {
+         return hasMethod(v, "x") && hasMethod(v, "y") && hasMethod(v, "z") ? true : hasField(v, "x") && hasField(v, "y") && hasField(v, "z");
+      }
+   }
+
+   private static boolean hasMethod(Object v, String name) {
+      try {
+         v.getClass().getMethod(name);
+         return true;
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
+   private static boolean hasField(Object v, String name) {
+      try {
+         v.getClass().getField(name);
+         return true;
+      } catch (Throwable ignoredPublic) {
+         try {
+            v.getClass().getDeclaredField(name);
             return true;
-        } catch (Throwable ignored) {
+         } catch (Throwable ignoredDeclared) {
             return false;
-        }
-    }
+         }
+      }
+   }
 
-    private static boolean hasField(Object v, String name) {
-        try {
-            v.getClass().getField(name);
-            return true;
-        } catch (Throwable ignoredPublic) {
-            try {
-                v.getClass().getDeclaredField(name);
-                return true;
-            } catch (Throwable ignoredDeclared) {
-                return false;
-            }
-        }
-    }
+   private static Object offsetVector3d(Object vec, double ox, double oy, double oz) {
+      try {
+         double x = readCoord(vec, "x");
+         double y = readCoord(vec, "y");
+         double z = readCoord(vec, "z");
 
-    private static Object offsetVector3d(Object vec, double ox, double oy, double oz) {
-        try {
-            double x = readCoord(vec, "x");
-            double y = readCoord(vec, "y");
-            double z = readCoord(vec, "z");
+         try {
+            return vec.getClass().getConstructor(double.class, double.class, double.class).newInstance(x + ox, y + oy, z + oz);
+         } catch (Throwable ignoredCtor) {
+            Object v2 = newVector3d(x + ox, y + oy, z + oz);
+            return v2 != null ? v2 : vec;
+         }
+      } catch (Throwable var16) {
+         return vec;
+      }
+   }
 
-            try {
-                return vec.getClass().getConstructor(double.class, double.class, double.class)
-                        .newInstance(x + ox, y + oy, z + oz);
-            } catch (Throwable ignoredCtor) {
-                Object v2 = newVector3d(x + ox, y + oy, z + oz);
-                return (v2 != null) ? v2 : vec;
-            }
-        } catch (Throwable ignored) {}
-        return vec;
-    }
+   private static double readCoord(Object vec, String axis) throws Exception {
+      String getName = "get" + axis.toUpperCase();
 
-    private static double readCoord(Object vec, String axis) throws Exception {
-        String getName = "get" + axis.toUpperCase();
-        try {
-            Object r = vec.getClass().getMethod(getName).invoke(vec);
-            return ((Number) r).doubleValue();
-        } catch (Throwable ignored) {}
-
-        try {
+      try {
+         Object r = vec.getClass().getMethod(getName).invoke(vec);
+         return ((Number)r).doubleValue();
+      } catch (Throwable var8) {
+         try {
             Object r = vec.getClass().getMethod(axis).invoke(vec);
-            return ((Number) r).doubleValue();
-        } catch (Throwable ignored) {}
-
-        try {
-            Object r = vec.getClass().getField(axis).get(vec);
-            return ((Number) r).doubleValue();
-        } catch (Throwable ignoredPublic) {
-            var f = vec.getClass().getDeclaredField(axis);
-            f.setAccessible(true);
-            Object r = f.get(vec);
-            return ((Number) r).doubleValue();
-        }
-    }
-
-    private static Object newVector3d(double x, double y, double z) {
-        String[] candidates = {
-                "org.joml.Vector3d",
-                "com.hypixel.hytale.math.Vector3d",
-                "com.hypixel.hytale.util.math.Vector3d",
-                "com.hypixel.hytale.protocol.util.Vector3d",
-                "com.hypixel.hytale.server.core.math.Vector3d"
-        };
-        for (String cn : candidates) {
+            return ((Number)r).doubleValue();
+         } catch (Throwable var7) {
             try {
-                Class<?> c = Class.forName(cn);
-                return c.getConstructor(double.class, double.class, double.class).newInstance(x, y, z);
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static Object newVector3f(float a, float b, float c0) {
-        String[] candidates = {
-                "com.hypixel.hytale.math.vector.Vector3f",
-                "com.hypixel.hytale.math.Vector3f",
-                "com.hypixel.hytale.util.math.Vector3f",
-                "com.hypixel.hytale.protocol.util.Vector3f",
-                "com.hypixel.hytale.server.core.math.Vector3f"
-        };
-        for (String cn : candidates) {
-            try {
-                Class<?> c = Class.forName(cn);
-                return c.getConstructor(float.class, float.class, float.class).newInstance(a, b, c0);
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    // =========================================================
-    // Generic reflection helpers
-    // =========================================================
-
-    private static Object invokeNoArg(Object target, String... methodNames) {
-        if (target == null) return null;
-        for (String name : methodNames) {
-            try {
-                Method m = target.getClass().getMethod(name);
-                return m.invoke(target);
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static Object invokeOneArg(Object target, String methodName, Class<?> argType, Object arg) {
-        if (target == null) return null;
-        try {
-            Method m = target.getClass().getMethod(methodName, argType);
-            return m.invoke(target, arg);
-        } catch (Throwable ignored) {}
-        return null;
-    }
-
-    private static Object invokeStaticNoArg(String className, String methodName) {
-        try {
-            Class<?> c = Class.forName(className);
-            Method m = c.getMethod(methodName);
-            return m.invoke(null);
-        } catch (Throwable ignored) {}
-        return null;
-    }
-
-    private static Object getStaticFieldIfExists(String className, String fieldName) {
-        try {
-            Class<?> c = Class.forName(className);
-            Field f = c.getField(fieldName);
-            return f.get(null);
-        } catch (Throwable ignored) {}
-        return null;
-    }
-
-    private static String firstStringFromArray(Object arr) {
-        if (arr instanceof String[] a && a.length > 0) return a[0];
-        return null;
-    }
-
-
-    /**
-     * Invoca um método com 2 argumentos por reflexão.
-     * Retorna true se encontrou e conseguiu invocar (sem exceção).
-     */
-    private static boolean invokeTwoArgs(Object target, String methodName,
-                                         Class<?> argType1, Class<?> argType2,
-                                         Object arg1, Object arg2) {
-        if (target == null) return false;
-        try {
-            try {
-                java.lang.reflect.Method m = target.getClass().getMethod(methodName, argType1, argType2);
-                m.invoke(target, arg1, arg2);
-                return true;
-            } catch (NoSuchMethodException ignored) {
-                for (java.lang.reflect.Method m : target.getClass().getMethods()) {
-                    if (!m.getName().equals(methodName)) continue;
-                    if (m.getParameterCount() != 2) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    boolean ok1 = arg1 == null || p[0].isAssignableFrom(arg1.getClass()) || p[0].isAssignableFrom(argType1);
-                    boolean ok2 = arg2 == null || p[1].isAssignableFrom(arg2.getClass()) || p[1].isAssignableFrom(argType2);
-                    if (!ok1 || !ok2) continue;
-                    m.invoke(target, arg1, arg2);
-                    return true;
-                }
+               Object r = vec.getClass().getField(axis).get(vec);
+               return ((Number)r).doubleValue();
+            } catch (Throwable ignoredPublic) {
+               Field f = vec.getClass().getDeclaredField(axis);
+               f.setAccessible(true);
+               Object r = f.get(vec);
+               return ((Number)r).doubleValue();
             }
-        } catch (Throwable ignored) {}
-        return false;
-    }
+         }
+      }
+   }
+
+   private static Object newVector3d(double x, double y, double z) {
+      String[] candidates = new String[]{
+         "com.hypixel.hytale.math.vector.Vector3d",
+         "com.hypixel.hytale.math.Vector3d",
+         "com.hypixel.hytale.util.math.Vector3d",
+         "com.hypixel.hytale.protocol.util.Vector3d",
+         "com.hypixel.hytale.server.core.math.Vector3d"
+      };
+
+      for (String cn : candidates) {
+         try {
+            Class<?> c = Class.forName(cn);
+            return c.getConstructor(double.class, double.class, double.class).newInstance(x, y, z);
+         } catch (Throwable var12) {
+         }
+      }
+
+      return null;
+   }
+
+   private static Object newVector3f(float a, float b, float c0) {
+      String[] candidates = new String[]{
+         "com.hypixel.hytale.math.vector.Vector3f",
+         "com.hypixel.hytale.math.Vector3f",
+         "com.hypixel.hytale.util.math.Vector3f",
+         "com.hypixel.hytale.protocol.util.Vector3f",
+         "com.hypixel.hytale.server.core.math.Vector3f"
+      };
+
+      for (String cn : candidates) {
+         try {
+            Class<?> c = Class.forName(cn);
+            return c.getConstructor(float.class, float.class, float.class).newInstance(a, b, c0);
+         } catch (Throwable var9) {
+         }
+      }
+
+      return null;
+   }
+
+   private static Object invokeNoArg(Object target, String... methodNames) {
+      if (target == null) {
+         return null;
+      }
+
+      for (String name : methodNames) {
+         try {
+            Method m = target.getClass().getMethod(name);
+            return m.invoke(target);
+         } catch (Throwable var7) {
+         }
+      }
+
+      return null;
+   }
+
+   private static Object invokeOneArg(Object target, String methodName, Class<?> argType, Object arg) {
+      if (target == null) {
+         return null;
+      }
+
+      try {
+         Method m = target.getClass().getMethod(methodName, argType);
+         return m.invoke(target, arg);
+      } catch (Throwable var5) {
+         return null;
+      }
+   }
+
+   private static Object invokeStaticNoArg(String className, String methodName) {
+      try {
+         Class<?> c = Class.forName(className);
+         Method m = c.getMethod(methodName);
+         return m.invoke(null);
+      } catch (Throwable var4) {
+         return null;
+      }
+   }
+
+   private static Object getStaticFieldIfExists(String className, String fieldName) {
+      try {
+         Class<?> c = Class.forName(className);
+         Field f = c.getField(fieldName);
+         return f.get(null);
+      } catch (Throwable var4) {
+         return null;
+      }
+   }
+
+   private static String firstStringFromArray(Object arr) {
+      return arr instanceof String[] a && a.length > 0 ? a[0] : null;
+   }
+
+   private static boolean invokeTwoArgs(Object target, String methodName, Class<?> argType1, Class<?> argType2, Object arg1, Object arg2) {
+      if (target == null) {
+         return false;
+      }
+
+      try {
+         try {
+            Method m = target.getClass().getMethod(methodName, argType1, argType2);
+            m.invoke(target, arg1, arg2);
+            return true;
+         } catch (NoSuchMethodException ignored) {
+            for (Method m : target.getClass().getMethods()) {
+               if (m.getName().equals(methodName) && m.getParameterCount() == 2) {
+                  Class<?>[] p = m.getParameterTypes();
+                  boolean ok1 = arg1 == null || p[0].isAssignableFrom(arg1.getClass()) || p[0].isAssignableFrom(argType1);
+                  boolean ok2 = arg2 == null || p[1].isAssignableFrom(arg2.getClass()) || p[1].isAssignableFrom(argType2);
+                  if (ok1 && ok2) {
+                     m.invoke(target, arg1, arg2);
+                     return true;
+                  }
+               }
+            }
+         }
+      } catch (Throwable var15) {
+      }
+
+      return false;
+   }
+
+   static final class NpcRecord {
+      final Object worldObj;
+      final UUID ownerId;
+      volatile Object refObj;
+      volatile AmigoNpcManager.State state;
+      volatile boolean downed;
+      volatile long downedUntilMillis;
+      volatile SimpleItemContainer backpack;
+      volatile long nextAutoLootMillis;
+      volatile boolean lootPausedInventoryFull;
+      volatile long nextLootFullRecheckMillis;
+      volatile long nextLootFullMsgMillis;
+      volatile boolean backpackDirty;
+      volatile long nextBackpackSaveMillis;
+      volatile long autoLootStickUntilMillis;
+      volatile Object autoLootStickDeadRefObj;
+      volatile Vector3d autoLootStickAnchorPos;
+      volatile boolean ownerUnderground;
+      volatile long nextUndergroundCheckMillis;
+      final ArrayList<CombatTag> combatTags = new ArrayList<>();
+      volatile long lastCombatEndMillis;
+      volatile long lootStickUntilMillis;
+      volatile long lastCombatTagMillis;
+      volatile Vector3d lastBattleCenter;
+      volatile boolean wasInCombat;
+      volatile boolean lootingActive;
+      volatile Object lootTargetRefObj;
+      volatile long lootTargetSinceMillis;
+      final ArrayList<Object> pendingLootRefObjs = new ArrayList<>();
+      final Map<Object, Long> lootProcessedUntil = new ConcurrentHashMap<>();
+      final Map<String, Integer> lootChatAcc = new LinkedHashMap<>();
+      volatile long lootChatSendAtMillis;
+      volatile int level = 1;
+      volatile String equippedWeaponId;
+      volatile double xpInLevel = 0.0;
+      volatile long totalXp = 0L;
+      volatile int npcLevelCached = 1;
+      volatile double stage1XpRemainder = 0.0;
+      volatile long baseHp = -1L;
+      volatile long baseDef = -1L;
+      volatile String modelId;
+      volatile double modelScale;
+      volatile String customName;
+      volatile boolean respawnRequested;
+      volatile Object respawnWorldObj;
+      volatile Object respawnSenderObj;
+      volatile long respawnAtMillis;
+      volatile String respawnMessage;
+      volatile long lastMoveToMillis;
+      volatile long lastSampleMillis;
+      volatile Vector3d lastMoveTarget;
+      volatile long lastMoveIssuedMillis;
+      volatile Vector3d lastOwnerPos;
+      volatile Vector3d lastNpcPos;
+      volatile long lastNpcMovedMillis;
+      volatile long lastTeleportMillis;
+      long farSinceMillis;
+      volatile long spawnFxUntilMillis;
+      volatile long spawnFxNextMillis;
+      volatile boolean wardrobeRestorePending;
+      volatile int wardrobeRestoreAttempts;
+      volatile long nextWardrobeRestoreMillis;
+      volatile long lastMeleeAttackMillis;
+      volatile long lastRangedAttackMillis;
+      volatile String rangedBowItemId;
+      volatile long rangedBowReadyAtMillis;
+      volatile long lastCombatNudgeMillis;
+      volatile long lastAggroPulseMillis;
+      volatile String lastAttackAnimId;
+      volatile long clearAttackAnimAtMillis;
+      volatile long debugNextEquipMillis;
+      volatile long debugNextCombatMillis;
+      volatile long debugNextAttackMillis;
+      volatile long debugNextDamageMillis;
+      volatile long debugNextZonesMillis;
+      volatile long debugNextMobLevelMillis;
+      volatile float idleLookYawOffset;
+      volatile long idleLookNextMillis;
+      volatile Object combatTargetRefObj;
+      volatile long combatUntilMillis;
+      volatile Object npcCombatTargetRefObj;
+      volatile long npcCombatUntilMillis;
+      volatile Object assistTargetRefObj;
+      volatile long assistUntilMillis;
+      volatile long targetLostSinceMillis;
+      volatile long targetStuckSinceMillis;
+      volatile double lastTargetHorizontal = -1.0;
+      volatile long lastTargetSampleMillis;
+      volatile boolean chaseDisengaged;
+      volatile boolean defendeEnabled;
+      volatile boolean autoLootEnabled = true;
+      volatile boolean debugLogEnabled;
+      volatile boolean godMode;
+      volatile long deathDespawnAtMillis;
+      volatile long levelUpFxUntilMillis;
+      volatile long levelUpFxNextTickMillis;
+      volatile int levelUpFxPendingCount;
+      volatile boolean regenWasInCombat;
+      volatile long regenStartAtMillis;
+      volatile long regenLastApplyMillis;
+      volatile int zoneExpected;
+      volatile int zoneCurrent;
+      volatile int zoneRawId;
+      volatile Color zoneHudColor;
+      volatile int currentTargetMobLevel;
+      volatile UUID currentTargetMobUuid;
+      volatile int zoneInferredId;
+      volatile int zoneInferredFromMobLevel;
+      volatile long zoneInferredAtMillis;
+
+      NpcRecord(Object worldObj, UUID ownerId, Object refObj, AmigoNpcManager.State state) {
+         this.worldObj = worldObj;
+         this.ownerId = ownerId;
+         this.refObj = refObj;
+         this.state = state;
+         this.debugLogEnabled = false;
+         this.zoneHudColor = new Color((byte)-1, (byte)-1, (byte)-1);
+      }
+   }
+
+   enum State {
+      SPAWNING,
+      ACTIVE,
+      DESPAWNING;
+   }
 }

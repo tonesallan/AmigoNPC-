@@ -1,26 +1,25 @@
 package br.tones.amigonpc.commands;
 
-import java.util.concurrent.CompletableFuture;
-
+import br.tones.amigonpc.core.AmigoService;
+import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-
-import br.tones.amigonpc.core.AmigoService;
+import java.util.concurrent.CompletableFuture;
 
 public final class AmigoSpawnCommand extends AbstractCommand {
+   private final AmigoService service;
 
-    // ✅ comando público (sem permissão)
-private final AmigoService service;
+   protected boolean canGeneratePermission() {
+      return false;
+   }
 
-    public AmigoSpawnCommand(AmigoService service) {
-        super("amigospawn", "Spawna o NPC do AmigoNPC");
-        this.requireNoPermission();
-        this.service = service;
-    }
+   public AmigoSpawnCommand(AmigoService service) {
+      super("amigospawn", AmigoText.text("cmd.desc.amigospawn"));
+      this.service = service;
+   }
 
-    @Override
-    protected CompletableFuture<Void> execute(CommandContext ctx) {
-        service.spawn(ctx);
-        return CompletableFuture.completedFuture(null);
-    }
+   protected CompletableFuture<Void> execute(CommandContext ctx) {
+      this.service.spawn(ctx);
+      return CompletableFuture.completedFuture(null);
+   }
 }

@@ -1,0 +1,706 @@
+
+$C = "../Common.ui";
+
+@CustomButtonStyle = TextButtonStyle(
+  Default: (Background: $C.@DefaultSquareButtonDefaultBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Hovered: (Background: $C.@DefaultSquareButtonHoveredBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Pressed: (Background: $C.@DefaultSquareButtonPressedBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Disabled: (Background: $C.@DefaultSquareButtonDisabledBackground, LabelStyle: $C.@DefaultButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds,
+);
+
+Group #RpgLvlLeaderboardPage {
+  Visible: false;
+  LayoutMode: Top;
+  Padding: (Left: 0, Right: 0, Top: 8, Bottom: 0);
+
+  // BEGIN SettingsHeader
+  // ----------------------------------------------------------
+  // Title + Status
+  // ----------------------------------------------------------
+
+  // BEGIN SettingsHeaderTitleBlock
+  Label #SettingsTitle {
+    Style: (
+      FontSize: 24,
+      TextColor: #ffffff,
+      RenderBold: true
+    );
+    Anchor: ();
+    Text: "SETTINGS";
+    Padding: (Bottom: 2);
+  }
+
+  Label #SettingsSubtitle {
+    Style: (
+      FontSize: 14,
+      TextColor: #b0b8c0,
+      RenderBold: false
+    );
+    Anchor: ();
+    Text: "Configurações do AmigoNPC";
+    Padding: (Bottom: 10);
+  }
+  // END SettingsHeaderTitleBlock
+
+  // BEGIN SettingsHeaderStatusRow
+  Group #SettingsStatusRow {
+    LayoutMode: Left;
+    Anchor: (Height: 26);
+    Padding: (Left: 0, Right: 0, Top: 0, Bottom: 8);
+
+    Label #SettingsNpcStatus {
+      Style: (
+        FontSize: 14,
+        TextColor: #ffffff,
+        RenderBold: true
+      );
+      Anchor: (Width: 220);
+      Text: "NPC: Inativo";
+      Padding: (Right: 10);
+    }
+
+    Group {
+      LayoutMode: Left;
+      FlexWeight: 1;
+      Background: #0f1622(0.55);
+      Padding: (Left: 10, Right: 10, Top: 4, Bottom: 4);
+
+      Label #SettingsPendingStatus {
+        Style: (
+          FontSize: 14,
+          TextColor: #e8c030,
+          RenderBold: true
+        );
+        Anchor: ();
+        Text: "Sem alterações pendentes";
+      }
+    }
+  }
+  // END SettingsHeaderStatusRow
+
+  // BEGIN SettingsHeaderFeedbackBox
+  Group #SettingsFeedbackBox {
+    LayoutMode: Top;
+    Anchor: (Width: 680);
+    Background: #0f1622(0.65);
+    Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
+    Visible: false;
+
+    Label #SettingsFeedback {
+      Style: (
+        FontSize: 13,
+        TextColor: #90ee90,
+        RenderBold: true
+      );
+      Anchor: ();
+      Text: "";
+      Visible: false;
+    }
+  }
+  // END SettingsHeaderFeedbackBox
+
+  Group { Anchor: (Height: 10); }
+  // END SettingsHeader
+
+  // ----------------------------------------------------------
+  // Scrollable Content (Admin + Player)
+  // ----------------------------------------------------------
+
+  Group #SettingsScroll {
+    Anchor: (Width: 720);
+    FlexWeight: 1;
+    LayoutMode: TopScrolling;
+    Padding: (Left: 7, Top: 2, Right: 12, Bottom: 4);
+    ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+    Group {
+      LayoutMode: Top;
+
+        // BEGIN SettingsPlayerSection
+        // ----------------------------------------------------------
+        // Player Section (prioridade)
+        // ----------------------------------------------------------
+
+        Group #SettingsPlayerSection {
+          LayoutMode: Top;
+          Background: #1a1a1a(0.25);
+          Padding: (Full: 10);
+          Anchor: (Width: 680);
+
+          // BEGIN SettingsPlayerSectionHeader
+          Label #SettingsPlayerSectionTitle {
+            Style: (
+              FontSize: 14,
+              TextColor: #ffffff,
+              RenderBold: true
+            );
+            Text: "JOGADOR";
+            Padding: (Bottom: 6);
+          }
+          // END SettingsPlayerSectionHeader
+
+          // BEGIN SettingsPlayerQuickActions
+          // Ações rápidas (imediatas)
+          Group {
+            LayoutMode: Top;
+            Background: #0f1622(0.35);
+            Padding: (Full: 10);
+
+            // BEGIN SettingsPlayerQuickActionsHeader
+            Label #SettingsPlayerQuickActionsTitle {
+              Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+              Text: "AÇÕES RÁPIDAS";
+              Padding: (Bottom: 6);
+            }
+            // END SettingsPlayerQuickActionsHeader
+
+            // BEGIN SettingsPlayerQuickActionsButtons
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 40);
+
+              $C.@TextButton #SettingsSpawnButton {
+                Anchor: (Width: 200, Height: 35);
+                Text: "SPAWN";
+                Style: @CustomButtonStyle;
+              }
+
+              Group { Anchor: (Width: 10, Height: 35); }
+
+              $C.@TextButton #SettingsDespawnButton {
+                Anchor: (Width: 200, Height: 35);
+                Text: "DESPAWN";
+                Style: @CustomButtonStyle;
+              }
+
+              Group { Anchor: (Width: 10, Height: 35); }
+
+              $C.@TextButton #SettingsLootButton {
+                Anchor: (Width: 200, Height: 35);
+                Text: "LOOT";
+                Style: @CustomButtonStyle;
+              }
+            }
+            // END SettingsPlayerQuickActionsButtons
+          }
+          // END SettingsPlayerQuickActions
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsPlayerPreferences
+          // Toggles (pending)
+          Group {
+            LayoutMode: Top;
+            Background: #0f1622(0.35);
+            Padding: (Full: 10);
+
+            // BEGIN SettingsPlayerPreferencesHeader
+            Label #SettingsPlayerPreferencesTitle {
+              Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+              Text: "PREFERÊNCIAS";
+              Padding: (Bottom: 6);
+            }
+            // END SettingsPlayerPreferencesHeader
+
+            // BEGIN SettingsPlayerPreferencesToggles
+            $C.@TextButton #SettingsAutoLootToggle {
+              Anchor: (Width: 640, Height: 35);
+              Text: "AutoLoot: ON";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            $C.@TextButton #SettingsDefenderToggle {
+              Anchor: (Width: 640, Height: 35);
+              Text: "Defender: OFF";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            $C.@TextButton #SettingsHudToggle {
+              Anchor: (Width: 640, Height: 35);
+              Text: "HUD: ON";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Height: 10); }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 32);
+
+              Label #SettingsLanguageLabel {
+                Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+                Anchor: (Width: 110);
+                Text: "Idioma";
+              }
+
+              Group {
+                Anchor: (Width: 410, Height: 32);
+                Background: #0f1622(0.55);
+                Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+
+                Label #SettingsLanguageValue {
+                  Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+                  Text: "Portugues (Brasil)";
+                }
+              }
+
+              Group { Anchor: (Width: 10, Height: 32); }
+
+              $C.@TextButton #SettingsLanguagePrevButton {
+                Anchor: (Width: 50, Height: 32);
+                Text: "<";
+                Style: @CustomButtonStyle;
+              }
+
+              Group { Anchor: (Width: 10, Height: 32); }
+
+              $C.@TextButton #SettingsLanguageNextButton {
+                Anchor: (Width: 50, Height: 32);
+                Text: ">";
+                Style: @CustomButtonStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            Label #SettingsLanguageHint {
+              Style: (FontSize: 12, TextColor: #b0b8c0, RenderBold: false);
+              Text: "Aplica e recarrega automaticamente para este jogador.";
+            }
+            // END SettingsPlayerPreferencesToggles
+          }
+          // END SettingsPlayerPreferences
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsPlayerModelSkin
+          // Model / Skin
+          Group {
+            LayoutMode: Top;
+            Background: #0f1622(0.35);
+            Padding: (Full: 10);
+
+            // BEGIN SettingsPlayerModelSkinHeader
+            Label #SettingsPlayerModelSkinTitle {
+              Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+              Text: "MODELO / SKIN";
+              Padding: (Bottom: 6);
+            }
+            // END SettingsPlayerModelSkinHeader
+
+            // BEGIN SettingsPlayerModelSkinFields
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 28);
+              Label #SettingsNpcNameLabel {
+                Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+                Anchor: (Width: 110);
+                Text: "Nome";
+              }
+              TextField #SettingsNpcNameInput {
+                Anchor: (Width: 270, Height: 28);
+                Value: "";
+                PlaceholderText: "nome acima da cabeça (máx. 20)";
+              }
+
+              Group { Anchor: (Width: 10, Height: 28); }
+
+              $C.@TextButton #SettingsApplyNameButton {
+                Anchor: (Width: 120, Height: 28);
+                Text: "APPLY NAME";
+                Style: @CustomButtonStyle;
+              }
+
+              Group { Anchor: (Width: 10, Height: 28); }
+
+              $C.@TextButton #SettingsNameOffButton {
+                Anchor: (Width: 120, Height: 28);
+                Text: "NAME OFF";
+                Style: @CustomButtonStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 28);
+              Label #SettingsModelIdLabel {
+                Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+                Anchor: (Width: 110);
+                Text: "ModelId";
+              }
+              TextField #SettingsModelIdInput {
+                Anchor: (Width: 530, Height: 28);
+                Value: "";
+                PlaceholderText: "ex: humanoid_knight";
+              }
+            }
+
+            Group { Anchor: (Height: 6); }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 28);
+              Label #SettingsModelScaleLabel {
+                Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true);
+                Anchor: (Width: 110);
+                Text: "Scale";
+              }
+              TextField #SettingsModelScaleInput {
+                Anchor: (Width: 120, Height: 28);
+                Value: "1.0";
+                PlaceholderText: "1.0 (0.1–5.0)";
+              }
+
+              Group { Anchor: (Width: 10, Height: 28); }
+
+              $C.@TextButton #SettingsApplyModelButton {
+                Anchor: (Width: 190, Height: 28);
+                Text: "APPLY MODEL";
+                Style: @CustomButtonStyle;
+              }
+
+              Group { Anchor: (Width: 10, Height: 28); }
+
+              $C.@TextButton #SettingsModelOffButton {
+                Anchor: (Width: 190, Height: 28);
+                Text: "MODEL OFF";
+                Style: @CustomButtonStyle;
+              }
+            }
+            // END SettingsPlayerModelSkinFields
+
+            // BEGIN SettingsPlayerModelSkinHint
+            Label #SettingsPlayerModelHint {
+              Style: (FontSize: 12, TextColor: #b0b8c0, RenderBold: false);
+              Text: "Dica: Scale fora do intervalo é ignorado. Se o NPC estiver ativo, o mod tenta re-spawn.";
+              Padding: (Top: 6);
+            }
+            // END SettingsPlayerModelSkinHint
+          }
+          // END SettingsPlayerModelSkin
+        }
+        // END SettingsPlayerSection
+
+        Group { Anchor: (Height: 14); }
+
+        Group {
+          Anchor: (Width: 680, Height: 2);
+          Background: #ffffff(0.08);
+        }
+
+        Group { Anchor: (Height: 14); }
+
+        // BEGIN SettingsAdminSection
+        // ----------------------------------------------------------
+        // Admin Section (somente OP)
+        // ----------------------------------------------------------
+
+        Group #SettingsAdminSection {
+          LayoutMode: Top;
+          Background: #1a1a1a(0.35);
+          Padding: (Full: 10);
+          Anchor: (Width: 680);
+          Visible: false;
+
+          // BEGIN SettingsAdminSectionHeader
+          Label #SettingsAdminSectionTitle {
+            Style: (
+              FontSize: 14,
+              TextColor: #ffffff,
+              RenderBold: true
+            );
+            Text: "SERVIDOR (ADMIN)";
+            Padding: (Bottom: 6);
+          }
+
+          Label #SettingsAdminLockLabel {
+            Style: (
+              FontSize: 13,
+              TextColor: #ffcc66,
+              RenderBold: true
+            );
+            Text: "Em edição por: -";
+            Padding: (Bottom: 8);
+            Visible: false;
+          }
+          // END SettingsAdminSectionHeader
+
+          // BEGIN SettingsAdminControls
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 40);
+
+            $C.@TextButton #SettingsAdminGodModeToggle {
+              Anchor: (Width: 320, Height: 35);
+              Text: "GodMode: OFF";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Width: 10, Height: 35); }
+
+            $C.@TextButton #SettingsAdminPvpToggle {
+              Anchor: (Width: 320, Height: 35);
+              Text: "PvP do Mod: OFF";
+              Style: @CustomButtonStyle;
+            }
+          }
+          // END SettingsAdminControls
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsAdminDebugActions
+          // BEGIN SettingsAdminDebugActionsHeader
+          Label #SettingsAdminDebugActionsTitle {
+            Style: (
+              FontSize: 13,
+              TextColor: #b0b8c0,
+              RenderBold: true
+            );
+            Text: "AÇÕES (ADMIN)";
+            Padding: (Bottom: 6);
+          }
+          // END SettingsAdminDebugActionsHeader
+
+          // BEGIN SettingsAdminDebugActionsButtons
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 40);
+
+            $C.@TextButton #SettingsAdminDebugInfoButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "DEBUG INFO";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Width: 10, Height: 35); }
+
+            $C.@TextButton #SettingsAdminDebugLogButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "DebugLog: OFF";
+              Style: @CustomButtonStyle;
+            }
+          }
+          // END SettingsAdminDebugActionsButtons
+          // END SettingsAdminDebugActions
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsAdminXpStats
+          // BEGIN SettingsAdminAddNpcXpSection
+          Label #SettingsAdminAddXpTitle {
+            Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+            Text: "ADD NPC XP";
+            Padding: (Bottom: 6);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 28);
+
+            TextField #SettingsAdminAddXpAmountInput {
+              Anchor: (Width: 150, Height: 28);
+              Value: "100";
+              PlaceholderText: "amount";
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            TextField #SettingsAdminAddXpSourceInput {
+              Anchor: (Width: 210, Height: 28);
+              Value: "COMMAND";
+              PlaceholderText: "source (opcional)";
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            $C.@TextButton #SettingsAdminAddXpButton {
+              Anchor: (Width: 280, Height: 28);
+              Text: "ADD XP";
+              Style: @CustomButtonStyle;
+            }
+          }
+
+          Group { Anchor: (Height: 10); }
+          // END SettingsAdminAddNpcXpSection
+
+          // BEGIN SettingsAdminStatsControlsSection
+          Label #SettingsAdminStatsTitle {
+            Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+            Text: "STATS (ADMIN)";
+            Padding: (Bottom: 6);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 28);
+
+            TextField #SettingsAdminStatAttrInput {
+              Anchor: (Width: 240, Height: 28);
+              Value: "DAMAGE";
+              PlaceholderText: "HEALTH | DAMAGE | CRITICAL_DAMAGE | DEFENSE";
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            TextField #SettingsAdminStatAmountInput {
+              Anchor: (Width: 110, Height: 28);
+              Value: "1";
+              PlaceholderText: "qtd";
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            $C.@TextButton #SettingsAdminStatsAddButton {
+              Anchor: (Width: 140, Height: 28);
+              Text: "ADD";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            $C.@TextButton #SettingsAdminStatsResetButton {
+              Anchor: (Width: 140, Height: 28);
+              Text: "RESET";
+              Style: @CustomButtonStyle;
+            }
+          }
+          // END SettingsAdminStatsControlsSection
+          // END SettingsAdminXpStats
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsAdminRewardsControls
+          // BEGIN SettingsAdminRewardsActionButtons
+          Label #SettingsAdminRewardsTitle {
+            Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+            Text: "REWARDS (ADMIN)";
+            Padding: (Bottom: 6);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 40);
+
+            $C.@TextButton #SettingsAdminRewardsReloadButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "RELOAD";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Width: 10, Height: 35); }
+
+            $C.@TextButton #SettingsAdminRewardsDefaultsButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "DEFAULTS";
+              Style: @CustomButtonStyle;
+            }
+          }
+
+          Group { Anchor: (Height: 6); }
+          // END SettingsAdminRewardsActionButtons
+
+          // BEGIN SettingsAdminRewardsResetPointsControls
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 28);
+
+            TextField #SettingsAdminRewardsResetPointsInput {
+              Anchor: (Width: 200, Height: 28);
+              Value: "0";
+              PlaceholderText: "reset points";
+            }
+
+            Group { Anchor: (Width: 10, Height: 28); }
+
+            $C.@TextButton #SettingsAdminRewardsSetResetButton {
+              Anchor: (Width: 450, Height: 28);
+              Text: "SET RESETPOINTS (SELF)";
+              Style: @CustomButtonStyle;
+            }
+          }
+          // END SettingsAdminRewardsResetPointsControls
+          // END SettingsAdminRewardsControls
+
+          Group { Anchor: (Height: 10); }
+
+          // BEGIN SettingsAdminSwordControls
+          // BEGIN SettingsAdminSwordHeader
+          Label #SettingsAdminSwordTitle {
+            Style: (FontSize: 13, TextColor: #b0b8c0, RenderBold: true);
+            Text: "AMIGOLVL (ADMIN)";
+            Padding: (Bottom: 6);
+          }
+          // END SettingsAdminSwordHeader
+
+          // BEGIN SettingsAdminSwordLevelButtons
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 40);
+
+            $C.@TextButton #SettingsAdminSwordLvlUpButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "LVL UP";
+              Style: @CustomButtonStyle;
+            }
+
+            Group { Anchor: (Width: 10, Height: 35); }
+
+            $C.@TextButton #SettingsAdminSwordLvlDownButton {
+              Anchor: (Width: 320, Height: 35);
+              Text: "LVL DOWN";
+              Style: @CustomButtonStyle;
+            }
+          }
+
+          Group { Anchor: (Height: 6); }
+          // END SettingsAdminSwordLevelButtons
+
+          // BEGIN SettingsAdminSwordHitkillButton
+          $C.@TextButton #SettingsAdminHitkillButton {
+            Anchor: (Width: 660, Height: 28);
+            Text: "HITKILL (em breve)";
+            Style: @CustomButtonStyle;
+            Disabled: true;
+          }
+          // END SettingsAdminSwordHitkillButton
+          // END SettingsAdminSwordControls
+        }
+        // END SettingsAdminSection
+
+        Group { Anchor: (Height: 12); }
+    }
+  }
+
+  // BEGIN SettingsFooter
+  // ----------------------------------------------------------
+  // Footer
+  // ----------------------------------------------------------
+
+  Group #SettingsFooter {
+    LayoutMode: Left;
+    Anchor: (Width: 680, Height: 40);
+
+    $C.@TextButton #SettingsApplyButton {
+      Anchor: (Width: 200, Height: 35);
+      Text: "APPLY";
+      Style: @CustomButtonStyle;
+    }
+
+    Group { Anchor: (Width: 10, Height: 35); }
+
+    $C.@CancelTextButton #SettingsCloseButton {
+      Anchor: (Width: 200, Height: 35);
+      Text: "CLOSE";
+    }
+
+    Group { FlexWeight: 1; }
+  }
+  // END SettingsFooter
+}

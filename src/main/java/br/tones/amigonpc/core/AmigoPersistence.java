@@ -1,497 +1,293 @@
 package br.tones.amigonpc.core;
 
-import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.server.core.Constants;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
-import com.hypixel.hytale.server.core.util.BsonUtil;
-import org.bson.BsonDateTime;
-import org.bson.BsonDocument;
-import org.bson.BsonInt32;
-import org.bson.BsonDouble;
-import org.bson.BsonString;
-
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import org.bson.BsonDocument;
 
-/**
- * Persistência simples do estado do AmigoNPC por player.
- *
- * - 1 arquivo por player (UUID.json)
- * - Guarda apenas o que importa (por enquanto: mochila 45 slots + campos base)
- * - Salva dentro da pasta do universo (Constants.UNIVERSE_PATH)
- */
 public final class AmigoPersistence {
-
-    private static final int FORMAT_VERSION = 4;
-    private static final short BACKPACK_CAPACITY = 45; // 5 x 9
-
-    // Aparência (opcional)
-    private static final String KEY_MODEL_ID = "modelId";
-    private static final String KEY_MODEL_SCALE = "modelScale";
-
-    // Tipo de NPC (opcional)
-    private static final String KEY_NPC_TYPE = "npcType";
-
-    // Progressão (espadas corpo a corpo – por enquanto)
-    private static final String KEY_SWORD_LEVEL = "swordLevel";
-    private static final String KEY_EQUIPPED_WEAPON_ID = "equippedWeaponId";
-
-    // Combate: modo Defender (persistente)
-    private static final String KEY_DEFENDER_ENABLED = "defenderEnabled";
-
-    // Loot automático (toggle via /autoloot)
-    private static final String KEY_AUTOLOOT_ENABLED = "autoLootEnabled";
-
-    // Progressão do NPC (XP total + stats base para scaling)
-    private static final String KEY_TOTAL_XP = "totalXp";
-    private static final String KEY_BASE_HP = "baseHp";
-    private static final String KEY_BASE_DEF = "baseDef";
-
-    private static Path baseDir() {
-        // Mantém junto do save do universo (mesma raiz do player data)
-        Path root = Constants.UNIVERSE_PATH;
-        return root.resolve("amigonpc").resolve("players");
-    }
-
-    public static Path fileFor(UUID ownerId) {
-        return baseDir().resolve(ownerId.toString() + ".json");
-    }
-
-    public static SimpleItemContainer loadBackpack(UUID ownerId) {
-        if (ownerId == null) return new SimpleItemContainer(BACKPACK_CAPACITY);
-
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) {
-            return new SimpleItemContainer(BACKPACK_CAPACITY);
-        }
-
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return new SimpleItemContainer(BACKPACK_CAPACITY);
-
-            // Compat: se não tiver, cria novo
-            if (!doc.containsKey("backpack")) {
-                return new SimpleItemContainer(BACKPACK_CAPACITY);
-            }
-
-            var val = doc.get("backpack");
-            if (val == null) return new SimpleItemContainer(BACKPACK_CAPACITY);
-
-            // Decode via CODEC
-            return SimpleItemContainer.CODEC.decode(val, new ExtraInfo());
-
-        } catch (Throwable t) {
-            // Falha de leitura/codec -> não quebra o servidor
-            return new SimpleItemContainer(BACKPACK_CAPACITY);
-        }
-    }
-
-    public static String loadModelId(UUID ownerId) {
-        if (ownerId == null) return null;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return null;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return null;
-            if (!doc.containsKey(KEY_MODEL_ID)) return null;
-            var v = doc.get(KEY_MODEL_ID);
-            return (v != null && v.isString()) ? v.asString().getValue() : null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    public static double loadModelScale(UUID ownerId) {
-        if (ownerId == null) return 1.0;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return 1.0;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return 1.0;
-            if (!doc.containsKey(KEY_MODEL_SCALE)) return 1.0;
-            var v = doc.get(KEY_MODEL_SCALE);
-            if (v == null) return 1.0;
-            if (v.isDouble()) return v.asDouble().getValue();
-            if (v.isInt32()) return v.asInt32().getValue();
-            return 1.0;
-        } catch (Throwable ignored) {
-            return 1.0;
-        }
-    }
-
-    public static void saveModel(UUID ownerId, String modelId, double scale) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            if (modelId == null || modelId.isBlank()) {
-                doc.remove(KEY_MODEL_ID);
-                doc.remove(KEY_MODEL_SCALE);
-            } else {
-                doc.put(KEY_MODEL_ID, new BsonString(modelId));
-                doc.put(KEY_MODEL_SCALE, new BsonDouble(scale));
-            }
-
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-    public static String loadNpcType(UUID ownerId) {
-        if (ownerId == null) return null;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return null;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return null;
-            if (!doc.containsKey(KEY_NPC_TYPE)) return null;
-            var v = doc.get(KEY_NPC_TYPE);
-            return (v != null && v.isString()) ? v.asString().getValue() : null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    public static void saveNpcType(UUID ownerId, String npcType) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            if (npcType == null || npcType.isBlank()) {
-                doc.remove(KEY_NPC_TYPE);
-            } else {
-                doc.put(KEY_NPC_TYPE, new BsonString(npcType));
-            }
-
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-
-    public static int loadSwordLevel(UUID ownerId) {
-        if (ownerId == null) return 1;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return 1;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return 1;
-            if (!doc.containsKey(KEY_SWORD_LEVEL)) return 1;
-            var v = doc.get(KEY_SWORD_LEVEL);
-            int lvl = 1;
-            if (v != null) {
-                if (v.isInt32()) lvl = v.asInt32().getValue();
-                else if (v.isDouble()) lvl = (int) v.asDouble().getValue();
-            }
-            return Math.max(1, lvl);
-        } catch (Throwable ignored) {
-            return 1;
-        }
-    }
-
-    public static String loadEquippedWeaponId(UUID ownerId) {
-        if (ownerId == null) return null;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return null;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return null;
-            if (!doc.containsKey(KEY_EQUIPPED_WEAPON_ID)) return null;
-            var v = doc.get(KEY_EQUIPPED_WEAPON_ID);
-            return (v != null && v.isString()) ? v.asString().getValue() : null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    public static void saveSwordState(UUID ownerId, int swordLevel, String equippedWeaponId) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            doc.put(KEY_SWORD_LEVEL, new BsonInt32(Math.max(1, swordLevel)));
-            if (equippedWeaponId == null || equippedWeaponId.isBlank()) {
-                doc.remove(KEY_EQUIPPED_WEAPON_ID);
-            } else {
-                doc.put(KEY_EQUIPPED_WEAPON_ID, new BsonString(equippedWeaponId));
-            }
-
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-
-    public static boolean loadDefenderEnabled(UUID ownerId) {
-        if (ownerId == null) return false;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return false;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return false;
-            if (!doc.containsKey(KEY_DEFENDER_ENABLED)) return false;
-            var v = doc.get(KEY_DEFENDER_ENABLED);
-            if (v == null) return false;
-
-            // aceitamos algumas formas por compatibilidade
-            if (v.isBoolean()) return v.asBoolean().getValue();
-            if (v.isInt32()) return v.asInt32().getValue() != 0;
-            if (v.isDouble()) return v.asDouble().getValue() != 0.0;
-            if (v.isString()) {
-                String s = v.asString().getValue();
-                if (s == null) return false;
-                s = s.trim().toLowerCase();
-                return s.equals("on") || s.equals("true") || s.equals("1") || s.equals("sim") || s.equals("yes");
-            }
-            return false;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    public static void saveDefenderEnabled(UUID ownerId, boolean enabled) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            // salva como int para não depender de BsonBoolean na build
-            doc.put(KEY_DEFENDER_ENABLED, new BsonInt32(enabled ? 1 : 0));
-
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-    public static boolean loadAutoLootEnabled(UUID ownerId) {
-        if (ownerId == null) return true;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return true;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return true;
-            if (!doc.containsKey(KEY_AUTOLOOT_ENABLED)) return true;
-            var v = doc.get(KEY_AUTOLOOT_ENABLED);
-            if (v == null) return true;
-            if (v.isBoolean()) return v.asBoolean().getValue();
-            if (v.isInt32()) return v.asInt32().getValue() != 0;
-            if (v.isDouble()) return v.asDouble().getValue() != 0.0;
-            if (v.isString()) {
-                String s = v.asString().getValue();
-                if (s == null) return true;
-                s = s.trim().toLowerCase();
-                return s.equals("on") || s.equals("true") || s.equals("1") || s.equals("sim") || s.equals("yes");
-            }
-            return true;
-        } catch (Throwable ignored) {
-            return true;
-        }
-    }
-
-    public static void saveAutoLootEnabled(UUID ownerId, boolean enabled) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            doc.put(KEY_AUTOLOOT_ENABLED, new BsonInt32(enabled ? 1 : 0));
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-    // =========================================================
-    // XP total + stats base (HP/DEF)
-    // =========================================================
-
-    public static long loadTotalXp(UUID ownerId) {
-        if (ownerId == null) return 0L;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return 0L;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return 0L;
-            if (!doc.containsKey(KEY_TOTAL_XP)) return 0L;
-            var v = doc.get(KEY_TOTAL_XP);
-            if (v == null) return 0L;
-            if (v.isInt64()) return v.asInt64().getValue();
-            if (v.isInt32()) return v.asInt32().getValue();
-            if (v.isDouble()) return (long) v.asDouble().getValue();
-            if (v.isString()) {
-                try { return Long.parseLong(v.asString().getValue()); } catch (Throwable ignored) {}
-            }
-            return 0L;
-        } catch (Throwable ignored) {
-            return 0L;
-        }
-    }
-
-    public static long loadBaseHp(UUID ownerId) {
-        if (ownerId == null) return -1L;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return -1L;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return -1L;
-            if (!doc.containsKey(KEY_BASE_HP)) return -1L;
-            var v = doc.get(KEY_BASE_HP);
-            if (v == null) return -1L;
-            if (v.isInt64()) return v.asInt64().getValue();
-            if (v.isInt32()) return v.asInt32().getValue();
-            if (v.isDouble()) return (long) v.asDouble().getValue();
-            if (v.isString()) {
-                try { return Long.parseLong(v.asString().getValue()); } catch (Throwable ignored) {}
-            }
-            return -1L;
-        } catch (Throwable ignored) {
-            return -1L;
-        }
-    }
-
-    public static long loadBaseDef(UUID ownerId) {
-        if (ownerId == null) return -1L;
-        Path file = fileFor(ownerId);
-        if (!Files.exists(file)) return -1L;
-        try {
-            BsonDocument doc = BsonUtil.readDocumentNow(file);
-            if (doc == null) return -1L;
-            if (!doc.containsKey(KEY_BASE_DEF)) return -1L;
-            var v = doc.get(KEY_BASE_DEF);
-            if (v == null) return -1L;
-            if (v.isInt64()) return v.asInt64().getValue();
-            if (v.isInt32()) return v.asInt32().getValue();
-            if (v.isDouble()) return (long) v.asDouble().getValue();
-            if (v.isString()) {
-                try { return Long.parseLong(v.asString().getValue()); } catch (Throwable ignored) {}
-            }
-            return -1L;
-        } catch (Throwable ignored) {
-            return -1L;
-        }
-    }
-
-    /** Salva totalXp e/ou baseHp/baseDef (qualquer valor < 0 é ignorado). */
-    public static void saveNpcProgress(UUID ownerId, long totalXp, long baseHp, long baseDef) {
-        if (ownerId == null) return;
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-
-            if (totalXp >= 0) {
-                try {
-                    doc.put(KEY_TOTAL_XP, new org.bson.BsonInt64(totalXp));
-                } catch (Throwable ignored) {
-                    doc.put(KEY_TOTAL_XP, new BsonDouble((double) totalXp));
-                }
-            }
-            if (baseHp >= 0) {
-                try {
-                    doc.put(KEY_BASE_HP, new org.bson.BsonInt64(baseHp));
-                } catch (Throwable ignored) {
-                    doc.put(KEY_BASE_HP, new BsonDouble((double) baseHp));
-                }
-            }
-            if (baseDef >= 0) {
-                try {
-                    doc.put(KEY_BASE_DEF, new org.bson.BsonInt64(baseDef));
-                } catch (Throwable ignored) {
-                    doc.put(KEY_BASE_DEF, new BsonDouble((double) baseDef));
-                }
-            }
-
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-        } catch (IOException ignored) {
-        } catch (Throwable ignored) {
-        }
-    }
-
-    public static void saveTotalXp(UUID ownerId, long totalXp) {
-        saveNpcProgress(ownerId, Math.max(0L, totalXp), -1L, -1L);
-    }
-
-    // Wrappers (compat) - usados pelo manager para salvar separadamente
-    public static void saveBaseHp(UUID ownerId, long baseHp) {
-        saveNpcProgress(ownerId, -1L, baseHp, -1L);
-    }
-
-    public static void saveBaseDef(UUID ownerId, long baseDef) {
-        saveNpcProgress(ownerId, -1L, -1L, baseDef);
-    }
-
-    public static void saveBaseHpDef(UUID ownerId, long baseHp, long baseDef) {
-        saveNpcProgress(ownerId, -1L, baseHp, baseDef);
-    }
-
-    public static void saveBackpack(UUID ownerId, SimpleItemContainer backpack) {
-        if (ownerId == null || backpack == null) return;
-
-        try {
-            Path dir = baseDir();
-            Files.createDirectories(dir);
-
-            // ✅ merge: não apagar outros campos (ex.: aparência)
-            BsonDocument doc = BsonUtil.readDocumentNow(fileFor(ownerId));
-            if (doc == null) doc = new BsonDocument();
-
-            doc.put("formatVersion", new BsonInt32(FORMAT_VERSION));
-            doc.put("savedAt", new BsonDateTime(System.currentTimeMillis()));
-            doc.put("backpack", SimpleItemContainer.CODEC.encode(backpack, new ExtraInfo()));
-
-            // writeDocument já cria .bak se pedir; por enquanto false
-            BsonUtil.writeDocument(fileFor(ownerId), doc, true).join();
-
-        } catch (IOException ignored) {
-            // createDirectories pode lançar IOException
-        } catch (Throwable ignored) {
-            // join/codec
-        }
-    }
-
-    private AmigoPersistence() {}
+   private static final int FORMAT_VERSION = 4;
+   private static final short BACKPACK_CAPACITY = 45;
+   private static final String KEY_MODEL_ID = "modelId";
+   private static final String KEY_MODEL_SCALE = "modelScale";
+   private static final String KEY_NPC_NAME = "npcName";
+   private static final String KEY_LANGUAGE = "language";
+   private static final String KEY_NPC_TYPE = "npcType";
+   private static final String KEY_SWORD_LEVEL = "swordLevel";
+   private static final String KEY_EQUIPPED_WEAPON_ID = "equippedWeaponId";
+   private static final String KEY_DEFENDER_ENABLED = "defenderEnabled";
+   private static final String KEY_AUTOLOOT_ENABLED = "autoLootEnabled";
+   private static final String KEY_HUD_ENABLED = "hudEnabled";
+   private static final String KEY_GODMODE = "godMode";
+   private static final String KEY_PVP_ENABLED_GLOBAL = "pvpEnabled";
+   private static final String KEY_TOTAL_XP = "totalXp";
+   private static final String KEY_BASE_HP = "baseHp";
+   private static final String KEY_BASE_DEF = "baseDef";
+   private static final String KEY_NPC_STATS = "npcStats";
+   private static final String KEY_AMIGO_REWARDS = "amigoRewards";
+   private static final String KEY_WARDROBE_STATE = "wardrobeState";
+   private static final String COSMETICS_CONFIG_FILE_NAME = "AmigoNPC Cosmetics Configuration.json";
+
+   private static Path baseDir() {
+      Path root = Constants.UNIVERSE_PATH;
+      return root.resolve("amigonpc").resolve("players");
+   }
+
+   private static Path serverFile() {
+      Path root = Constants.UNIVERSE_PATH;
+      return root.resolve("amigonpc").resolve("server.json");
+   }
+
+   public static Path fileFor(UUID ownerId) {
+      return baseDir().resolve(ownerId.toString() + ".json");
+   }
+
+   public static Path cosmeticsFile() {
+      return baseDir().resolve("AmigoNPC Cosmetics Configuration.json");
+   }
+
+   public static SimpleItemContainer loadBackpack(UUID ownerId) {
+      return ownerId == null ? new SimpleItemContainer((short)45) : AmigoPersistenceBackpackSupport.loadBackpack(fileFor(ownerId), (short)45);
+   }
+
+   public static String loadModelId(UUID ownerId) {
+      return ownerId == null ? null : AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), "modelId");
+   }
+
+   public static double loadModelScale(UUID ownerId) {
+      return ownerId == null ? 1.0 : AmigoPersistenceProfileSupport.loadDouble(fileFor(ownerId), "modelScale", 1.0);
+   }
+
+   public static void saveModel(UUID ownerId, String modelId, double scale) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveModel(fileFor(ownerId), 4, "modelId", "modelScale", modelId, scale);
+         } catch (IOException var5) {
+         } catch (Throwable var6) {
+         }
+      }
+   }
+
+   public static String loadCustomName(UUID ownerId) {
+      return ownerId == null ? null : AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), "npcName");
+   }
+
+   public static void saveCustomName(UUID ownerId, String customName) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), 4, "npcName", customName);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static String loadLanguage(UUID ownerId) {
+      return ownerId == null ? null : AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), "language");
+   }
+
+   public static void saveLanguage(UUID ownerId, String language) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), 4, "language", language);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static String loadNpcType(UUID ownerId) {
+      return ownerId == null ? null : AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), "npcType");
+   }
+
+   public static void saveNpcType(UUID ownerId, String npcType) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), 4, "npcType", npcType);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static int loadSwordLevel(UUID ownerId) {
+      return ownerId == null ? 1 : AmigoPersistenceProfileSupport.loadPositiveInt(fileFor(ownerId), "swordLevel", 1);
+   }
+
+   public static String loadEquippedWeaponId(UUID ownerId) {
+      return ownerId == null ? null : AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), "equippedWeaponId");
+   }
+
+   public static void saveSwordState(UUID ownerId, int swordLevel, String equippedWeaponId) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveSwordState(fileFor(ownerId), 4, "swordLevel", "equippedWeaponId", swordLevel, equippedWeaponId);
+         } catch (IOException var4) {
+         } catch (Throwable var5) {
+         }
+      }
+   }
+
+   public static boolean loadDefenderEnabled(UUID ownerId) {
+      return ownerId == null ? false : AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), "defenderEnabled", false);
+   }
+
+   public static void saveDefenderEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), 4, "defenderEnabled", enabled);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static boolean loadAutoLootEnabled(UUID ownerId) {
+      return ownerId == null ? true : AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), "autoLootEnabled", true);
+   }
+
+   public static void saveAutoLootEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), 4, "autoLootEnabled", enabled);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static boolean loadHudEnabled(UUID ownerId) {
+      return ownerId == null ? true : AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), "hudEnabled", true);
+   }
+
+   public static void saveHudEnabled(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), 4, "hudEnabled", enabled);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static boolean loadGodMode(UUID ownerId) {
+      return ownerId == null ? false : AmigoPersistenceFlagSupport.loadFlag(fileFor(ownerId), "godMode", false);
+   }
+
+   public static void saveGodMode(UUID ownerId, boolean enabled) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceFlagSupport.saveFlag(fileFor(ownerId), 4, "godMode", enabled);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static boolean loadPvpEnabledGlobal() {
+      return AmigoPersistenceFlagSupport.loadFlag(serverFile(), "pvpEnabled", false);
+   }
+
+   public static void savePvpEnabledGlobal(boolean enabled) {
+      try {
+         AmigoPersistenceFlagSupport.saveFlag(serverFile(), 4, "pvpEnabled", enabled);
+      } catch (IOException var2) {
+      } catch (Throwable var3) {
+      }
+   }
+
+   public static long loadTotalXp(UUID ownerId) {
+      return ownerId == null ? 0L : AmigoPersistenceProgressionSupport.loadLong(fileFor(ownerId), "totalXp", 0L);
+   }
+
+   public static long loadBaseHp(UUID ownerId) {
+      return ownerId == null ? -1L : AmigoPersistenceProgressionSupport.loadLong(fileFor(ownerId), "baseHp", -1L);
+   }
+
+   public static long loadBaseDef(UUID ownerId) {
+      return ownerId == null ? -1L : AmigoPersistenceProgressionSupport.loadLong(fileFor(ownerId), "baseDef", -1L);
+   }
+
+   public static void saveNpcProgress(UUID ownerId, long totalXp, long baseHp, long baseDef) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProgressionSupport.saveNpcProgress(fileFor(ownerId), 4, "totalXp", "baseHp", "baseDef", totalXp, baseHp, baseDef);
+         } catch (IOException var8) {
+         } catch (Throwable var9) {
+         }
+      }
+   }
+
+   public static void saveTotalXp(UUID ownerId, long totalXp) {
+      saveNpcProgress(ownerId, Math.max(0L, totalXp), -1L, -1L);
+   }
+
+   public static void saveBaseHp(UUID ownerId, long baseHp) {
+      saveNpcProgress(ownerId, -1L, baseHp, -1L);
+   }
+
+   public static void saveBaseDef(UUID ownerId, long baseDef) {
+      saveNpcProgress(ownerId, -1L, -1L, baseDef);
+   }
+
+   public static BsonDocument loadNpcStats(UUID ownerId) {
+      return ownerId == null ? new BsonDocument() : AmigoPersistenceProgressionSupport.loadDocumentSection(fileFor(ownerId), "npcStats");
+   }
+
+   public static void saveNpcStats(UUID ownerId, BsonDocument npcStatsDoc) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProgressionSupport.saveDocumentSection(fileFor(ownerId), 4, "npcStats", npcStatsDoc);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static BsonDocument loadAmigoRewards(UUID ownerId) {
+      return ownerId == null ? new BsonDocument() : AmigoPersistenceProgressionSupport.loadDocumentSection(fileFor(ownerId), "amigoRewards");
+   }
+
+   public static void saveAmigoRewards(UUID ownerId, BsonDocument rewardsDoc) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceProgressionSupport.saveDocumentSection(fileFor(ownerId), 4, "amigoRewards", rewardsDoc);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static void saveBaseHpDef(UUID ownerId, long baseHp, long baseDef) {
+      saveNpcProgress(ownerId, -1L, baseHp, baseDef);
+   }
+
+   public static BsonDocument loadWardrobeState(UUID ownerId) {
+      return ownerId == null ? new BsonDocument() : AmigoPersistenceWardrobeSupport.loadWardrobeState(cosmeticsFile(), ownerId, "wardrobeState");
+   }
+
+   public static void saveWardrobeState(UUID ownerId, BsonDocument wardrobeDoc) {
+      if (ownerId != null) {
+         try {
+            AmigoPersistenceWardrobeSupport.saveWardrobeState(cosmeticsFile(), 4, ownerId, wardrobeDoc, "wardrobeState");
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   public static void saveBackpack(UUID ownerId, SimpleItemContainer backpack) {
+      if (ownerId != null && backpack != null) {
+         try {
+            AmigoPersistenceBackpackSupport.saveBackpack(fileFor(ownerId), 4, backpack);
+         } catch (IOException var3) {
+         } catch (Throwable var4) {
+         }
+      }
+   }
+
+   private AmigoPersistence() {
+   }
 }

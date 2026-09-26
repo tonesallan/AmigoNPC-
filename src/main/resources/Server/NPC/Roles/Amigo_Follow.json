@@ -2,7 +2,7 @@
   "StartState": "Idle",
   "DefaultSubState": "Default",
   "Type": "Generic",
-  "Appearance": "Wraith",
+  "Appearance": "PlayerTestModel_V",
   "Invulnerable": false,
   "MotionControllerList": [
     {
@@ -42,6 +42,21 @@
                     "SlowDownDistance": 6,
                     "StopDistance": 2,
                     "RelativeSpeed": 1.0,
+                    "RelaxedMoveConstraints": true
+                  }
+                },
+                {
+                  "$Comment": "Cave/Subsolo: seguir mais perto (4-5 blocos)",
+                  "Sensor": {
+                    "Type": "Target",
+                    "Range": 25,
+                    "TargetSlot": "LockedTargetClose"
+                  },
+                  "BodyMotion": {
+                    "Type": "Seek",
+                    "SlowDownDistance": 8,
+                    "StopDistance": 4.5,
+                    "RelativeSpeed": 0.6,
                     "RelaxedMoveConstraints": true
                   }
                 },

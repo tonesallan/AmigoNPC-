@@ -1,8 +1,8 @@
 {
   "Group": "br.tones",
   "Name": "AmigoNPC",
-  "Version": "1.0.1",
-  "Description": "AmigoNPC - NPC companheiro server-side para Hytale.",
+  "Version": "2.0.1",
+  "Description": "AmigoNPC-v2.0.1",
   "Authors": [
     {
       "Name": "Tones Allan de Oliveira Alves",
@@ -11,7 +11,7 @@
     }
   ],
   "Website": "",
-  "ServerVersion": "*",
+  "ServerVersion": "2026.02.17-255364b8e",
   "Dependencies": {},
   "OptionalDependencies": {},
   "LoadBefore": {},

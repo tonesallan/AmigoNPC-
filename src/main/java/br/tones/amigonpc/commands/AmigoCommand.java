@@ -1,50 +1,116 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoService;
-
-import java.util.concurrent.CompletableFuture;
-
+import br.tones.amigonpc.core.debug.ActionTraceService;
+import br.tones.amigonpc.core.i18n.AmigoText;
+import br.tones.amigonpc.core.ui.lvlgui.AmigoLvlGuiService;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.concurrent.CompletableFuture;
 
 public final class AmigoCommand extends AbstractCommand {
+   protected boolean canGeneratePermission() {
+      return false;
+   }
 
-    // ✅ Comandos públicos (sem permissão)
-    // A API atual exige requireNoPermission() para comandos públicos.
-public AmigoCommand(AmigoService service) {
-        super("amigo", "Comandos do AmigoNPC");
-        this.requireNoPermission();
+   public AmigoCommand(AmigoService service) {
+      super("amigo", AmigoText.text("cmd.desc.amigo"));
+      this.setAllowsExtraArguments(true);
+      this.addSubCommand(new AmigoSpawnSubCommand(service));
+      this.addSubCommand(new AmigoDespawnSubCommand(service));
+      this.addSubCommand(new AmigoModeloSubCommand());
+      this.addSubCommand(new AmigoModeloOffSubCommand());
+      this.addSubCommand(new AmigoDefenderSubCommand());
+      this.addSubCommand(new AmigoLogSubCommand());
+      this.addSubCommand(new AmigoGodmodSubCommand());
+      this.addSubCommand(new AmigoHudSubCommand());
+      this.addSubCommand(new AmigoStatsSubCommand());
+      this.addSubCommand(new AmigoRewardsSubCommand());
+      this.addSubCommand(new AmigoAddNpcXpSubCommand());
+      this.addSubCommand(new AmigoPlayerStatsSubCommand());
+      this.addSubCommand(new AmigoMobScalingSubCommand());
+      this.addSubCommand(new AmigoReloadSubCommand());
+   }
 
-        // ✅ MUITO IMPORTANTE: permite "/amigo <algo>" sem o parser travar em Expected: 0
-        this.setAllowsExtraArguments(true);
+   protected CompletableFuture<Void> execute(CommandContext ctx) {
+      try {
+         String in = ctx.getInputString();
+         if (in != null) {
+            in = in.trim();
+            if (in.startsWith("/")) {
+               in = in.substring(1);
+            }
 
-        // ✅ Subcomandos oficiais da API
-        this.addSubCommand(new AmigoSpawnSubCommand(service));
-        this.addSubCommand(new AmigoDespawnSubCommand(service));
+            if (!in.isBlank()) {
+               String[] parts = in.split("\\s+");
+               if (parts.length > 1 && "amigo".equalsIgnoreCase(parts[0])) {
+                  String sub = parts[1].toLowerCase();
+                  if (!"ui".equals(sub) && !"ui2".equals(sub) && !"lvl".equals(sub) && !"lvlup".equals(sub) && !"lvldown".equals(sub)) {
+                     ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.unknown_subcommand")));
+                     return CompletableFuture.completedFuture(null);
+                  }
 
-        // Aparência (opcional)
-        this.addSubCommand(new AmigoModeloSubCommand());
-        this.addSubCommand(new AmigoModeloOffSubCommand());
+                  return CompletableFuture.completedFuture(null);
+               }
+            }
+         }
+      } catch (Throwable var12) {
+      }
 
-        // Combate: modo defender
-        this.addSubCommand(new AmigoDefenderSubCommand());
+      if (ctx.sender() instanceof Player player) {
+         try {
+            ActionTraceService.getShared().record(ctx.sender().getUuid(), "command", "/amigo");
+         } catch (Throwable var11) {
+         }
 
-        // Debug: liga/desliga logs no chat
-        this.addSubCommand(new AmigoLogSubCommand());
+         Ref<EntityStore> ref = player.getReference();
+         if (ref != null && ref.isValid()) {
+            Store<EntityStore> store = ref.getStore();
+            World world = null;
 
+            try {
+               if (store.getExternalData() instanceof EntityStore es) {
+                  world = es.getWorld();
+               }
+            } catch (Throwable var10) {
+            }
 
-        // Aliases opcionais (se quiser)
-        // this.addAliases("anpc");
-    }
+            if (world == null) {
+               try {
+                  PlayerRef playerRef = (PlayerRef)store.getComponent(ref, PlayerRef.getComponentType());
+                  if (playerRef != null) {
+                     AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
+                  }
+               } catch (Throwable var9) {
+               }
 
-    @Override
-    protected CompletableFuture<Void> execute(CommandContext ctx) {
-        // Executa quando o player digita só "/amigo"
-        ctx.sendMessage(Message.raw("§7[AmigoNPC] Use: §f/amigo spawn §7| §f/amigo despawn"));
-        ctx.sendMessage(Message.raw("§7[AmigoNPC] Aparência: §f/amigo modelo <id> [scale] §7| §f/amigo modelooff"));
-        ctx.sendMessage(Message.raw("§7[AmigoNPC] Combate: §f/amigo defender §7(toggles ON/OFF, padrão OFF)"));
-        ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: §f/amigo log §7(toggles ON/OFF)"));
-        return CompletableFuture.completedFuture(null);
-    }
+               return CompletableFuture.completedFuture(null);
+            } else {
+               World executor = world;
+               return CompletableFuture.runAsync(() -> {
+                  try {
+                     PlayerRef playerRef = (PlayerRef)store.getComponent(ref, PlayerRef.getComponentType());
+                     if (playerRef != null) {
+                        AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
+                     }
+                  } catch (Throwable var4x) {
+                  }
+               }, executor);
+            }
+         } else {
+            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+            return CompletableFuture.completedFuture(null);
+         }
+      } else {
+         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.only_players")));
+         return CompletableFuture.completedFuture(null);
+      }
+   }
 }

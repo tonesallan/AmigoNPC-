@@ -1,7 +1,7 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoPersistence;
-
+import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -14,53 +14,27 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
-/**
- * /amigo modelo <modelId> [scale]
- *
- * Define um ModelAsset ID para o AmigoNPC usar no próximo spawn.
- * Exemplo (igual ao mod de referência):
- *  - /amigo modelo <id_do_modelo> 1.0
- */
 public final class AmigoModeloSubCommand extends AbstractPlayerCommand {
+   private final RequiredArg modelArg = this.withRequiredArg("modelId", AmigoText.text("cmd.arg.amigo.modelo.model_id"), ArgTypes.STRING);
+   private final OptionalArg scaleArg = this.withOptionalArg("scale", AmigoText.text("cmd.arg.amigo.modelo.scale"), ArgTypes.DOUBLE);
 
-    // ✅ subcomando público (sem permissão)
-private final RequiredArg modelArg;
-    private final OptionalArg scaleArg;
+   protected boolean canGeneratePermission() {
+      return false;
+   }
 
-    public AmigoModeloSubCommand() {
-        super("modelo", "Define o modelo (aparência) do AmigoNPC");
-        this.requireNoPermission();
+   public AmigoModeloSubCommand() {
+      super("modelo", AmigoText.text("cmd.desc.amigo.modelo"));
+   }
 
-        this.modelArg = this.withRequiredArg(
-                "modelId",
-                "Model asset id (ex.: npc.male_head_01)",
-                ArgTypes.STRING
-        );
+   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+      String modelId = (String)this.modelArg.get(ctx);
+      double scale = 1.0;
+      if (this.scaleArg.provided(ctx) && this.scaleArg.get(ctx) instanceof Double d) {
+         scale = d;
+      }
 
-        this.scaleArg = this.withOptionalArg(
-                "scale",
-                "Escala do modelo (padrão: 1.0)",
-                ArgTypes.DOUBLE
-        );
-    }
-
-    @Override
-    protected void execute(CommandContext ctx,
-                           Store<EntityStore> store,
-                           Ref<EntityStore> playerEntityRef,
-                           PlayerRef playerRef,
-                           World world) {
-
-        String modelId = (String) modelArg.get(ctx);
-        double scale = 1.0;
-        if (scaleArg.provided(ctx)) {
-            Object v = scaleArg.get(ctx);
-            if (v instanceof Double d) scale = d;
-        }
-
-        AmigoPersistence.saveModel(playerRef.getUuid(), modelId, scale);
-
-        ctx.sendMessage(Message.raw("§a[AmigoNPC] Modelo salvo: §f" + modelId + "§a (scale=" + scale + ")"));
-        ctx.sendMessage(Message.raw("§7[AmigoNPC] Para aplicar: use §f/amigo despawn§7 e depois §f/amigo spawn§7."));
-    }
+      AmigoPersistence.saveModel(playerRef.getUuid(), modelId, scale);
+      ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.modelo.saved", modelId, scale)));
+      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.common.apply_respawn")));
+   }
 }

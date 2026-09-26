@@ -1,0 +1,57 @@
+$C = "../Common.ui";
+
+Group #PlayerHeader {
+  LayoutMode: Left;
+  Padding: (Top: 8, Bottom: 6);
+
+  Group #PlayerHeaderProfilePictureBorder {
+    Anchor: (Width: 68, Height: 68);
+    Background: #3a3a3a;
+    Padding: (Left: 2, Top: 2, Right: 2, Bottom: 2);
+
+    AssetImage #PlayerHeaderProfilePicture {
+      Anchor: (Width: 64, Height: 64);
+      Background: #2a2a2a(0.8);
+    }
+  }
+
+  Group {
+    LayoutMode: Top;
+    Padding: (Left: 18);
+    FlexWeight: 1;
+
+    Label #PlayerHeaderLevelLabel {
+      Style: (
+        FontSize: 20,
+        TextColor: #ffffff,
+        RenderBold: true
+      );
+      Anchor: ();
+      Text: " - Level 1";
+      Padding: (Bottom: 5);
+    }
+
+    Group #PlayerHeaderProgressBarContainer {
+      Anchor: (Width: 600, Height: 18);
+      Background: "AmigoNPC_XPBackground.png";
+
+      ProgressBar #PlayerHeaderProgressBar {
+        Anchor: (Width: 600, Height: 18);
+        BarTexturePath: "AmigoNPC_XPFill.png";
+        EffectTexturePath: "AmigoNPC_XPEffect.png";
+        Value: 0.0;
+      }
+    }
+
+    Label #PlayerHeaderXPProgressLabel {
+      Style: (
+        FontSize: 14,
+        TextColor: #ffffff,
+        RenderBold: false
+      );
+      Anchor: ();
+      Text: "0.0 / 0.0 XP (0%)";
+      Padding: (Top: 2, Bottom: 5);
+    }
+  }
+}

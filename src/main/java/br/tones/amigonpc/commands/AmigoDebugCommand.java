@@ -1,55 +1,67 @@
 package br.tones.amigonpc.commands;
 
-import java.util.concurrent.CompletableFuture;
-
+import br.tones.amigonpc.core.AmigoNpcManager;
+import br.tones.amigonpc.core.HytaleBridge;
+import br.tones.amigonpc.core.debug.BuildInfo;
+import br.tones.amigonpc.core.i18n.AmigoText;
+import br.tones.amigonpc.ui.AmigoUiFactory;
+import br.tones.amigonpc.ui.UiBridge;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-
-import br.tones.amigonpc.core.HytaleBridge;
-import br.tones.amigonpc.ui.AmigoUiFactory;
-import br.tones.amigonpc.ui.UiBridge;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public final class AmigoDebugCommand extends AbstractCommand {
+   protected boolean canGeneratePermission() {
+      return false;
+   }
 
-    // ✅ comando público (sem permissão)
-public AmigoDebugCommand() {
-        super("amigo", "Debug do AmigoNPC");
-        this.requireNoPermission();
-        // ⚠️ Não usamos este construtor para substituir /amigo.
-        // Vamos registrar este comando como subcomando separado no próximo arquivo.
-    }
+   public AmigoDebugCommand() {
+      super("amigo", AmigoText.text("cmd.desc.amigodebug"));
+   }
 
-    /**
-     * Este arquivo é um comando "isolado", então usamos outro nome para não conflitar.
-     * Para manter /amigo debug, vamos registrar este como "amigodebug".
-     *
-     * Se você realmente quiser /amigo debug, eu faço isso alterando o AmigoCommand
-     * (mas você disse que não quer substituições).
-     */
-    public static AmigoDebugCommand createAsStandalone() {
-        return new AmigoDebugCommand("amigodebug");
-    }
+   public static AmigoDebugCommand createAsStandalone() {
+      return new AmigoDebugCommand("amigodebug");
+   }
 
-    private AmigoDebugCommand(String name) {
-        super(name, "Mostra informações de debug do AmigoNPC");
-        this.requireNoPermission();
-    }
+   private AmigoDebugCommand(String name) {
+      super(name, "Mostra informações de debug do AmigoNPC");
+      this.setAllowsExtraArguments(false);
+   }
 
-    @Override
-    protected CompletableFuture<Void> execute(CommandContext ctx) {
-        ctx.sendMessage(Message.raw("§b[AmigoNPC] Debug"));
+   protected CompletableFuture<Void> execute(CommandContext ctx) {
+      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.title")));
+      String v = BuildInfo.getModVersion();
+      String bid = BuildInfo.getBuildId();
+      ctx.sendMessage(
+         Message.raw(
+            AmigoText.format(
+               "cmd.amigodebug.version_build",
+               v == null ? AmigoText.text("cmd.amigodebug.unknown") : v,
+               bid == null ? AmigoText.text("cmd.amigodebug.unknown") : bid
+            )
+         )
+      );
+      if (ctx.isPlayer()) {
+         UUID ownerId = ctx.sender().getUuid();
+         boolean enabled = AmigoNpcManager.getShared().toggleDebugLog(ownerId);
+         ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigodebug.debuglog", AmigoText.coloredOnOff(enabled))));
+      } else {
+         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.debuglog_players_only")));
+      }
 
-        String hb = HytaleBridge.getLastError();
-        ctx.sendMessage(Message.raw("§7- HytaleBridge: " + (hb == null ? "OK/sem erro" : hb)));
-
-        String ub = UiBridge.getLastError();
-        ctx.sendMessage(Message.raw("§7- UiBridge: " + (ub == null ? "OK/sem erro" : ub)));
-
-        String uf = AmigoUiFactory.getLastError();
-        ctx.sendMessage(Message.raw("§7- AmigoUiFactory: " + (uf == null ? "OK/sem erro" : uf)));
-
-        ctx.sendMessage(Message.raw("§7Dica: teste §f/amigo spawn§7, §f/amigo despawn§7, §f/amigo defender§7."));
-        return CompletableFuture.completedFuture(null);
-    }
+      String hb = HytaleBridge.getLastError();
+      ctx.sendMessage(
+         Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "HytaleBridge", hb == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : hb))
+      );
+      String ub = UiBridge.getLastError();
+      ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "UiBridge", ub == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : ub)));
+      String uf = AmigoUiFactory.getLastError();
+      ctx.sendMessage(
+         Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "AmigoUiFactory", uf == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : uf))
+      );
+      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.tip")));
+      return CompletableFuture.completedFuture(null);
+   }
 }

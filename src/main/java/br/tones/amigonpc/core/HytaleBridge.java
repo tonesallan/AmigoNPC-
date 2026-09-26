@@ -1,371 +1,359 @@
 package br.tones.amigonpc.core;
 
+import br.tones.amigonpc.core.i18n.AmigoText;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
-/**
- * Camada de compatibilidade (Bridge) para evitar quebrar com variação de API entre builds.
- *
- * Regras:
- * - NÃO importar classes ECS diretamente (TransformComponent, etc.)
- * - Tudo via reflexão
- * - Se algo não existir, falha de forma segura (sem quebrar compilação)
- */
 public final class HytaleBridge {
+   private static volatile String LAST_ERROR;
 
-    private HytaleBridge() {}
+   private HytaleBridge() {
+   }
 
-    // Guarda o último erro (para debug no chat/console depois, se você quiser)
-    private static volatile String LAST_ERROR;
+   public static String getLastError() {
+      return LAST_ERROR;
+   }
 
-    public static String getLastError() {
-        return LAST_ERROR;
-    }
+   private static void setError(String msg) {
+      LAST_ERROR = msg;
+   }
 
-    private static void setError(String msg) {
-        LAST_ERROR = msg;
-    }
+   public static Object tryGetWorldFromCommandContext(Object commandContext) {
+      try {
+         if (commandContext == null) {
+            return null;
+         }
 
-    /**
-     * Tenta obter o World a partir do sender do CommandContext.
-     * Retorna null se não conseguir.
-     */
-    public static Object tryGetWorldFromCommandContext(Object commandContext) {
-        try {
-            if (commandContext == null) return null;
+         Method senderMethod = commandContext.getClass().getMethod("sender");
+         Object sender = senderMethod.invoke(commandContext);
+         if (sender == null) {
+            return null;
+         }
 
-            Method senderMethod = commandContext.getClass().getMethod("sender");
-            Object sender = senderMethod.invoke(commandContext);
-            if (sender == null) return null;
+         String[] candidates = new String[]{"getWorld", "world", "getCurrentWorld", "getPlayerWorld"};
 
-            // Nomes comuns em builds diferentes
-            String[] candidates = { "getWorld", "world", "getCurrentWorld", "getPlayerWorld" };
-
-            for (String name : candidates) {
-                try {
-                    Method m = sender.getClass().getMethod(name);
-                    Object world = m.invoke(sender);
-                    if (world != null) return world;
-                } catch (Throwable ignored) {}
+         for (String name : candidates) {
+            try {
+               Method m = sender.getClass().getMethod(name);
+               Object world = m.invoke(sender);
+               if (world != null) {
+                  return world;
+               }
+            } catch (Throwable var10) {
             }
+         }
 
-            return null;
-        } catch (Throwable t) {
-            setError("tryGetWorldFromCommandContext falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
-            return null;
-        }
-    }
+         return null;
+      } catch (Throwable t) {
+         setError(AmigoText.format("core.bridge.error.get_world_from_context_failed", t.getClass().getSimpleName(), t.getMessage()));
+         return null;
+      }
+   }
 
-    /**
-     * Executa uma task no contexto do World.
-     * Tenta world.execute(Runnable) e alternativas comuns.
-     */
-    public static boolean worldExecute(Object world, Runnable task) {
-        if (world == null || task == null) return false;
-
-        // 1) world.execute(Runnable)
-        try {
+   public static boolean worldExecute(Object world, Runnable task) {
+      if (world != null && task != null) {
+         try {
             Method m = world.getClass().getMethod("execute", Runnable.class);
             m.invoke(world, task);
             return true;
-        } catch (Throwable ignored) {}
-
-        // 2) world.run(Runnable) (fallback)
-        try {
-            Method m = world.getClass().getMethod("run", Runnable.class);
-            m.invoke(world, task);
-            return true;
-        } catch (Throwable ignored) {}
-
-        setError("Não achei método world.execute/run compatível nesta build.");
-        return false;
-    }
-
-    /**
-     * Spawn ECS compatível por reflexão.
-     *
-     * @param worldObj objeto World (não tipado para evitar imports frágeis)
-     * @param ownerId UUID do dono
-     * @return true se disparou spawn; false se falhou
-     */
-    public static boolean spawnBasicNpc(Object worldObj, UUID ownerId) {
-        if (worldObj == null) {
-            setError("World é null (não foi possível obter world do player).");
-            return false;
-        }
-        if (ownerId == null) {
-            setError("ownerId é null.");
-            return false;
-        }
-
-        return worldExecute(worldObj, () -> {
+         } catch (Throwable var4) {
             try {
-                // World.getEntityStore()
-                Object store = invokeNoArg(worldObj, "getEntityStore", "entityStore");
-                if (store == null) {
-                    setError("World.getEntityStore() não encontrado.");
-                    return;
-                }
+               Method m = world.getClass().getMethod("run", Runnable.class);
+               m.invoke(world, task);
+               return true;
+            } catch (Throwable var3) {
+               setError(AmigoText.text("core.bridge.error.world_execute_incompatible"));
+               return false;
+            }
+         }
+      } else {
+         return false;
+      }
+   }
 
-                // Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder()
-                Object holder = createEntityHolder();
-                if (holder == null) {
-                    setError("Não consegui criar Holder via EntityStore.REGISTRY.newHolder().");
-                    return;
-                }
+   public static boolean spawnBasicNpc(Object worldObj, UUID ownerId) {
+      if (worldObj == null) {
+         setError(AmigoText.text("core.bridge.error.world_null"));
+         return false;
+      } else if (ownerId == null) {
+         setError(AmigoText.text("core.bridge.error.owner_id_null"));
+         return false;
+      } else {
+         return worldExecute(worldObj, () -> {
+            try {
+               Object store = invokeNoArg(worldObj, "getEntityStore", "entityStore");
+               if (store == null) {
+                  setError(AmigoText.text("core.bridge.error.entity_store_missing"));
+                  return;
+               }
 
-                // Adiciona componentes mínimos SE existirem (sem quebrar se não existir)
-                tryAddTransform(holder);
-                tryAddUUIDComponent(holder, ownerId);
-                tryAddNetworkId(holder, store);
+               Object holder = createEntityHolder();
+               if (holder == null) {
+                  setError(AmigoText.text("core.bridge.error.create_holder_failed"));
+                  return;
+               }
 
-                // store.addEntity(holder, AddReason.SPAWN)
-                Object addReasonSpawn = getEnumConstant(
-                        "com.hypixel.hytale.server.core.universe.world.storage.EntityStore$AddReason",
-                        "SPAWN"
-                );
+               tryAddTransform(holder);
+               tryAddUUIDComponent(holder, ownerId);
+               tryAddNetworkId(holder, store);
+               Object addReasonSpawn = getEnumConstant("com.hypixel.hytale.server.core.universe.world.storage.EntityStore$AddReason", "SPAWN");
+               if (addReasonSpawn == null) {
+                  boolean ok = invokeAddEntityWithoutReason(store, holder);
+                  if (!ok) {
+                     setError(AmigoText.text("core.bridge.error.add_entity_without_reason_failed"));
+                  }
 
-                if (addReasonSpawn == null) {
-                    // Se não existir AddReason, tenta addEntity(holder) sem reason
-                    boolean ok = invokeAddEntityWithoutReason(store, holder);
-                    if (!ok) setError("Não consegui chamar addEntity(holder[, reason]) nesta build.");
-                    return;
-                }
+                  return;
+               }
 
-                boolean ok = invokeAddEntityWithReason(store, holder, addReasonSpawn);
-                if (!ok) setError("Não consegui chamar addEntity(holder, AddReason.SPAWN) nesta build.");
-
+               boolean ok = invokeAddEntityWithReason(store, holder, addReasonSpawn);
+               if (!ok) {
+                  setError(AmigoText.text("core.bridge.error.add_entity_with_reason_failed"));
+               }
             } catch (Throwable t) {
-                setError("spawnBasicNpc falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
+               setError(AmigoText.format("core.bridge.error.spawn_basic_npc_failed", t.getClass().getSimpleName(), t.getMessage()));
             }
-        });
-    }
+         });
+      }
+   }
 
-    // ----------------------------
-    // Helpers: Holder / Registry
-    // ----------------------------
-
-    private static Object createEntityHolder() {
-        try {
-            Class<?> entityStoreClass = Class.forName("com.hypixel.hytale.server.core.universe.world.storage.EntityStore");
-            Field registryField = entityStoreClass.getField("REGISTRY");
-            Object registry = registryField.get(null);
-            if (registry == null) return null;
-
-            // registry.newHolder()
-            Method newHolder = registry.getClass().getMethod("newHolder");
-            return newHolder.invoke(registry);
-
-        } catch (Throwable t) {
-            setError("createEntityHolder falhou: " + t.getClass().getSimpleName() + " - " + t.getMessage());
+   private static Object createEntityHolder() {
+      try {
+         Class<?> entityStoreClass = Class.forName("com.hypixel.hytale.server.core.universe.world.storage.EntityStore");
+         Field registryField = entityStoreClass.getField("REGISTRY");
+         Object registry = registryField.get(null);
+         if (registry == null) {
             return null;
-        }
-    }
+         }
 
-    private static boolean invokeAddEntityWithReason(Object store, Object holder, Object addReasonSpawn) {
-        try {
+         Method newHolder = registry.getClass().getMethod("newHolder");
+         return newHolder.invoke(registry);
+      } catch (Throwable t) {
+         setError(AmigoText.format("core.bridge.error.create_entity_holder_failed", t.getClass().getSimpleName(), t.getMessage()));
+         return null;
+      }
+   }
+
+   private static boolean invokeAddEntityWithReason(Object store, Object holder, Object addReasonSpawn) {
+      try {
+         for (Method m : store.getClass().getMethods()) {
+            if (m.getName().equals("addEntity")) {
+               Class<?>[] p = m.getParameterTypes();
+               if (p.length == 2 && p[1].isInstance(addReasonSpawn)) {
+                  m.invoke(store, holder, addReasonSpawn);
+                  return true;
+               }
+            }
+         }
+      } catch (Throwable var8) {
+      }
+
+      return false;
+   }
+
+   private static boolean invokeAddEntityWithoutReason(Object store, Object holder) {
+      try {
+         Method m = store.getClass().getMethod("addEntity", holder.getClass());
+         m.invoke(store, holder);
+         return true;
+      } catch (Throwable var8) {
+         try {
             for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("addEntity")) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p.length == 2 && p[1].isInstance(addReasonSpawn)) {
-                    m.invoke(store, holder, addReasonSpawn);
-                    return true;
-                }
+               if (m.getName().equals("addEntity")) {
+                  Class<?>[] p = m.getParameterTypes();
+                  if (p.length == 1) {
+                     m.invoke(store, holder);
+                     return true;
+                  }
+               }
             }
-        } catch (Throwable ignored) {}
-        return false;
-    }
+         } catch (Throwable var7) {
+         }
 
-    private static boolean invokeAddEntityWithoutReason(Object store, Object holder) {
-        try {
-            Method m = store.getClass().getMethod("addEntity", holder.getClass());
-            m.invoke(store, holder);
-            return true;
-        } catch (Throwable ignored) {}
+         return false;
+      }
+   }
 
-        // tenta por varredura (caso o Holder seja interface/superclasse)
-        try {
-            for (Method m : store.getClass().getMethods()) {
-                if (!m.getName().equals("addEntity")) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p.length == 1) {
-                    m.invoke(store, holder);
-                    return true;
-                }
+   private static void tryAddTransform(Object holder) {
+      String[] classNames = new String[]{
+         "com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent",
+         "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"
+      };
+      Object comp = tryInstantiateFirstExisting(classNames);
+      if (comp != null) {
+         invokeHolderAdd(holder, comp);
+      }
+   }
+
+   private static void tryAddUUIDComponent(Object holder, UUID ownerId) {
+      String[] classNames = new String[]{
+         "com.hypixel.hytale.server.core.universe.world.entity.component.UUIDComponent",
+         "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"
+      };
+      Object comp = tryInstantiateUUIDComponent(classNames, ownerId);
+      if (comp != null) {
+         invokeHolderAdd(holder, comp);
+      }
+   }
+
+   private static void tryAddNetworkId(Object holder, Object store) {
+      String[] classNames = new String[]{
+         "com.hypixel.hytale.server.core.universe.world.entity.component.NetworkIdComponent",
+         "com.hypixel.hytale.server.core.universe.world.entity.components.NetworkIdComponent"
+      };
+      Object networkId = null;
+
+      try {
+         Object externalData = invokeNoArg(store, "getExternalData", "externalData");
+         if (externalData != null) {
+            networkId = invokeNoArg(externalData, "takeNextNetworkId", "nextNetworkId", "getNextNetworkId");
+         }
+      } catch (Throwable var5) {
+      }
+
+      if (networkId != null) {
+         Object comp = tryInstantiateSingleArgFirstExisting(classNames, networkId);
+         if (comp != null) {
+            invokeHolderAdd(holder, comp);
+         }
+      }
+   }
+
+   private static void invokeHolderAdd(Object holder, Object component) {
+      try {
+         for (Method m : holder.getClass().getMethods()) {
+            if (m.getName().equals("add")) {
+               Class<?>[] p = m.getParameterTypes();
+               if (p.length == 1) {
+                  m.invoke(holder, component);
+                  return;
+               }
             }
-        } catch (Throwable ignored) {}
+         }
+      } catch (Throwable var7) {
+      }
+   }
 
-        return false;
-    }
+   private static Object invokeNoArg(Object target, String... methodNames) {
+      for (String name : methodNames) {
+         try {
+            Method m = target.getClass().getMethod(name);
+            return m.invoke(target);
+         } catch (Throwable var7) {
+         }
+      }
 
-    // ----------------------------
-    // Helpers: Components (opcionais)
-    // ----------------------------
+      return null;
+   }
 
-    private static void tryAddTransform(Object holder) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"
-        };
+   private static Object getEnumConstant(String enumClassName, String constantName) {
+      try {
+         Class<?> enumClass = Class.forName(enumClassName);
+         return !enumClass.isEnum() ? null : Enum.valueOf(enumClass, constantName);
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
 
-        Object comp = tryInstantiateFirstExisting(classNames);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
+   private static Object tryInstantiateFirstExisting(String[] classNames) {
+      for (String cn : classNames) {
+         try {
+            Class<?> c = Class.forName(cn);
+            Constructor<?> ctor = c.getDeclaredConstructor();
+            ctor.setAccessible(true);
+            return ctor.newInstance();
+         } catch (Throwable var7) {
+         }
+      }
 
-    private static void tryAddUUIDComponent(Object holder, UUID ownerId) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.UUIDComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"
-        };
+      return null;
+   }
 
-        Object comp = tryInstantiateUUIDComponent(classNames, ownerId);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
+   private static Object tryInstantiateUUIDComponent(String[] classNames, UUID ownerId) {
+      for (String cn : classNames) {
+         try {
+            Class<?> c = Class.forName(cn);
 
-    private static void tryAddNetworkId(Object holder, Object store) {
-        String[] classNames = {
-                "com.hypixel.hytale.server.core.universe.world.entity.component.NetworkIdComponent",
-                "com.hypixel.hytale.server.core.universe.world.entity.components.NetworkIdComponent"
-        };
-
-        Object networkId = null;
-
-        try {
-            Object externalData = invokeNoArg(store, "getExternalData", "externalData");
-            if (externalData != null) {
-                networkId = invokeNoArg(externalData, "takeNextNetworkId", "nextNetworkId", "getNextNetworkId");
+            try {
+               Constructor<?> ctor = c.getDeclaredConstructor(UUID.class);
+               ctor.setAccessible(true);
+               return ctor.newInstance(ownerId);
+            } catch (Throwable var16) {
             }
-        } catch (Throwable ignored) {}
 
-        if (networkId == null) return;
+            try {
+               Constructor<?> ctor = c.getDeclaredConstructor();
+               ctor.setAccessible(true);
+               Object obj = ctor.newInstance();
+               String[] setters = new String[]{"setUuid", "setId", "setValue"};
 
-        Object comp = tryInstantiateSingleArgFirstExisting(classNames, networkId);
-        if (comp != null) invokeHolderAdd(holder, comp);
-    }
+               for (String s : setters) {
+                  try {
+                     Method m = c.getMethod(s, UUID.class);
+                     m.invoke(obj, ownerId);
+                     return obj;
+                  } catch (Throwable var18) {
+                  }
+               }
 
-    private static void invokeHolderAdd(Object holder, Object component) {
-        try {
-            for (Method m : holder.getClass().getMethods()) {
-                if (!m.getName().equals("add")) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p.length == 1) {
-                    m.invoke(holder, component);
-                    return;
-                }
+               String[] fields = new String[]{"uuid", "id", "value"};
+
+               for (String f : fields) {
+                  try {
+                     Field field = c.getDeclaredField(f);
+                     field.setAccessible(true);
+                     field.set(obj, ownerId);
+                     return obj;
+                  } catch (Throwable var17) {
+                  }
+               }
+            } catch (Throwable var19) {
             }
-        } catch (Throwable ignored) {}
-    }
+         } catch (Throwable var20) {
+         }
+      }
 
-    // ----------------------------
-    // Generic reflection helpers
-    // ----------------------------
+      return null;
+   }
 
-    private static Object invokeNoArg(Object target, String... methodNames) {
-        for (String name : methodNames) {
-            try {
-                Method m = target.getClass().getMethod(name);
-                return m.invoke(target);
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
+   private static Object tryInstantiateSingleArgFirstExisting(String[] classNames, Object arg) {
+      for (String cn : classNames) {
+         try {
+            Class<?> c = Class.forName(cn);
 
-    private static Object getEnumConstant(String enumClassName, String constantName) {
-        try {
-            Class<?> enumClass = Class.forName(enumClassName);
-            if (!enumClass.isEnum()) return null;
-            @SuppressWarnings("unchecked")
-            Object constant = Enum.valueOf((Class<? extends Enum>) enumClass, constantName);
-            return constant;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
+            for (Constructor<?> ctor : c.getDeclaredConstructors()) {
+               Class<?>[] p = ctor.getParameterTypes();
+               if (p.length == 1 && (arg == null || p[0].isInstance(arg) || isPrimitiveWrapperMatch(p[0], arg.getClass()))) {
+                  ctor.setAccessible(true);
+                  return ctor.newInstance(arg);
+               }
+            }
+         } catch (Throwable var12) {
+         }
+      }
 
-    private static Object tryInstantiateFirstExisting(String[] classNames) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-                Constructor<?> ctor = c.getDeclaredConstructor();
-                ctor.setAccessible(true);
-                return ctor.newInstance();
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
+      return null;
+   }
 
-    private static Object tryInstantiateUUIDComponent(String[] classNames, UUID ownerId) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-
-                // 1) ctor(UUID)
-                try {
-                    Constructor<?> ctor = c.getDeclaredConstructor(UUID.class);
-                    ctor.setAccessible(true);
-                    return ctor.newInstance(ownerId);
-                } catch (Throwable ignoredCtor) {}
-
-                // 2) ctor() e tenta set/field (se existir)
-                try {
-                    Constructor<?> ctor = c.getDeclaredConstructor();
-                    ctor.setAccessible(true);
-                    Object obj = ctor.newInstance();
-
-                    String[] setters = { "setUuid", "setId", "setValue" };
-                    for (String s : setters) {
-                        try {
-                            Method m = c.getMethod(s, UUID.class);
-                            m.invoke(obj, ownerId);
-                            return obj;
-                        } catch (Throwable ignoredSetter) {}
-                    }
-
-                    String[] fields = { "uuid", "id", "value" };
-                    for (String f : fields) {
-                        try {
-                            Field field = c.getDeclaredField(f);
-                            field.setAccessible(true);
-                            field.set(obj, ownerId);
-                            return obj;
-                        } catch (Throwable ignoredField) {}
-                    }
-                } catch (Throwable ignoredCtor2) {}
-
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static Object tryInstantiateSingleArgFirstExisting(String[] classNames, Object arg) {
-        for (String cn : classNames) {
-            try {
-                Class<?> c = Class.forName(cn);
-
-                for (Constructor<?> ctor : c.getDeclaredConstructors()) {
-                    Class<?>[] p = ctor.getParameterTypes();
-                    if (p.length == 1 && (arg == null || p[0].isInstance(arg) || isPrimitiveWrapperMatch(p[0], arg.getClass()))) {
-                        ctor.setAccessible(true);
-                        return ctor.newInstance(arg);
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return null;
-    }
-
-    private static boolean isPrimitiveWrapperMatch(Class<?> paramType, Class<?> argType) {
-        if (!paramType.isPrimitive()) return false;
-        if (paramType == int.class && argType == Integer.class) return true;
-        if (paramType == long.class && argType == Long.class) return true;
-        if (paramType == boolean.class && argType == Boolean.class) return true;
-        if (paramType == double.class && argType == Double.class) return true;
-        if (paramType == float.class && argType == Float.class) return true;
-        if (paramType == short.class && argType == Short.class) return true;
-        if (paramType == byte.class && argType == Byte.class) return true;
-        if (paramType == char.class && argType == Character.class) return true;
-        return false;
-    }
+   private static boolean isPrimitiveWrapperMatch(Class<?> paramType, Class<?> argType) {
+      if (!paramType.isPrimitive()) {
+         return false;
+      } else if (paramType == int.class && argType == Integer.class) {
+         return true;
+      } else if (paramType == long.class && argType == Long.class) {
+         return true;
+      } else if (paramType == boolean.class && argType == Boolean.class) {
+         return true;
+      } else if (paramType == double.class && argType == Double.class) {
+         return true;
+      } else if (paramType == float.class && argType == Float.class) {
+         return true;
+      } else if (paramType == short.class && argType == Short.class) {
+         return true;
+      } else {
+         return paramType == byte.class && argType == Byte.class ? true : paramType == char.class && argType == Character.class;
+      }
+   }
 }

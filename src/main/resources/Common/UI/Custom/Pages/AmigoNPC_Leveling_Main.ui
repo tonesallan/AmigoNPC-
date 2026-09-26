@@ -1,0 +1,133 @@
+$C = "../Common.ui";
+$Nav = "Nav/AmigoNPC_Leveling_Sidebar.ui";
+
+$C.@PageOverlay {
+  $C.@DecoratedContainer {
+    Anchor: (Width: 900, Height: 700);
+    Padding: (Full: 0);
+
+    #Title {
+      Group {
+        
+        $C.@Title {
+          @Text = "AmigoNPC";
+        }
+      }
+    }
+
+    #Content {
+      LayoutMode: Left;
+      Padding: (Left:7, Bottom: 7);
+
+      // BEGIN MainSidebar
+      Group #Sidebar {
+        Anchor: (Width: 180);
+        LayoutMode: Top;
+        Background: #0a0f14;
+        FlexWeight: 0;
+        Padding: (Full: 0);
+        
+        // BEGIN MainSidebarTopSpacer
+        Group {
+          Anchor: (Height: 0);
+        }
+        // END MainSidebarTopSpacer
+        
+        // BEGIN MainSidebarStatsSection
+        Group #NavStatsButtonGroup {
+          LayoutMode: Top;
+          
+          $C.@TextButton #NavStatsButtonSelected { 
+            Text: "STATS MANAGEMENT"; 
+            Style: $Nav.@SidebarButtonFocusedStyle; 
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: true;
+          }
+          
+          $C.@TextButton #NavStatsButton { 
+            Text: "STATS MANAGEMENT"; 
+            Style: $Nav.@SidebarButtonStyle; 
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: false;
+          }
+        }
+        
+        Group {
+          Anchor: (Height: 4);
+        }
+        // END MainSidebarStatsSection
+        
+        // BEGIN MainSidebarSettingsSection
+        Group #NavLeaderboardButtonGroup {
+          LayoutMode: Top;
+          
+          $C.@TextButton #NavLeaderboardButtonSelected { 
+            Text: "SETTINGS"; 
+            Style: $Nav.@SidebarButtonFocusedStyle; 
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: false;
+          }
+          
+          $C.@TextButton #NavLeaderboardButton { 
+            Text: "SETTINGS"; 
+            Style: $Nav.@SidebarButtonStyle; 
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: true;
+          } 
+        } 
+        
+        Group {
+          Anchor: (Height: 4);
+        }
+        // END MainSidebarSettingsSection
+        
+        // BEGIN MainSidebarRewardsSection
+        Group #NavRewardsButtonGroup {
+          LayoutMode: Top;
+          
+          $C.@TextButton #NavRewardsButtonSelected {
+            Text: "REWARDS";
+            Style: $Nav.@SidebarButtonFocusedStyle;
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: false;
+          }
+          
+          $C.@TextButton #NavRewardsButton {
+            Text: "REWARDS";
+            Style: $Nav.@SidebarButtonStyle;
+            Padding: (Top: 14, Bottom: 14, Left: 12, Right: 12);
+            Anchor: (Height: 50);
+            Visible: true;
+          }
+        }
+        // END MainSidebarRewardsSection
+      }
+      // END MainSidebar
+
+      // BEGIN MainContentArea
+      Group #ContentArea {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Padding: (Left: 20, Right: 20, Bottom: 20, Top: 0);
+
+        Group #StatsPageContainer {
+          LayoutMode: Top;
+        }
+
+        Group #RpgLvlLeaderboardPageContainer {
+          LayoutMode: Top;
+        }
+
+        Group #RewardsPageContainer {
+          LayoutMode: Top;
+        }
+      }
+      // END MainContentArea
+    }
+  }
+}
