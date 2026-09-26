@@ -1862,6 +1862,37 @@ public final class AmigoNpcManager {
             }
 
             long defValScaled = StatScaling.scaledDef(rec.baseDef, level);
+
+            try {
+               Object ownerRefObj = rec.worldObj == null ? null : invokeOneArg(rec.worldObj, "getEntityRef", UUID.class, ownerId);
+               if (ownerRefObj instanceof Ref<?> rawOwnerRef) {
+                  @SuppressWarnings("unchecked")
+                  Ref<EntityStore> ownerRef = (Ref<EntityStore>)rawOwnerRef;
+                  EntityStatMap ownerStats = (EntityStatMap)store.getComponent(ownerRef, EntityStatMap.getComponentType());
+                  if (ownerStats != null) {
+                     try {
+                        float ownerMaxHp = ownerStats.get(healthIdx).getMax();
+                        if (ownerMaxHp > 0.0F) {
+                           desiredMaxHp = Math.min(desiredMaxHp, Math.max(1L, (long)Math.floor(ownerMaxHp * 0.90)));
+                        }
+                     } catch (Throwable ignored) {
+                     }
+
+                     int ownerDefIdx = NpcScalingSupport.resolveDefenseStatIndex();
+                     if (ownerDefIdx >= 0) {
+                        try {
+                           float ownerDef = ownerStats.get(ownerDefIdx).get();
+                           if (ownerDef >= 0.0F) {
+                              defValScaled = Math.min(defValScaled, Math.max(0L, (long)Math.floor(ownerDef * 0.90)));
+                           }
+                        } catch (Throwable ignored) {
+                        }
+                     }
+                  }
+               }
+            } catch (Throwable ignored) {
+            }
+
             String HP_MAX_MOD_KEY = "amigonpc_hpmax";
 
             try {
@@ -3456,8 +3487,7 @@ public final class AmigoNpcManager {
          } catch (Throwable var57) {
          }
 
-         String weaponId = resolveConfiguredOrLegacyMeleeWeaponId(rec);
-         double base = NpcWeaponSupport.getWeaponBaseDamage(weaponId);
+         double base = NpcWeaponSupport.getWeaponBaseDamage(bowId);
          float amount = (float)(base + rec.level * 0.03);
          int swordLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
          if (swordLvl <= 30) {
@@ -3472,6 +3502,7 @@ public final class AmigoNpcManager {
          }
 
          amount = Math.min(24.0F, amount * 1.2F);
+         amount = this.capNpcDamageToOwnerSupport(store, ownerRefObj, amount);
          float hpBefore = -1.0F;
 
          try {
@@ -3632,7 +3663,7 @@ public final class AmigoNpcManager {
          }
          boolean isAggressor = isOwnerAggressor;
 
-         long cd = isAggressor ? 650L : 850L;
+         long cd = 1000L;
          if (now - rec.lastMeleeAttackMillis < cd) {
             return;
          }
@@ -3728,6 +3759,7 @@ public final class AmigoNpcManager {
          } catch (Throwable var61) {
          }
 
+         amount = this.capNpcDamageToOwnerSupport(store, ownerRefObj, amount);
          float hpBefore = -1.0F;
 
          try {
@@ -3899,6 +3931,44 @@ public final class AmigoNpcManager {
             setFlockState(store, rec.refObj, "Run", "");
          }
       } catch (Throwable var12) {
+      }
+   }
+
+   private float capNpcDamageToOwnerSupport(Store<EntityStore> store, Object ownerRefObj, float requestedAmount) {
+      float amount = Math.max(0.0F, requestedAmount);
+      if (store == null || ownerRefObj == null) {
+         return Math.min(amount, 3.0F);
+      }
+
+      try {
+         if (!(ownerRefObj instanceof Ref<?> rawOwnerRef)) {
+            return Math.min(amount, 3.0F);
+         }
+
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> ownerRef = (Ref<EntityStore>)rawOwnerRef;
+         Player ownerPlayer = (Player)store.getComponent(ownerRef, Player.getComponentType());
+         if (ownerPlayer == null) {
+            return Math.min(amount, 3.0F);
+         }
+
+         Object inventory = invokeNoArg(ownerPlayer, "getInventory", "inventory");
+         Object heldObj = inventory == null ? null : invokeNoArg(inventory, "getItemInHand", "getActiveHotbarItem");
+         String ownerWeaponId = null;
+         if (heldObj instanceof ItemStack stack && stack != null && !stack.isEmpty()) {
+            ownerWeaponId = stack.getItemId();
+         } else if (heldObj != null) {
+            Object id = invokeNoArg(heldObj, "getItemId", "itemId");
+            if (id instanceof String s && !s.isBlank()) {
+               ownerWeaponId = s;
+            }
+         }
+
+         double ownerBase = NpcWeaponSupport.getWeaponBaseDamage(ownerWeaponId);
+         float supportCeiling = (float)Math.max(1.0, ownerBase * 0.85);
+         return Math.min(amount, supportCeiling);
+      } catch (Throwable ignored) {
+         return Math.min(amount, 3.0F);
       }
    }
 
