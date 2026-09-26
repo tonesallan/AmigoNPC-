@@ -35,6 +35,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -1522,10 +1523,10 @@ private static final int LOOT_PENDING_MAX = 512;
                 Ref<EntityStore> ownerRef = (Ref<EntityStore>) invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
                 if (ownerRef == null) return;
 
-                Player player = store.getComponent(ownerRef, Player.getComponentType());
-                if (player == null) return;
+                PlayerRef playerRef = store.getComponent(ownerRef, PlayerRef.getComponentType());
+                if (playerRef == null) return;
 
-                player.sendMessage(Message.raw("§7[AmigoNPC] " + text));
+                playerRef.sendMessage(Message.raw("§7[AmigoNPC] " + text));
             } catch (Throwable ignored) {}
         });
     }

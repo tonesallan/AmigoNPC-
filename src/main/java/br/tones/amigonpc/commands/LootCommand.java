@@ -86,7 +86,7 @@ public LootCommand() {
             );
 
             if (!ok) {
-                playerComponent.sendMessage(Message.raw("§c[AmigoNPC] Não foi possível abrir a mochila agora."));
+                playerRef.sendMessage(Message.raw("§c[AmigoNPC] Não foi possível abrir a mochila agora."));
             }
         });
 
