@@ -66,7 +66,8 @@ public final class AmigoText {
       Map.entry("ui.status.combat", "Combate"),
       Map.entry("ui.status.gathering", "Coletando"),
       Map.entry("ui.status.following", "Seguindo"),
-      Map.entry("ui.status.idle", "Parado")
+      Map.entry("ui.status.idle", "Parado"),
+      Map.entry("ui.settings.feedback.saved_automatically", "Configuração salva automaticamente.")
    );
    private static volatile String currentLocale = "pt_br";
 

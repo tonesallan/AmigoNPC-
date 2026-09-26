@@ -22,7 +22,7 @@ final class AmigoLvlGuiSettingsPageActionSupport {
       AmigoLvlGuiSettingsPageState pageState,
       UICommandBuilder cmd
    ) {
-      AmigoLvlGuiSettingsPageActionResult playerRouteResult = AmigoLvlGuiSettingsPagePlayerRouteSupport.handle(action, pageState);
+      AmigoLvlGuiSettingsPageActionResult playerRouteResult = AmigoLvlGuiSettingsPagePlayerRouteSupport.handle(ownerId, store, action, pageState);
       if (playerRouteResult.handled) {
          return playerRouteResult;
       }
