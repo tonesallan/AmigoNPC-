@@ -25,3 +25,6 @@ Thumbs.db
 HytaleServer.jar
 run/
 server/
+
+# Local binary/reference recovery material
+reference/
