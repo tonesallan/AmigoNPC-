@@ -129,7 +129,7 @@ public final class LevelProgressHudService {
 
    private static void sendClearCustomHud(PlayerRef playerRef) {
       try {
-         playerRef.getPacketHandler().writeNoCache(new CustomHud(true, new CustomUICommand[0]));
+         playerRef.getPacketHandler().writeNoCache(new CustomHud("AmigoNPC_LevelProgress", 0, true, new CustomUICommand[0]));
       } catch (Throwable var2) {
       }
    }

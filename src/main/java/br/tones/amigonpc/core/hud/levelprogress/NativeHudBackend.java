@@ -8,7 +8,7 @@ final class NativeHudBackend implements HudBackend {
    @Override
    public void show(Player player, PlayerRef playerRef, String hudId, CustomUIHud hud) {
       if (player != null && playerRef != null) {
-         player.getHudManager().setCustomHud(playerRef, hud);
+         player.getHudManager().addCustomHud(playerRef, hud);
       }
    }
 
@@ -16,7 +16,7 @@ final class NativeHudBackend implements HudBackend {
    public void hide(Player player, PlayerRef playerRef, String hudId) {
       if (player != null && playerRef != null) {
          try {
-            player.getHudManager().resetHud(playerRef);
+            player.getHudManager().removeCustomHud(playerRef, hudId);
          } catch (Throwable var5) {
          }
       }

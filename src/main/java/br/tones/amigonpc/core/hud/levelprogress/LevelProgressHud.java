@@ -13,7 +13,7 @@ final class LevelProgressHud extends CustomUIHud {
    private volatile Color textColor = Color.BLACK;
 
    LevelProgressHud(PlayerRef playerRef) {
-      super(playerRef);
+      super(playerRef, "AmigoNPC_LevelProgress");
    }
 
    void setLevelInfo(int level, long xp, long xpNeeded) {
