@@ -101,9 +101,19 @@ final class NpcCombatStateSupport {
       if (ownerId != null && targetRefObj != null) {
          if (rec != null && !rec.downed && rec.refObj != null && targetRefObj != rec.refObj) {
             long now = System.currentTimeMillis();
-            rec.assistTargetRefObj = targetRefObj;
-            rec.assistUntilMillis = now + 3000L;
             rec.ownerCombatContextUntilMillis = now + 3000L;
+
+            if (rec.combatMode == CombatMode.WEAKEST_ENEMY) {
+               // The owner's attacked entity is an explicit combat opponent, but
+               // the companion still chooses the lowest-health valid enemy nearby.
+               rec.combatTargetRefObj = targetRefObj;
+               rec.combatUntilMillis = now + 3000L;
+               rec.assistTargetRefObj = null;
+               rec.assistUntilMillis = 0L;
+            } else {
+               rec.assistTargetRefObj = targetRefObj;
+               rec.assistUntilMillis = now + 3000L;
+            }
 
             try {
                ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=owner_attack");

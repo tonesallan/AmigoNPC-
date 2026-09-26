@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 
 final class NpcTargetAcquisitionSupport {
    private NpcTargetAcquisitionSupport() {
@@ -76,8 +78,24 @@ final class NpcTargetAcquisitionSupport {
                }
 
                boolean otherAmigo = amigoRefPredicate != null && amigoRefPredicate.test(ref);
-               if (otherAmigo && !pvpEnabled) {
-                  continue;
+               boolean explicitOwnerOpponent = rec.combatTargetRefObj != null && refEq(ref, rec.combatTargetRefObj);
+               if (otherAmigo) {
+                  if (!pvpEnabled) {
+                     continue;
+                  }
+               } else if (!explicitOwnerOpponent) {
+                  try {
+                     if (companion == null || companion.getRole() == null) {
+                        continue;
+                     }
+
+                     Attitude attitude = NPCPlugin.get().getAttitudeMap().getAttitude(companion.getRole(), ref, store);
+                     if (attitude != Attitude.HOSTILE) {
+                        continue;
+                     }
+                  } catch (Throwable ignored) {
+                     continue;
+                  }
                }
 
                try {
@@ -133,15 +151,6 @@ final class NpcTargetAcquisitionSupport {
                   }
                } catch (Throwable ignored) {
                   continue;
-               }
-
-               if (!otherAmigo && companion != null && companion.getRole() != null) {
-                  try {
-                     if (companion.getRole().isFriendly(ref, store)) {
-                        continue;
-                     }
-                  } catch (Throwable ignored) {
-                  }
                }
 
                if (hp < bestHp[0] || hp == bestHp[0] && d2 < bestD2[0]) {
