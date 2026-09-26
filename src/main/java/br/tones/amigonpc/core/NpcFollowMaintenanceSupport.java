@@ -7,14 +7,9 @@ final class NpcFollowMaintenanceSupport {
    }
 
    static boolean isInCombatOrAssistNow(AmigoNpcManager.NpcRecord rec, long now) {
-      return rec == null
-         ? false
-         : now < rec.combatUntilMillis
-            || now < rec.assistUntilMillis
-            || now < rec.npcCombatUntilMillis
-            || rec.combatTargetRefObj != null
-            || rec.assistTargetRefObj != null
-            || rec.npcCombatTargetRefObj != null;
+      return rec != null
+         && (NpcCombatStateSupport.getActiveCombatTarget(rec, now) != null
+            || NpcCombatStateSupport.getActiveAssistTarget(rec, now) != null);
    }
 
    static void updateRegenAndAutoLootStick(
@@ -105,6 +100,7 @@ final class NpcFollowMaintenanceSupport {
       rec.npcCombatTargetRefObj = null;
       rec.assistUntilMillis = now + assistGraceMillis;
       rec.assistTargetRefObj = null;
+      rec.ownerCombatContextUntilMillis = 0L;
       rec.chaseDisengaged = true;
       rec.targetLostSinceMillis = 0L;
       rec.targetStuckSinceMillis = 0L;

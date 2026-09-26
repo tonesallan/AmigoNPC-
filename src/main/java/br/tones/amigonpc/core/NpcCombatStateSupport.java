@@ -32,7 +32,17 @@ final class NpcCombatStateSupport {
    }
 
    static Object getActiveAssistTarget(AmigoNpcManager.NpcRecord rec, long now) {
-      return rec == null ? null : rec.assistTargetRefObj;
+      if (rec == null || rec.assistTargetRefObj == null) {
+         return null;
+      }
+
+      if (rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
+         rec.assistTargetRefObj = null;
+         rec.assistUntilMillis = 0L;
+         return null;
+      }
+
+      return rec.assistTargetRefObj;
    }
 
    static void clearAssist(AmigoNpcManager.NpcRecord rec) {
@@ -69,28 +79,15 @@ final class NpcCombatStateSupport {
    static void startNpcCombat(
       AmigoNpcManager.NpcRecord rec, UUID ownerId, Object attackerRefObj, long combatWindowMillis, NpcCombatStateSupport.CombatDebugger debugger
    ) {
-      if (ownerId != null && attackerRefObj != null) {
-         if (rec != null) {
-            if (!rec.downed) {
-               if (rec.refObj != null) {
-                  if (attackerRefObj != rec.refObj) {
-                     long now = System.currentTimeMillis();
-                     if (getActiveCombatTarget(rec, now) == null) {
-                        rec.npcCombatTargetRefObj = attackerRefObj;
-                        rec.npcCombatUntilMillis = now + combatWindowMillis;
-
-                        try {
-                           ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=npc_attacked");
-                        } catch (Throwable var9) {
-                        }
-
-                        debugger.log(rec, ownerId, "startNpcCombat: agressorRef=" + attackerRefObj);
-                     }
-                  }
-               }
-            }
-         }
+      if (rec == null || ownerId == null || attackerRefObj == null || rec.downed) {
+         return;
       }
+
+      // AmigoNPC never starts an independent fight because only the companion was hit.
+      // Owner-driven combat (startCombat/startAssist) is the only combat context.
+      rec.npcCombatTargetRefObj = null;
+      rec.npcCombatUntilMillis = 0L;
+      debugger.log(rec, ownerId, "npc_attacked: no solo combat");
    }
 
    static void startAssist(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object targetRefObj, NpcCombatStateSupport.CombatDebugger debugger) {

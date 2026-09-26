@@ -111,18 +111,15 @@ final class NpcEntityQuerySupport {
       AmigoNpcManager.NpcRecord rec, Object store, long now, long assistGraceMillis, NpcEntityQuerySupport.StoreComponentGetter componentGetter
    ) {
       if (rec != null) {
-         if (!rec.defendeEnabled) {
+         if (rec.ownerCombatContextUntilMillis <= 0L || now > rec.ownerCombatContextUntilMillis) {
             rec.assistTargetRefObj = null;
             rec.assistUntilMillis = 0L;
-         } else if (rec.assistTargetRefObj != null) {
-            if (!isAliveEntityRef(store, rec.assistTargetRefObj, componentGetter)) {
-               rec.assistTargetRefObj = null;
-               rec.assistUntilMillis = now + assistGraceMillis;
-            }
-         } else {
-            if (rec.assistUntilMillis > 0L && now > rec.assistUntilMillis) {
-               rec.assistUntilMillis = 0L;
-            }
+            return;
+         }
+
+         if (rec.assistTargetRefObj != null && !isAliveEntityRef(store, rec.assistTargetRefObj, componentGetter)) {
+            rec.assistTargetRefObj = null;
+            rec.assistUntilMillis = Math.min(rec.ownerCombatContextUntilMillis, now + assistGraceMillis);
          }
       }
    }
