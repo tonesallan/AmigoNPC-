@@ -108,7 +108,10 @@ final class NpcCombatLootTargetSupport {
       NpcCombatLootTargetSupport.LootPickupHandler pickupHandler
    ) {
       if (store != null && ownerId != null && rec != null && bag != null && npcPos != null) {
-         if (rec.lootTargetRefObj instanceof Ref<EntityStore> itemRef) {
+         if (rec.lootTargetRefObj instanceof Ref<?> rawItemRef) {
+            @SuppressWarnings("unchecked")
+            Ref<EntityStore> itemRef = (Ref<EntityStore>)rawItemRef;
+
             try {
                TransformComponent itc = (TransformComponent)store.getComponent(itemRef, TransformComponent.getComponentType());
                if (itc == null || itc.getPosition() == null) {

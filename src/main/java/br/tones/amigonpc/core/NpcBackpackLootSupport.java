@@ -81,9 +81,11 @@ final class NpcBackpackLootSupport {
    ) {
       if (store == null || ownerId == null || rec == null || bag == null || itemRefObj == null) {
          return false;
-      } else if (!(itemRefObj instanceof Ref<EntityStore> itemRef)) {
+      } else if (!(itemRefObj instanceof Ref<?> rawItemRef)) {
          return false;
       } else {
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> itemRef = (Ref<EntityStore>)rawItemRef;
          ItemComponent ic;
          try {
             ic = (ItemComponent)store.getComponent(itemRef, ItemComponent.getComponentType());

@@ -134,9 +134,12 @@ final class NpcLootStateSupport {
    static boolean isItemRefValid(Store<EntityStore> store, Object refObj) {
       if (store == null || refObj == null) {
          return false;
-      } else if (!(refObj instanceof Ref<EntityStore> r)) {
+      } else if (!(refObj instanceof Ref<?> rawRef)) {
          return false;
       } else {
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> r = (Ref<EntityStore>)rawRef;
+
          try {
             TransformComponent tc = (TransformComponent)store.getComponent(r, TransformComponent.getComponentType());
             Object ic = store.getComponent(r, ItemComponent.getComponentType());

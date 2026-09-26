@@ -250,7 +250,9 @@ final class NpcDefenderTargetingSupport {
             rec.autoLootStickDeadRefObj = desiredTarget;
 
             try {
-               if (desiredTarget instanceof Ref<EntityStore> deadRef) {
+               if (desiredTarget instanceof Ref<?> rawDeadRef) {
+                  @SuppressWarnings("unchecked")
+                  Ref<EntityStore> deadRef = (Ref<EntityStore>)rawDeadRef;
                   TransformComponent deadT = (TransformComponent)store.getComponent(deadRef, TransformComponent.getComponentType());
                   if (deadT != null && deadT.getPosition() != null) {
                      rec.autoLootStickAnchorPos = deadT.getPosition();

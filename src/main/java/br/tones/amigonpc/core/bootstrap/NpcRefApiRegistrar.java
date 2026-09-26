@@ -89,7 +89,14 @@ public final class NpcRefApiRegistrar {
                   if (rec == null) {
                      return Optional.empty();
                   } else {
-                     return this.getRefObj(rec) instanceof Ref<EntityStore> ref ? Optional.of(ref) : Optional.empty();
+                     Object refObj = this.getRefObj(rec);
+                      if (!(refObj instanceof Ref<?> rawRef)) {
+                         return Optional.empty();
+                      }
+
+                      @SuppressWarnings("unchecked")
+                      Ref<EntityStore> ref = (Ref<EntityStore>)rawRef;
+                      return Optional.of(ref);
                   }
                } catch (Throwable ignored) {
                   return Optional.empty();

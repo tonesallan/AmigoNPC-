@@ -421,7 +421,10 @@ public final class AmigoNpcManager {
          AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
             rec.customName = normalizedName;
-            if (store != null && rec.refObj instanceof Ref<EntityStore> npcRef) {
+            if (store != null && rec.refObj instanceof Ref<?> rawNpcRef) {
+               @SuppressWarnings("unchecked")
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
+
                try {
                   NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
                } catch (Throwable var7) {
@@ -546,7 +549,10 @@ public final class AmigoNpcManager {
          AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
             rec.godMode = enabled;
-            if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref<EntityStore> npcRef) {
+            if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref<?> rawNpcRef) {
+               @SuppressWarnings("unchecked")
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
+
                try {
                   EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
                   if (stats != null) {
@@ -1207,7 +1213,9 @@ public final class AmigoNpcManager {
 
             try {
                try {
-                  if (rec.refObj instanceof Ref<EntityStore> npcRef) {
+                  if (rec.refObj instanceof Ref<?> rawNpcRef) {
+                     @SuppressWarnings("unchecked")
+                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
                      AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
                   }
                } catch (Throwable var9) {
@@ -1345,7 +1353,9 @@ public final class AmigoNpcManager {
                   }
 
                   try {
-                     if (rec.refObj instanceof Ref<EntityStore> npcRef) {
+                     if (rec.refObj instanceof Ref<?> rawNpcRef) {
+                        @SuppressWarnings("unchecked")
+                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
                         Store<EntityStore> store = (Store<EntityStore>)componentStore;
                         AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
                      }
@@ -3259,7 +3269,9 @@ public final class AmigoNpcManager {
                rec.autoLootStickDeadRefObj = targetRefObj;
 
                try {
-                  if (targetRefObj instanceof Ref<EntityStore> tgtRef3) {
+                  if (targetRefObj instanceof Ref<?> rawTargetRef) {
+                     @SuppressWarnings("unchecked")
+                     Ref<EntityStore> tgtRef3 = (Ref<EntityStore>)rawTargetRef;
                      TransformComponent tgtT3 = (TransformComponent)store.getComponent(tgtRef3, TransformComponent.getComponentType());
                      if (tgtT3 != null && tgtT3.getPosition() != null) {
                         rec.autoLootStickAnchorPos = tgtT3.getPosition();
@@ -3547,10 +3559,12 @@ public final class AmigoNpcManager {
             return;
          }
 
-         if (!(npcRefObj instanceof Ref) || !(rec.refObj instanceof Ref<EntityStore> npcRef)) {
+         if (!(npcRefObj instanceof Ref<?>) || !(rec.refObj instanceof Ref<?> rawNpcRef)) {
             return;
          }
 
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
          TransformComponent nt = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
          if (nt == null || nt.getPosition() == null) {
             return;
@@ -3721,10 +3735,12 @@ public final class AmigoNpcManager {
             return;
          }
 
-         if (!(npcRefObj instanceof Ref<EntityStore> npcRef)) {
+         if (!(npcRefObj instanceof Ref<?> rawNpcRef)) {
             return;
          }
 
+         @SuppressWarnings("unchecked")
+         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
          ActiveAnimationComponent anim = (ActiveAnimationComponent)store.getComponent(npcRef, ActiveAnimationComponent.getComponentType());
          if (anim == null) {
             return;

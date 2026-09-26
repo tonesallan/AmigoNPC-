@@ -108,9 +108,11 @@ final class NpcCombatExecutionSupport {
    private static void applySwordIfPossible(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, NpcCombatExecutionSupport.SwordApplier swordApplier) {
       if (store != null && rec != null && swordApplier != null) {
          try {
-            if (rec.refObj instanceof Ref<EntityStore> npcRef) {
-               swordApplier.apply(store, npcRef, rec.ownerId, rec, false);
-            }
+            if (rec.refObj instanceof Ref<?> rawNpcRef) {
+                @SuppressWarnings("unchecked")
+                Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
+                swordApplier.apply(store, npcRef, rec.ownerId, rec, false);
+             }
          } catch (Throwable var4) {
          }
       }
