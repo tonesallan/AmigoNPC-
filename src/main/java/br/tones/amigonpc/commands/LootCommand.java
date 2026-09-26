@@ -21,6 +21,7 @@ public final class LootCommand extends AbstractPlayerCommand {
 
    public LootCommand() {
       super("loot", AmigoText.text("cmd.desc.loot"));
+      this.requireNoPermission();
    }
 
    protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {

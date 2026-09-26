@@ -20,6 +20,7 @@ public final class AmigoDespawnSubCommand extends AbstractPlayerCommand {
 
    public AmigoDespawnSubCommand(AmigoService service) {
       super("despawn", AmigoText.text("cmd.desc.amigo.despawn"));
+      this.requireNoPermission();
       this.service = service;
       this.setAllowsExtraArguments(false);
    }
