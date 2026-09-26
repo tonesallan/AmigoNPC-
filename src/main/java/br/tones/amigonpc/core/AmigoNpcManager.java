@@ -3409,8 +3409,7 @@ public final class AmigoNpcManager {
             return;
          }
 
-         String bowIdCheck = rec.rangedBowItemId != null && !rec.rangedBowItemId.isBlank() ? rec.rangedBowItemId : resolveDefaultBowId();
-         if (bowIdCheck != null && !bowIdCheck.isBlank() && !NpcWeaponSupport.isHotbar0Item(store, npcRef, bowIdCheck)) {
+         if (!NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
             this.tryEquipDefaultBow(store, rec, now);
             return;
          }
@@ -3866,7 +3865,7 @@ public final class AmigoNpcManager {
 
    private void tryRetargetAfterKill(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object npcRefObj, Object deadRefObj, long now) {
       try {
-         if (store == null || rec == null || !rec.defendeEnabled) {
+         if (store == null || rec == null || rec.combatMode != CombatMode.WEAKEST_ENEMY) {
             return;
          }
 
