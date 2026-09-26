@@ -18,6 +18,7 @@ public final class AmigoPersistence {
    private static final String KEY_SWORD_LEVEL = "swordLevel";
    private static final String KEY_EQUIPPED_WEAPON_ID = "equippedWeaponId";
    private static final String KEY_DEFENDER_ENABLED = "defenderEnabled";
+   private static final String KEY_COMBAT_MODE = "combatMode";
    private static final String KEY_AUTOLOOT_ENABLED = "autoLootEnabled";
    private static final String KEY_HUD_ENABLED = "hudEnabled";
    private static final String KEY_GODMODE = "godMode";
@@ -126,6 +127,29 @@ public final class AmigoPersistence {
             AmigoPersistenceProfileSupport.saveSwordState(fileFor(ownerId), 4, "swordLevel", "equippedWeaponId", swordLevel, equippedWeaponId);
          } catch (IOException var4) {
          } catch (Throwable var5) {
+         }
+      }
+   }
+
+   public static CombatMode loadCombatMode(UUID ownerId) {
+      if (ownerId == null) {
+         return CombatMode.PROTECT_OWNER;
+      }
+
+      String saved = AmigoPersistenceProfileSupport.loadString(fileFor(ownerId), KEY_COMBAT_MODE);
+      if (saved != null && !saved.isBlank()) {
+         return CombatMode.fromString(saved);
+      }
+
+      return loadDefenderEnabled(ownerId) ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY;
+   }
+
+   public static void saveCombatMode(UUID ownerId, CombatMode mode) {
+      if (ownerId != null && mode != null) {
+         try {
+            AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), FORMAT_VERSION, KEY_COMBAT_MODE, mode.name());
+            saveDefenderEnabled(ownerId, mode == CombatMode.PROTECT_OWNER);
+         } catch (Throwable ignored) {
          }
       }
    }

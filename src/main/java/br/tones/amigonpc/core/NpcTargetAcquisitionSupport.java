@@ -12,9 +12,151 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
 final class NpcTargetAcquisitionSupport {
    private NpcTargetAcquisitionSupport() {
+   }
+
+   static Object findWeakestCombatTarget(
+      Store<EntityStore> store,
+      AmigoNpcManager.NpcRecord rec,
+      Object ownerRefObj,
+      Vector3d ownerPos,
+      boolean pvpEnabled,
+      double radius,
+      double maxDy,
+      double rangedAirMaxDy,
+      java.util.function.Predicate<Object> amigoRefPredicate
+   ) {
+      if (store == null || rec == null || ownerRefObj == null || ownerPos == null || !(ownerRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) {
+         return null;
+      }
+
+      long now = System.currentTimeMillis();
+      boolean ownerCombatContext = NpcCombatStateSupport.getActiveCombatTarget(rec, now) != null
+         || NpcCombatStateSupport.getActiveAssistTarget(rec, now) != null;
+      if (!ownerCombatContext) {
+         return null;
+      }
+
+      Ref<EntityStore> ownerRef = (Ref<EntityStore>)ownerRefObj;
+      Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+      NPCEntity companion = store.getComponent(npcRef, NPCEntity.getComponentType());
+      double r2 = radius * radius;
+      Object[] bestRef = new Object[1];
+      float[] bestHp = new float[]{Float.POSITIVE_INFINITY};
+      double[] bestD2 = new double[]{Double.POSITIVE_INFINITY};
+
+      try {
+         store.forEachChunk((chunk, cb) -> {
+            int size;
+            try {
+               size = chunk.size();
+            } catch (Throwable ignored) {
+               return;
+            }
+
+            for (int i = 0; i < size; i++) {
+               Ref<EntityStore> ref;
+               try {
+                  ref = chunk.getReferenceTo(i);
+               } catch (Throwable ignored) {
+                  continue;
+               }
+
+               if (ref == null || refEq(ref, ownerRef) || refEq(ref, npcRef)) {
+                  continue;
+               }
+
+               try {
+                  Player player = chunk.getComponent(i, Player.getComponentType());
+                  if (player != null) {
+                     continue;
+                  }
+               } catch (Throwable ignored) {
+               }
+
+               boolean otherAmigo = amigoRefPredicate != null && amigoRefPredicate.test(ref);
+               if (otherAmigo && !pvpEnabled) {
+                  continue;
+               }
+
+               try {
+                  DeathComponent death = chunk.getComponent(i, DeathComponent.getComponentType());
+                  if (death != null) {
+                     continue;
+                  }
+               } catch (Throwable ignored) {
+               }
+
+               TransformComponent transform;
+               EntityStatMap stats;
+               try {
+                  transform = chunk.getComponent(i, TransformComponent.getComponentType());
+                  stats = chunk.getComponent(i, EntityStatMap.getComponentType());
+               } catch (Throwable ignored) {
+                  continue;
+               }
+               if (transform == null || transform.getPosition() == null || stats == null) {
+                  continue;
+               }
+
+               Vector3d p = transform.getPosition();
+               double dy = Math.abs(p.y() - ownerPos.y());
+               if (dy > rangedAirMaxDy) {
+                  continue;
+               }
+               if (dy > maxDy) {
+                  try {
+                     MovementStatesComponent movement = chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                     MovementStates states = movement != null ? movement.getMovementStates() : null;
+                     if (states == null || states.onGround) {
+                        continue;
+                     }
+                  } catch (Throwable ignored) {
+                     continue;
+                  }
+               }
+
+               double dx = p.x() - ownerPos.x();
+               double dz = p.z() - ownerPos.z();
+               double d2 = dx * dx + dz * dz;
+               if (d2 > r2) {
+                  continue;
+               }
+
+               float hp;
+               try {
+                  EntityStatValue value = stats.get(DefaultEntityStatTypes.getHealth());
+                  hp = value == null ? Float.POSITIVE_INFINITY : value.get();
+                  if (hp <= 0.0F || !Float.isFinite(hp)) {
+                     continue;
+                  }
+               } catch (Throwable ignored) {
+                  continue;
+               }
+
+               if (!otherAmigo && companion != null && companion.getRole() != null) {
+                  try {
+                     if (companion.getRole().isFriendly(ref, store)) {
+                        continue;
+                     }
+                  } catch (Throwable ignored) {
+                  }
+               }
+
+               if (hp < bestHp[0] || hp == bestHp[0] && d2 < bestD2[0]) {
+                  bestHp[0] = hp;
+                  bestD2[0] = d2;
+                  bestRef[0] = ref;
+               }
+            }
+         });
+      } catch (Throwable ignored) {
+      }
+
+      return bestRef[0];
    }
 
    static Object findNearestDefenderTarget(

@@ -47,7 +47,7 @@ final class NpcFollowCombatSupport {
       if (store != null && rec != null) {
          if (lootStickActiveNow) {
             holdLootStick(store, rec, lockedTargetCloseSlot, componentGetter, markedTargetSetter, lockedTargetSetter);
-         } else if (!rec.defendeEnabled) {
+         } else if (rec.combatMode == CombatMode.PROTECT_OWNER) {
             runNonDefender(
                store,
                rec,

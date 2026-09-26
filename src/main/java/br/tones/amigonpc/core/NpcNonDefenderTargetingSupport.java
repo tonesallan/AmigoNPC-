@@ -41,9 +41,16 @@ final class NpcNonDefenderTargetingSupport {
             npcCombatTarget = null;
          }
 
-         rec.assistUntilMillis = 0L;
-         rec.assistTargetRefObj = null;
-         Object desiredTarget = combatTarget != null ? combatTarget : (npcCombatTarget != null ? npcCombatTarget : ownerRefObj);
+         Object assistTarget = NpcCombatStateSupport.getActiveAssistTarget(rec, now);
+         if (assistTarget != null && !aliveChecker.isAlive(store, assistTarget)) {
+            rec.assistUntilMillis = 0L;
+            rec.assistTargetRefObj = null;
+            assistTarget = null;
+         }
+
+         // PROTECT_OWNER only joins the owner's combat. An attacker of the NPC alone
+         // does not make the companion start an independent fight.
+         Object desiredTarget = combatTarget != null ? combatTarget : (assistTarget != null ? assistTarget : ownerRefObj);
          if (desiredTarget != null && !refEq(desiredTarget, ownerRefObj) && horizontal > chaseMaxDistance) {
             rec.combatUntilMillis = 0L;
             rec.combatTargetRefObj = null;

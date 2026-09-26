@@ -362,26 +362,37 @@ public final class AmigoNpcManager {
       }
    }
 
-   public boolean isDefendeEnabled(UUID owner) {
+   public CombatMode getCombatMode(UUID owner) {
       if (owner == null) {
-         return false;
+         return CombatMode.PROTECT_OWNER;
       }
 
       AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
-      return rec != null ? rec.defendeEnabled : AmigoPersistence.loadDefenderEnabled(owner);
+      return rec != null ? rec.combatMode : AmigoPersistence.loadCombatMode(owner);
+   }
+
+   public void setCombatMode(UUID owner, CombatMode mode) {
+      if (owner == null || mode == null) {
+         return;
+      }
+
+      AmigoPersistence.saveCombatMode(owner, mode);
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+      if (rec != null) {
+         rec.combatMode = mode;
+         rec.defendeEnabled = mode == CombatMode.PROTECT_OWNER;
+         rec.chaseDisengaged = false;
+         rec.targetLostSinceMillis = 0L;
+         rec.targetStuckSinceMillis = 0L;
+      }
+   }
+
+   public boolean isDefendeEnabled(UUID owner) {
+      return getCombatMode(owner) == CombatMode.PROTECT_OWNER;
    }
 
    public void setDefendeEnabled(UUID owner, boolean enabled) {
-      if (owner != null) {
-         AmigoPersistence.saveDefenderEnabled(owner, enabled);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
-         if (rec != null) {
-            rec.defendeEnabled = enabled;
-            if (!enabled) {
-               this.clearAssist(rec);
-            }
-         }
-      }
+      setCombatMode(owner, enabled ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY);
    }
 
    public boolean isAutoLootEnabled(UUID ownerId) {
@@ -2128,7 +2139,9 @@ public final class AmigoNpcManager {
    }
 
    private Object findNearestDefenderTarget(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d ownerPos) {
-      return NpcTargetAcquisitionSupport.findNearestDefenderTarget(store, rec, ownerRefObj, ownerPos, this.pvpEnabled, 12.0, 2.5, 35.0);
+      return NpcTargetAcquisitionSupport.findWeakestCombatTarget(
+         store, rec, ownerRefObj, ownerPos, this.pvpEnabled, 12.0, 2.5, 35.0, this::isAmigoRef
+      );
    }
 
    private Object findNearestTargetNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Object excludeRefObj) {

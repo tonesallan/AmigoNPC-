@@ -93,29 +93,17 @@ final class NpcCombatStateSupport {
 
    static void startAssist(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object targetRefObj, NpcCombatStateSupport.CombatDebugger debugger) {
       if (ownerId != null && targetRefObj != null) {
-         if (rec != null) {
-            if (rec.defendeEnabled) {
-               if (!rec.downed) {
-                  if (rec.refObj != null) {
-                     if (targetRefObj != rec.refObj) {
-                        long now = System.currentTimeMillis();
-                        if (getActiveCombatTarget(rec, now) == null) {
-                           if (rec.assistTargetRefObj == null) {
-                              rec.assistTargetRefObj = targetRefObj;
-                              rec.assistUntilMillis = 0L;
+         if (rec != null && !rec.downed && rec.refObj != null && targetRefObj != rec.refObj) {
+            long now = System.currentTimeMillis();
+            rec.assistTargetRefObj = targetRefObj;
+            rec.assistUntilMillis = now + 3000L;
 
-                              try {
-                                 ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=assist");
-                              } catch (Throwable var7) {
-                              }
-
-                              debugger.log(rec, ownerId, "startAssist: targetRef=" + targetRefObj);
-                           }
-                        }
-                     }
-                  }
-               }
+            try {
+               ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=owner_attack");
+            } catch (Throwable ignored) {
             }
+
+            debugger.log(rec, ownerId, "startAssist: targetRef=" + targetRefObj);
          }
       }
    }
