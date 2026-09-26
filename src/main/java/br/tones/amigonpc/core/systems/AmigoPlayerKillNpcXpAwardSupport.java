@@ -75,12 +75,16 @@ final class AmigoPlayerKillNpcXpAwardSupport {
       return new NpcXpContext(worldName, worldName, null, 0, mobId, mobLevel, System.currentTimeMillis());
    }
 
-   static void awardXp(UUID ownerId, long xpGain, NpcXpContext ctx) {
-      if (ownerId != null && xpGain > 0L && ctx != null) {
-         try {
-            AmigoNPCApi.addNpcXp(ownerId, xpGain, NpcXpSource.COMBAT_ASSIST, ctx);
-         } catch (Throwable var5) {
-         }
+   static boolean awardXp(UUID ownerId, long xpGain, NpcXpSource source, NpcXpContext ctx) {
+      if (ownerId == null || xpGain <= 0L || ctx == null) {
+         return false;
+      }
+
+      try {
+         NpcXpSource resolvedSource = source != null ? source : NpcXpSource.COMBAT_ASSIST;
+         return AmigoNPCApi.addNpcXp(ownerId, xpGain, resolvedSource, ctx);
+      } catch (Throwable ignored) {
+         return false;
       }
    }
 }
