@@ -61,6 +61,7 @@ public final class ManualReviveService {
       InteractionState state = chain.state;
       if (state == InteractionState.NotFinished) {
          attempt.lastSignalMillis = now;
+         attempt.holdConfirmed = true;
       } else if (state == InteractionState.Finished
          || state == InteractionState.Failed
          || state == InteractionState.Skip
