@@ -17,20 +17,19 @@ final class AmigoPersistenceProgressionSupport {
    }
 
    static void saveNpcProgress(Path file, int formatVersion, String totalXpKey, String baseHpKey, String baseDefKey, long totalXp, long baseHp, long baseDef) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      if (totalXp >= 0L) {
-         AmigoPersistenceDocSupport.putLongCompat(doc, totalXpKey, totalXp);
-      }
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         if (totalXp >= 0L) {
+            AmigoPersistenceDocSupport.putLongCompat(doc, totalXpKey, totalXp);
+         }
 
-      if (baseHp >= 0L) {
-         AmigoPersistenceDocSupport.putLongCompat(doc, baseHpKey, baseHp);
-      }
+         if (baseHp >= 0L) {
+            AmigoPersistenceDocSupport.putLongCompat(doc, baseHpKey, baseHp);
+         }
 
-      if (baseDef >= 0L) {
-         AmigoPersistenceDocSupport.putLongCompat(doc, baseDefKey, baseDef);
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+         if (baseDef >= 0L) {
+            AmigoPersistenceDocSupport.putLongCompat(doc, baseDefKey, baseDef);
+         }
+      });
    }
 
    static BsonDocument loadDocumentSection(Path file, String key) {
@@ -42,13 +41,12 @@ final class AmigoPersistenceProgressionSupport {
    }
 
    static void saveDocumentSection(Path file, int formatVersion, String key, BsonDocument sectionDoc) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      if (sectionDoc != null && !sectionDoc.isEmpty()) {
-         doc.put(key, sectionDoc);
-      } else {
-         doc.remove(key);
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         if (sectionDoc != null && !sectionDoc.isEmpty()) {
+            doc.put(key, sectionDoc);
+         } else {
+            doc.remove(key);
+         }
+      });
    }
 }

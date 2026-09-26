@@ -4,6 +4,8 @@ import com.hypixel.hytale.server.core.util.BsonUtil;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.bson.BsonDateTime;
 import org.bson.BsonDocument;
 import org.bson.BsonDouble;
@@ -12,7 +14,29 @@ import org.bson.BsonInt64;
 import org.bson.BsonValue;
 
 final class AmigoPersistenceDocSupport {
+   private static final ConcurrentMap<Path, Object> FILE_LOCKS = new ConcurrentHashMap<>();
+
    private AmigoPersistenceDocSupport() {
+   }
+
+   static void updateDocument(Path file, int formatVersion, DocumentUpdater updater) throws IOException {
+      if (file == null || updater == null) {
+         return;
+      }
+
+      Path key = file.toAbsolutePath().normalize();
+      Object lock = FILE_LOCKS.computeIfAbsent(key, ignored -> new Object());
+      synchronized (lock) {
+         Files.createDirectories(file.getParent());
+         BsonDocument doc = Files.exists(file) ? BsonUtil.readDocumentNow(file) : null;
+         if (doc == null) {
+            doc = new BsonDocument();
+         }
+
+         touchDocument(doc, formatVersion);
+         updater.update(doc);
+         BsonUtil.writeDocument(file, doc, true).join();
+      }
    }
 
    static BsonDocument loadDocumentSafely(Path file) {
@@ -145,6 +169,11 @@ final class AmigoPersistenceDocSupport {
       } else {
          return defaultValue;
       }
+   }
+
+   @FunctionalInterface
+   interface DocumentUpdater {
+      void update(BsonDocument doc);
    }
 
    static BsonDocument getDocument(BsonDocument doc, String key) {

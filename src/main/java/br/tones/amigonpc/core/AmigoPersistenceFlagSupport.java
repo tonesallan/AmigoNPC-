@@ -18,8 +18,8 @@ final class AmigoPersistenceFlagSupport {
    }
 
    static void saveFlag(Path file, int formatVersion, String key, boolean enabled) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      doc.put(key, new BsonInt32(enabled ? 1 : 0));
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(
+         file, formatVersion, doc -> doc.put(key, new BsonInt32(enabled ? 1 : 0))
+      );
    }
 }

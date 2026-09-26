@@ -30,8 +30,10 @@ final class AmigoPersistenceBackpackSupport {
    }
 
    static void saveBackpack(Path file, int formatVersion, SimpleItemContainer backpack) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      doc.put("backpack", SimpleItemContainer.CODEC.encode(backpack, new ExtraInfo()));
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(
+         file,
+         formatVersion,
+         doc -> doc.put("backpack", SimpleItemContainer.CODEC.encode(backpack, new ExtraInfo()))
+      );
    }
 }

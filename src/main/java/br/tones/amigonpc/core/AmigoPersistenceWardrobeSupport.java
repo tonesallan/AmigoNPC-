@@ -44,24 +44,23 @@ final class AmigoPersistenceWardrobeSupport {
    }
 
    static void saveWardrobeState(Path file, int formatVersion, UUID ownerId, BsonDocument wardrobeDoc, String wardrobeStateKey) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      if (wardrobeDoc != null && !wardrobeDoc.isEmpty()) {
-         BsonValue existing = doc.get(ownerId.toString());
-         BsonDocument entry;
-         if (existing != null && existing.isDocument()) {
-            entry = existing.asDocument();
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         if (wardrobeDoc != null && !wardrobeDoc.isEmpty()) {
+            BsonValue existing = doc.get(ownerId.toString());
+            BsonDocument entry;
+            if (existing != null && existing.isDocument()) {
+               entry = existing.asDocument();
+            } else {
+               entry = new BsonDocument();
+            }
+
+            AmigoPersistenceDocSupport.touchDocument(entry, formatVersion);
+            entry.put(wardrobeStateKey, wardrobeDoc);
+            doc.put(ownerId.toString(), entry);
          } else {
-            entry = new BsonDocument();
+            doc.remove(ownerId.toString());
          }
-
-         AmigoPersistenceDocSupport.touchDocument(entry, formatVersion);
-         entry.put(wardrobeStateKey, wardrobeDoc);
-         doc.put(ownerId.toString(), entry);
-      } else {
-         doc.remove(ownerId.toString());
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      });
    }
 
    private static boolean looksLikeWardrobeStateDoc(BsonDocument doc) {

@@ -36,38 +36,35 @@ final class AmigoPersistenceProfileSupport {
    }
 
    static void saveModel(Path file, int formatVersion, String modelIdKey, String modelScaleKey, String modelId, double scale) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      if (modelId != null && !modelId.isBlank()) {
-         doc.put(modelIdKey, new BsonString(modelId));
-         doc.put(modelScaleKey, new BsonDouble(scale));
-      } else {
-         doc.remove(modelIdKey);
-         doc.remove(modelScaleKey);
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         if (modelId != null && !modelId.isBlank()) {
+            doc.put(modelIdKey, new BsonString(modelId));
+            doc.put(modelScaleKey, new BsonDouble(scale));
+         } else {
+            doc.remove(modelIdKey);
+            doc.remove(modelScaleKey);
+         }
+      });
    }
 
    static void saveOptionalString(Path file, int formatVersion, String key, String value) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      if (value != null && !value.isBlank()) {
-         doc.put(key, new BsonString(value));
-      } else {
-         doc.remove(key);
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         if (value != null && !value.isBlank()) {
+            doc.put(key, new BsonString(value));
+         } else {
+            doc.remove(key);
+         }
+      });
    }
 
    static void saveSwordState(Path file, int formatVersion, String swordLevelKey, String equippedWeaponKey, int swordLevel, String equippedWeaponId) throws IOException {
-      BsonDocument doc = AmigoPersistenceDocSupport.prepareWritableDocument(file, formatVersion);
-      doc.put(swordLevelKey, new BsonInt32(Math.max(1, swordLevel)));
-      if (equippedWeaponId != null && !equippedWeaponId.isBlank()) {
-         doc.put(equippedWeaponKey, new BsonString(equippedWeaponId));
-      } else {
-         doc.remove(equippedWeaponKey);
-      }
-
-      AmigoPersistenceDocSupport.writeDocument(file, doc);
+      AmigoPersistenceDocSupport.updateDocument(file, formatVersion, doc -> {
+         doc.put(swordLevelKey, new BsonInt32(Math.max(1, swordLevel)));
+         if (equippedWeaponId != null && !equippedWeaponId.isBlank()) {
+            doc.put(equippedWeaponKey, new BsonString(equippedWeaponId));
+         } else {
+            doc.remove(equippedWeaponKey);
+         }
+      });
    }
 }
