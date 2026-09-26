@@ -1685,6 +1685,54 @@ public final class AmigoNpcManager {
       return rec != null && rec.downed;
    }
 
+   public String getNpcDisplayName(UUID ownerId) {
+      if (ownerId == null) {
+         return "AmigoNPC";
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      String name = rec != null ? rec.customName : null;
+      if (name == null || name.isBlank()) {
+         try {
+            name = AmigoPersistence.loadCustomName(ownerId);
+         } catch (Throwable ignored) {
+         }
+      }
+
+      return name == null || name.isBlank() ? "AmigoNPC" : name;
+   }
+
+   public String getActivityStateName(UUID ownerId) {
+      if (ownerId == null) {
+         return "INACTIVE";
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec == null) {
+         return "INACTIVE";
+      }
+
+      if (rec.downed) {
+         return "DOWNED";
+      }
+
+      if (rec.refObj == null || rec.state != AmigoNpcManager.State.ACTIVE) {
+         return "INACTIVE";
+      }
+
+      return rec.activityState == null ? "IDLE" : rec.activityState.name();
+   }
+
+   public float getCachedHealth(UUID ownerId) {
+      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      return rec == null ? 0.0F : Math.max(0.0F, rec.cachedHealth);
+   }
+
+   public float getCachedMaxHealth(UUID ownerId) {
+      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      return rec == null ? 0.0F : Math.max(0.0F, rec.cachedMaxHealth);
+   }
+
    public boolean hasRecentCombatParticipation(UUID ownerId, Object targetRefObj, long now) {
       if (ownerId == null || targetRefObj == null) {
          return false;
@@ -1715,6 +1763,7 @@ public final class AmigoNpcManager {
          if (!rec.downed) {
             rec.downed = true;
             rec.activityState = CompanionActivityState.DOWNED;
+            rec.cachedHealth = 0.0F;
             long now = System.currentTimeMillis();
             rec.downedUntilMillis = now + DOWNED_AUTO_REVIVE_MILLIS;
 
@@ -2711,9 +2760,13 @@ public final class AmigoNpcManager {
                         if (st != null) {
                            try {
                               EntityStatValue hp = st.get(DefaultEntityStatTypes.getHealth());
-                              if (hp != null && hp.get() <= 0.0F) {
-                                 this.markDowned(owner);
-                                 return;
+                              if (hp != null) {
+                                 rec.cachedHealth = Math.max(0.0F, hp.get());
+                                 rec.cachedMaxHealth = Math.max(0.0F, hp.getMax());
+                                 if (hp.get() <= 0.0F) {
+                                    this.markDowned(owner);
+                                    return;
+                                 }
                               }
                            } catch (Throwable var26) {
                            }
@@ -2921,6 +2974,14 @@ public final class AmigoNpcManager {
             EntityStatMap stats = store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
             this.applyNpcScaling(store, ref, ownerId, rec, true);
             stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+            try {
+               EntityStatValue hp = stats.get(DefaultEntityStatTypes.getHealth());
+               if (hp != null) {
+                  rec.cachedHealth = Math.max(0.0F, hp.get());
+                  rec.cachedMaxHealth = Math.max(0.0F, hp.getMax());
+               }
+            } catch (Throwable ignored) {
+            }
             store.putComponent(ref, EntityStatMap.getComponentType(), stats);
             store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
             MovementStatesComponent movement = store.ensureAndGetComponent(ref, MovementStatesComponent.getComponentType());
@@ -5070,6 +5131,8 @@ public final class AmigoNpcManager {
       volatile boolean autoWeaponSwitchEnabled = true;
       volatile boolean interruptAttacksEnabled = true;
       volatile boolean autoLootEnabled = true;
+      volatile float cachedHealth;
+      volatile float cachedMaxHealth;
       volatile CompanionActivityState activityState = CompanionActivityState.FOLLOWING;
       volatile long nextGatherScanMillis;
       volatile int gatherTargetX = Integer.MIN_VALUE;

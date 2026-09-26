@@ -22,9 +22,23 @@ final class AmigoLvlGuiSettingsPlayerRenderSupport {
       } catch (Throwable var15) {
       }
 
+      String activityState = mgr.getActivityStateName(ownerId);
+      String activityText = switch (activityState) {
+         case "DOWNED" -> AmigoText.text("ui.status.downed");
+         case "COMBAT" -> AmigoText.text("ui.status.combat");
+         case "GATHERING" -> AmigoText.text("ui.status.gathering");
+         case "FOLLOWING" -> AmigoText.text("ui.status.following");
+         case "IDLE" -> AmigoText.text("ui.status.idle");
+         default -> AmigoText.text("ui.status.inactive");
+      };
+      String runtimeStatus = mgr.getNpcDisplayName(ownerId)
+         + " | " + activityText
+         + " | " + Math.round(mgr.getCachedHealth(ownerId))
+         + "/" + Math.round(mgr.getCachedMaxHealth(ownerId))
+         + " HP";
       cmd.set(
          "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsNpcStatus.Text",
-         AmigoText.format("ui.settings.status.npc", AmigoText.text(hasNpc ? "ui.settings.status.npc.active" : "ui.settings.status.npc.inactive"))
+         runtimeStatus
       );
       cmd.set(
          "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPendingStatus.Text",

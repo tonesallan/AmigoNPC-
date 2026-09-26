@@ -57,7 +57,16 @@ public final class AmigoText {
       Map.entry("ui.settings.feedback.combat_protect_pending", "Modo de combate: proteger o jogador (pendente)"),
       Map.entry("ui.settings.feedback.combat_weakest_pending", "Modo de combate: inimigo com menos vida (pendente)"),
       Map.entry("ui.settings.feedback.auto_weapon_pending", "Troca automática de arma: {0} (pendente)"),
-      Map.entry("ui.settings.feedback.interrupt_pending", "Interromper ataques inimigos: {0} (pendente)")
+      Map.entry("ui.settings.feedback.interrupt_pending", "Interromper ataques inimigos: {0} (pendente)"),
+      Map.entry("ui.header.npc_name", "NPC: {0}"),
+      Map.entry("ui.header.status", "Status: {0}"),
+      Map.entry("ui.header.health", "Vida: {0} / {1}"),
+      Map.entry("ui.status.inactive", "Inativo"),
+      Map.entry("ui.status.downed", "Caído"),
+      Map.entry("ui.status.combat", "Combate"),
+      Map.entry("ui.status.gathering", "Coletando"),
+      Map.entry("ui.status.following", "Seguindo"),
+      Map.entry("ui.status.idle", "Parado")
    );
    private static volatile String currentLocale = "pt_br";
 

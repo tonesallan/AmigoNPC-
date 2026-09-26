@@ -55,8 +55,8 @@ Group #RpgLvlLeaderboardPage {
         TextColor: #ffffff,
         RenderBold: true
       );
-      Anchor: (Width: 220);
-      Text: "NPC: Inativo";
+      Anchor: (Width: 430);
+      Text: "AmigoNPC | Inativo | 0/0 HP";
       Padding: (Right: 10);
     }
 

@@ -20,6 +20,42 @@ Group #PlayerHeader {
     Padding: (Left: 18);
     FlexWeight: 1;
 
+    Label #PlayerHeaderNameLabel {
+      Style: (
+        FontSize: 18,
+        TextColor: #ffffff,
+        RenderBold: true
+      );
+      Anchor: ();
+      Text: "NPC: AmigoNPC";
+      Padding: (Bottom: 2);
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 20);
+
+      Label #PlayerHeaderStatusLabel {
+        Style: (
+          FontSize: 13,
+          TextColor: #b0b8c0,
+          RenderBold: true
+        );
+        Anchor: (Width: 220);
+        Text: "Status: Seguindo";
+      }
+
+      Label #PlayerHeaderHealthLabel {
+        Style: (
+          FontSize: 13,
+          TextColor: #b0b8c0,
+          RenderBold: true
+        );
+        Anchor: (Width: 220);
+        Text: "Vida: 0 / 0";
+      }
+    }
+
     Label #PlayerHeaderLevelLabel {
       Style: (
         FontSize: 20,
