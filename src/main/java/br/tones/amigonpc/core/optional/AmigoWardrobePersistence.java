@@ -108,9 +108,15 @@ public final class AmigoWardrobePersistence {
                         return false;
                      } else {
                         AmigoWardrobeModelSupport.forceWardrobeVisualRefresh(wardrobe);
-                        AmigoWardrobeModelSupport.putOrSetComponent(store, npcRef, wardrobeComponentType, wardrobe);
-                        AmigoWardrobeModelSupport.tryApplyWardrobeModelTo(store, ownerRef, npcRef, wardrobe);
-                        return true;
+                        if (!AmigoWardrobeModelSupport.putOrSetComponent(store, npcRef, wardrobeComponentType, wardrobe)) {
+                           return false;
+                        }
+
+                        if (ownerRef == null) {
+                           return true;
+                        }
+
+                        return AmigoWardrobeModelSupport.tryApplyWardrobeModelTo(store, ownerRef, npcRef, wardrobe);
                      }
                   }
                }
