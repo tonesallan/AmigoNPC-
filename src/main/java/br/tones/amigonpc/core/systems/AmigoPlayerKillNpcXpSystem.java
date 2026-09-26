@@ -52,32 +52,37 @@ public final class AmigoPlayerKillNpcXpSystem extends DamageEventSystem {
                if (AmigoPlayerKillNpcXpSupport.isDeadTarget(store, targetRef, damage)) {
                   Ref<EntityStore> attackerRef = AmigoPlayerKillNpcXpSupport.extractAttackerRef(damage.getSource());
                   if (attackerRef != null) {
+                     UUID ownerId = null;
                      if (AmigoPlayerKillNpcXpSupport.isPlayerRef(store, attackerRef)) {
-                        UUID ownerId = AmigoPlayerKillNpcXpSupport.resolveOwnerId(store, attackerRef);
-                        if (ownerId != null) {
-                           if (AmigoPlayerKillNpcXpAwardSupport.isNpcActive(manager, ownerId)) {
-                              long now = System.currentTimeMillis();
-                              if (!manager.hasRecentCombatParticipation(ownerId, targetRef, now)) {
-                                 return;
-                              }
-
-                              AmigoPlayerKillNpcXpSupport.scheduleSecondScan(manager, store, ownerId, targetRef, attackerRef);
-                              String mobId = AmigoPlayerKillNpcXpSupport.resolveMobId(store, targetRef);
-                              if (mobId != null) {
-                                 if (AmigoPlayerKillNpcXpSupport.shouldSkipRecentKill(RECENT_KILLS, mobId, now, 1500L, 5000)) {
-                                    return;
-                                 }
-                              }
-
-                              int npcLevel = AmigoPlayerKillNpcXpAwardSupport.resolveNpcLevel(manager, ownerId);
-                              int mobLevel = AmigoPlayerKillNpcXpAwardSupport.resolveMobLevel(store, targetRef, STAGE1_MOB_CALC, STAGE1_CFG);
-                              double xpD = AmigoPlayerKillNpcXpAwardSupport.resolveXpFromKill(npcLevel, mobLevel, STAGE1_CFG);
-                              long xpGain = AmigoPlayerKillNpcXpSupport.coerceStage1XpGainToLong(STAGE1_REMAINDER, ownerId, xpD, 5000);
-                              if (xpGain > 0L) {
-                                 NpcXpContext ctx = AmigoPlayerKillNpcXpAwardSupport.buildKillContext(store, mobId, mobLevel);
-                                 AmigoPlayerKillNpcXpAwardSupport.awardXp(ownerId, xpGain, ctx);
-                              }
+                        ownerId = AmigoPlayerKillNpcXpSupport.resolveOwnerId(store, attackerRef);
+                     } else {
+                        try {
+                           if (manager.isAmigoRef(attackerRef)) {
+                              ownerId = manager.getOwnerFromRef(attackerRef);
                            }
+                        } catch (Throwable ignored) {
+                        }
+                     }
+
+                     if (ownerId != null && AmigoPlayerKillNpcXpAwardSupport.isNpcActive(manager, ownerId)) {
+                        long now = System.currentTimeMillis();
+                        if (!manager.hasRecentCombatParticipation(ownerId, targetRef, now)) {
+                           return;
+                        }
+
+                        AmigoPlayerKillNpcXpSupport.scheduleSecondScan(manager, store, ownerId, targetRef, attackerRef);
+                        String mobId = AmigoPlayerKillNpcXpSupport.resolveMobId(store, targetRef);
+                        if (mobId != null && AmigoPlayerKillNpcXpSupport.shouldSkipRecentKill(RECENT_KILLS, mobId, now, 1500L, 5000)) {
+                           return;
+                        }
+
+                        int npcLevel = AmigoPlayerKillNpcXpAwardSupport.resolveNpcLevel(manager, ownerId);
+                        int mobLevel = AmigoPlayerKillNpcXpAwardSupport.resolveMobLevel(store, targetRef, STAGE1_MOB_CALC, STAGE1_CFG);
+                        double xpD = AmigoPlayerKillNpcXpAwardSupport.resolveXpFromKill(npcLevel, mobLevel, STAGE1_CFG);
+                        long xpGain = AmigoPlayerKillNpcXpSupport.coerceStage1XpGainToLong(STAGE1_REMAINDER, ownerId, xpD, 5000);
+                        if (xpGain > 0L) {
+                           NpcXpContext ctx = AmigoPlayerKillNpcXpAwardSupport.buildKillContext(store, mobId, mobLevel);
+                           AmigoPlayerKillNpcXpAwardSupport.awardXp(ownerId, xpGain, ctx);
                         }
                      }
                   }
