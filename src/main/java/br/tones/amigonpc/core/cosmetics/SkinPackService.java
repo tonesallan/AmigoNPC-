@@ -1,5 +1,6 @@
 package br.tones.amigonpc.core.cosmetics;
 
+import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
@@ -102,7 +103,7 @@ public final class SkinPackService {
             return;
          }
 
-         module.registerPack(packId, zip, manifest, true);
+         module.registerPack(packId, zip, manifest, AssetPack.PackSource.MODS);
          if (module.getAssetPack(packId) != null) {
             this.registeredPackIds.add(packId);
          }
