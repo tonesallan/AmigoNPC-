@@ -21,7 +21,7 @@ public final class TeleportRespawnCoordinator {
    public void register() {
       EventRegistry registry = this.eventRegistrySupplier.get();
       if (registry != null) {
-         registry.register(AddPlayerToWorldEvent.class, this::onAddedToWorld);
+         registry.registerGlobal(AddPlayerToWorldEvent.class, this::onAddedToWorld);
       }
    }
 
