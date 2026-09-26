@@ -51,16 +51,16 @@ public final class AmigoUiActions {
 
             switch (actionId.toLowerCase()) {
                case "spawn":
-                  boolean ok = MANAGER.spawn(world, ownerId);
-                  if (!ok) {
+                  boolean spawnOk = MANAGER.spawn(world, ownerId);
+                  if (!spawnOk) {
                      setError(AmigoText.format("ui.legacy.actions.error.spawn_failed", MANAGER.getLastError()));
                      return false;
                   }
 
                   return true;
                case "despawn":
-                  boolean ok = MANAGER.despawn(world, ownerId);
-                  if (!ok) {
+                  boolean despawnOk = MANAGER.despawn(world, ownerId);
+                  if (!despawnOk) {
                      setError(AmigoText.format("ui.legacy.actions.error.despawn_failed", MANAGER.getLastError()));
                      return false;
                   }

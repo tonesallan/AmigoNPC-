@@ -251,7 +251,22 @@ public final class HytaleBridge {
    private static Object getEnumConstant(String enumClassName, String constantName) {
       try {
          Class<?> enumClass = Class.forName(enumClassName);
-         return !enumClass.isEnum() ? null : Enum.valueOf(enumClass, constantName);
+         if (!enumClass.isEnum()) {
+            return null;
+         }
+
+         Object[] constants = enumClass.getEnumConstants();
+         if (constants == null) {
+            return null;
+         }
+
+         for (Object constant : constants) {
+            if (constant instanceof Enum<?> enumValue && enumValue.name().equals(constantName)) {
+               return constant;
+            }
+         }
+
+         return null;
       } catch (Throwable ignored) {
          return null;
       }
