@@ -37,7 +37,7 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.entity.AnimationUtils;
-import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -1571,12 +1571,13 @@ private static final int LOOT_PENDING_MAX = 512;
     /** Lê o itemId do slot 0 da hotbar (ou null). */
     private String getHotbar0ItemId(Store<EntityStore> store, Ref<EntityStore> npcRef) {
         try {
-            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-            if (npc == null) return null;
-            Inventory inv = npc.getInventory();
-            if (inv == null) return null;
-            ItemContainer hotbar = inv.getHotbar();
+            InventoryComponent.Hotbar hotbarComponent =
+                    store.getComponent(npcRef, InventoryComponent.Hotbar.getComponentType());
+            if (hotbarComponent == null) return null;
+
+            ItemContainer hotbar = hotbarComponent.getInventory();
             if (hotbar == null) return null;
+
             ItemStack st = hotbar.getItemStack((short) 0);
             if (st == null || st.isEmpty()) return null;
             return st.getItemId();
@@ -1592,50 +1593,38 @@ private static final int LOOT_PENDING_MAX = 512;
     }
 
     /**
-     * Define a arma no slot 0 da hotbar e marca como ativa.
-     *
-     * Nota: alguns builds só mostram o item na mão quando:
-     * - o Inventory está associado à entidade (inv.setEntity)
-     * - usandoToolsItem = false (senão ele mostra tool-slot)
+     * Define a arma no slot 0 da hotbar usando os componentes ECS atuais.
      */
     private boolean equipWeaponInHotbar0(Store<EntityStore> store, Ref<EntityStore> npcRef, String itemId) {
         try {
-            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-            if (npc == null) return false;
+            InventoryComponent.Hotbar hotbarComponent =
+                    store.getComponent(npcRef, InventoryComponent.Hotbar.getComponentType());
 
-            Inventory inv = npc.getInventory();
-            if (inv == null) inv = new Inventory();
-
-            // importante para o item aparecer na mão
-            try { inv.setEntity(npc); } catch (Throwable ignored) {}
-            try { inv.setUsingToolsItem(false); } catch (Throwable ignored) {}
-
-            ItemContainer hotbar = inv.getHotbar();
-            if (hotbar == null) {
-                // fallback: inventário novo
-                inv = new Inventory();
-                try { inv.setEntity(npc); } catch (Throwable ignored) {}
-                try { inv.setUsingToolsItem(false); } catch (Throwable ignored) {}
-                hotbar = inv.getHotbar();
-                if (hotbar == null) return false;
+            if (hotbarComponent == null) {
+                hotbarComponent = new InventoryComponent.Hotbar();
+                store.putComponent(npcRef, InventoryComponent.Hotbar.getComponentType(), hotbarComponent);
             }
+
+            InventoryComponent.Tool toolComponent =
+                    store.getComponent(npcRef, InventoryComponent.Tool.getComponentType());
+            if (toolComponent != null) {
+                toolComponent.setUsingToolsItem(false);
+                toolComponent.markDirty();
+            }
+
+            ItemContainer hotbar = hotbarComponent.getInventory();
+            if (hotbar == null) return false;
 
             hotbar.setItemStackForSlot((short) 0, new ItemStack(itemId, 1));
 
-            // valida se o item existe (alguns ids inválidos viram stack vazio)
-            try {
-                ItemStack st = hotbar.getItemStack((short) 0);
-                if (st == null || st.isEmpty()) {
-                    return false;
-                }
-            } catch (Throwable ignored) {}
+            ItemStack st = hotbar.getItemStack((short) 0);
+            if (st == null || st.isEmpty()) {
+                return false;
+            }
 
-            inv.setActiveHotbarSlot((byte) 0);
-            inv.markChanged();
-
-            // garante broadcast de equipamento
-            npc.setInventory(inv);
-            npc.invalidateEquipmentNetwork();
+            hotbarComponent.setActiveSlot((byte) 0, npcRef, store);
+            hotbarComponent.markDirty();
+            hotbarComponent.setOutdatedEquipment(true);
             return true;
 
         } catch (Throwable ignored) {
