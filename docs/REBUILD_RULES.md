@@ -37,7 +37,8 @@ O mecanismo oficial de referência é `PluginManager.reload(PluginIdentifier)`.
 
 ## Compatibilidade
 
-- Java 21.
+- Java 25 para a build Release atual do servidor.
+- A versão de Java deve acompanhar o bytecode do `HytaleServer.jar` da build alvo.
 - Preferir API pública e tipada da Hytale.
 - Reflection apenas para integrações opcionais/compatibilidade justificada.
 - A build deve receber o caminho do HytaleServer.jar por `HYTALE_SERVER_JAR` quando disponível.
