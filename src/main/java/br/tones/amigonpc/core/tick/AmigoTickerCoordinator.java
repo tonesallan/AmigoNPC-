@@ -2,6 +2,7 @@ package br.tones.amigonpc.core.tick;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.debug.ErrorDumpService;
+import br.tones.amigonpc.core.downed.ManualReviveService;
 import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -59,6 +60,7 @@ public final class AmigoTickerCoordinator {
          this.followTicker = this.scheduler.scheduleAtFixedRate(() -> {
             try {
                AmigoNpcManager.getShared().tickFollow();
+               ManualReviveService.getShared().tick();
             } catch (Throwable var3) {
                Throwable t = var3;
 

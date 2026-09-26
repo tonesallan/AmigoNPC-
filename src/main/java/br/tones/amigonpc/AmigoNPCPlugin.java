@@ -9,6 +9,7 @@ import br.tones.amigonpc.core.bootstrap.AmigoRuntimeBootstrap;
 import br.tones.amigonpc.core.bootstrap.AmigoSystemRegistrar;
 import br.tones.amigonpc.core.bootstrap.NpcRefApiRegistrar;
 import br.tones.amigonpc.core.lifecycle.HudLifecycleCoordinator;
+import br.tones.amigonpc.core.lifecycle.ManualReviveCoordinator;
 import br.tones.amigonpc.core.lifecycle.PlayerSessionCoordinator;
 import br.tones.amigonpc.core.lifecycle.TeleportRespawnCoordinator;
 import br.tones.amigonpc.core.tick.AmigoTickerCoordinator;
@@ -22,6 +23,7 @@ public final class AmigoNPCPlugin extends JavaPlugin {
    private AmigoService service;
    private final AmigoTickerCoordinator tickerCoordinator = new AmigoTickerCoordinator();
    private final HudLifecycleCoordinator hudLifecycleCoordinator = new HudLifecycleCoordinator(this::getEventRegistry);
+   private final ManualReviveCoordinator manualReviveCoordinator = new ManualReviveCoordinator(this::getEventRegistry);
    private final PlayerSessionCoordinator playerSessionCoordinator = new PlayerSessionCoordinator(this::getEventRegistry);
    private final TeleportRespawnCoordinator teleportRespawnCoordinator = new TeleportRespawnCoordinator(this::getEventRegistry);
    private final AmigoRuntimeBootstrap runtimeBootstrap = new AmigoRuntimeBootstrap();
@@ -42,10 +44,12 @@ public final class AmigoNPCPlugin extends JavaPlugin {
       this.tickerCoordinator.startFollowTicker();
       this.teleportRespawnCoordinator.register();
       this.hudLifecycleCoordinator.register();
+      this.manualReviveCoordinator.register();
       this.tickerCoordinator.startHudTicker();
    }
 
    protected void shutdown() {
+      this.manualReviveCoordinator.shutdown();
       this.npcRefApiRegistrar.unregister();
       this.tickerCoordinator.shutdown();
 
