@@ -1,6 +1,6 @@
 package br.tones.amigonpc.core.debug;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.lang.reflect.Method;
 import java.util.List;
 

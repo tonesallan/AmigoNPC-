@@ -9,7 +9,7 @@ import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
@@ -197,13 +197,13 @@ final class NpcAutoLootSupport {
 
                         Vector3d pos = tc.getPosition();
                         if (pos != null) {
-                           double ldx = pos.getX() - lootCenterPos.getX();
-                           double ldz = pos.getZ() - lootCenterPos.getZ();
-                           double ldy = Math.abs(pos.getY() - lootCenterPos.getY());
+                           double ldx = pos.x() - lootCenterPos.x();
+                           double ldz = pos.z() - lootCenterPos.z();
+                           double ldy = Math.abs(pos.y() - lootCenterPos.y());
                            if (!(ldx * ldx + ldz * ldz > radiusSq) && !(ldy > maxDy)) {
                               if (ownerPos != null) {
-                                 double odx = pos.getX() - ownerPos.getX();
-                                 double odz = pos.getZ() - ownerPos.getZ();
+                                 double odx = pos.x() - ownerPos.x();
+                                 double odz = pos.z() - ownerPos.z();
                                  if (odx * odx + odz * odz > ownerRadiusSq) {
                                     continue;
                                  }

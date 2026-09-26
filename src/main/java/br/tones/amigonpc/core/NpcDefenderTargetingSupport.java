@@ -2,7 +2,7 @@ package br.tones.amigonpc.core;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
@@ -140,9 +140,9 @@ final class NpcDefenderTargetingSupport {
                   if (npcT != null && tgtT != null && npcT.getPosition() != null && tgtT.getPosition() != null) {
                      Vector3d np2 = npcT.getPosition();
                      Vector3d tp2 = tgtT.getPosition();
-                     double dx2 = tp2.getX() - np2.getX();
-                     double dz2 = tp2.getZ() - np2.getZ();
-                     double dy2 = tp2.getY() - np2.getY();
+                     double dx2 = tp2.x() - np2.x();
+                     double dz2 = tp2.z() - np2.z();
+                     double dy2 = tp2.y() - np2.y();
                      double h2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
                      double ady2 = Math.abs(dy2);
                      boolean airborne = false;
@@ -160,7 +160,7 @@ final class NpcDefenderTargetingSupport {
                            double len = Math.sqrt(dx2 * dx2 + dz2 * dz2);
                            double nx = len > 0.001 ? -dx2 / len : 1.0;
                            double nz = len > 0.001 ? -dz2 / len : 0.0;
-                           Vector3d npos = new Vector3d(np2.getX() + nx * 0.8, np2.getY(), np2.getZ() + nz * 0.8);
+                           Vector3d npos = new Vector3d(np2.x() + nx * 0.8, np2.y(), np2.z() + nz * 0.8);
                            npcT.teleportPosition(npos);
                            rec.lastCombatNudgeMillis = now;
                         } catch (Throwable var58) {

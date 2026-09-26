@@ -34,7 +34,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.protocol.ItemAnimation;
@@ -2175,9 +2175,9 @@ public final class AmigoNpcManager {
    }
 
    private static double distSq(Vector3d a, Vector3d b) {
-      double dx = a.getX() - b.getX();
-      double dy = a.getY() - b.getY();
-      double dz = a.getZ() - b.getZ();
+      double dx = a.x() - b.x();
+      double dy = a.y() - b.y();
+      double dz = a.z() - b.z();
       return dx * dx + dy * dy + dz * dz;
    }
 
@@ -2883,7 +2883,7 @@ public final class AmigoNpcManager {
             TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
             if (tgtT != null && tgtT.getPosition() != null) {
                Vector3d tp = tgtT.getPosition();
-               double dy = tp.getY() - npcPos.getY();
+               double dy = tp.y() - npcPos.y();
                double dyAbs = Math.abs(dy);
                MovementStatesComponent ms = (MovementStatesComponent)store.getComponent(targetRef, MovementStatesComponent.getComponentType());
                if (ms != null) {
@@ -2929,10 +2929,10 @@ public final class AmigoNpcManager {
             if (np != null && tp != null) {
                double npcH = Math.max(1.2, getEntityHeight(store, npcRef));
                double tgtH = Math.max(0.6, getEntityHeight(store, targetRef));
-               double eyeY = np.getY() + npcH * 0.85;
-               double aimY = tp.getY() + tgtH * 0.55;
-               double dx = tp.getX() - np.getX();
-               double dz = tp.getZ() - np.getZ();
+               double eyeY = np.y() + npcH * 0.85;
+               double aimY = tp.y() + tgtH * 0.55;
+               double dx = tp.x() - np.x();
+               double dz = tp.z() - np.z();
                double dy = aimY - eyeY;
                double h = Math.sqrt(dx * dx + dz * dz);
                if (!(h < 1.0E-4)) {
@@ -3114,9 +3114,9 @@ public final class AmigoNpcManager {
             return;
          }
 
-         double dx = tp.getX() - np.getX();
-         double dz = tp.getZ() - np.getZ();
-         double dy = tp.getY() - np.getY();
+         double dx = tp.x() - np.x();
+         double dz = tp.z() - np.z();
+         double dy = tp.y() - np.y();
          double dyAbs = Math.abs(dy);
          double horizontal = Math.sqrt(dx * dx + dz * dz);
          if (horizontal > 20.0) {
@@ -3350,9 +3350,9 @@ public final class AmigoNpcManager {
             return;
          }
 
-         double dx = tp.getX() - np.getX();
-         double dz = tp.getZ() - np.getZ();
-         double dy = tp.getY() - np.getY();
+         double dx = tp.x() - np.x();
+         double dz = tp.z() - np.z();
+         double dy = tp.y() - np.y();
          double horizontal = Math.sqrt(dx * dx + dz * dz);
          double targetHeight = getEntityHeight(store, targetRef);
          boolean tallTarget = targetHeight >= 1.9;
@@ -4253,9 +4253,9 @@ public final class AmigoNpcManager {
             return false;
          }
 
-         int x = (int)Math.floor(ownerPos.getX());
-         int z = (int)Math.floor(ownerPos.getZ());
-         int y = (int)Math.floor(ownerPos.getY());
+         int x = (int)Math.floor(ownerPos.x());
+         int z = (int)Math.floor(ownerPos.z());
+         int y = (int)Math.floor(ownerPos.y());
          int startY = y + 2;
 
          for (int i = 0; i < 12; i++) {
@@ -4321,7 +4321,7 @@ public final class AmigoNpcManager {
             return;
          }
 
-         SoundUtil.playSoundEvent3d(idx, SoundCategory.SFX, pos.getX(), pos.getY(), pos.getZ(), dbToGain(volumeDb), stToPitch(pitchSt), store);
+         SoundUtil.playSoundEvent3d(idx, SoundCategory.SFX, pos.x(), pos.y(), pos.z(), dbToGain(volumeDb), stToPitch(pitchSt), store);
       } catch (Throwable var6) {
       }
    }
@@ -4431,7 +4431,7 @@ public final class AmigoNpcManager {
 
    private static Object newVector3d(double x, double y, double z) {
       String[] candidates = new String[]{
-         "com.hypixel.hytale.math.vector.Vector3d",
+         "org.joml.Vector3d",
          "com.hypixel.hytale.math.Vector3d",
          "com.hypixel.hytale.util.math.Vector3d",
          "com.hypixel.hytale.protocol.util.Vector3d",

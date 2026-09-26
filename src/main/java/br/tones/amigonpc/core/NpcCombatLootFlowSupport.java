@@ -1,7 +1,7 @@
 package br.tones.amigonpc.core;
 
 import br.tones.amigonpc.core.debug.ActionTraceService;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.util.UUID;
 
 final class NpcCombatLootFlowSupport {
@@ -131,9 +131,9 @@ final class NpcCombatLootFlowSupport {
 
    private static double dist2(Vector3d a, Vector3d b) {
       if (a != null && b != null) {
-         double dx = a.getX() - b.getX();
-         double dy = a.getY() - b.getY();
-         double dz = a.getZ() - b.getZ();
+         double dx = a.x() - b.x();
+         double dy = a.y() - b.y();
+         double dz = a.z() - b.z();
          return dx * dx + dy * dy + dz * dz;
       } else {
          return Double.POSITIVE_INFINITY;

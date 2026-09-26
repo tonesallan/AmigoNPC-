@@ -4,7 +4,7 @@ import br.tones.amigonpc.core.autoloot.AutoLootConfig;
 import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -116,10 +116,10 @@ final class NpcCombatLootTargetSupport {
                }
 
                Vector3d ip = itc.getPosition();
-               double dx = ip.getX() - npcPos.getX();
-               double dz = ip.getZ() - npcPos.getZ();
+               double dx = ip.x() - npcPos.x();
+               double dz = ip.z() - npcPos.z();
                double h2 = dx * dx + dz * dz;
-               double dy = Math.abs(ip.getY() - npcPos.getY());
+               double dy = Math.abs(ip.y() - npcPos.y());
                double lootMaxDy = 10.0;
 
                try {
