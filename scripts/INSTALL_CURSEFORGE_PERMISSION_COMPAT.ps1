@@ -2,7 +2,6 @@ $ErrorActionPreference = "Stop"
 
 $repo = "C:\Users\TONES\Documents\AmigoNPC"
 $branch = "recovery/amigonpc-2.0.1-curseforge-exact"
-$expectedHead = "a836ff5db1a60e000cfa4d0a75acfe82402e4107"
 $baselineSha = "31B3515FD5897F2D81818030EC9692B485B0850DEE0E452B1804D5630328ED17"
 
 $modsDir = Join-Path $env:APPDATA "Hytale\UserData\Mods"
@@ -22,9 +21,8 @@ git switch $branch
 git pull --ff-only origin $branch
 
 $head = (git rev-parse HEAD).Trim()
-if ($head -ne $expectedHead) {
-    throw "HEAD inesperado. Atual: $head | Esperado: $expectedHead"
-}
+Write-Host "Branch: $branch"
+Write-Host "HEAD:   $head"
 
 if (-not (Test-Path -LiteralPath $baselineInstalled)) {
     throw "AmigoNPC original nao esta instalado: $baselineInstalled"
