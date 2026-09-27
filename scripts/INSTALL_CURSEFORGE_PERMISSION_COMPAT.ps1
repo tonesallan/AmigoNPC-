@@ -6,7 +6,7 @@ $baselineSha = "31B3515FD5897F2D81818030EC9692B485B0850DEE0E452B1804D5630328ED17
 
 $modsDir = Join-Path $env:APPDATA "Hytale\UserData\Mods"
 $baselineInstalled = Join-Path $modsDir "AmigoNPC-2.0.1.jar"
-$compatBuilt = Join-Path $repo "build\libs\AmigoNPC-PermissionCompat-1.0.0.jar"
+$compatBuilt = Join-Path $repo "build\libs\AmigoNPC-PermissionCompat-1.0.1.jar"
 $compatInstalled = Join-Path $modsDir "AmigoNPC-PermissionCompat-1.0.0.jar"
 
 Set-Location $repo
@@ -47,6 +47,11 @@ if (-not (Test-Path -LiteralPath $compatBuilt)) {
 }
 
 New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
+
+# Remove a versao anterior para evitar dois plugins com o mesmo identificador.
+if (Test-Path -LiteralPath $oldCompatInstalled) {
+    Remove-Item -LiteralPath $oldCompatInstalled -Force
+}
 
 # Instala a correcao de permissao na pasta Mods.
 Copy-Item -LiteralPath $compatBuilt -Destination $compatInstalled -Force
