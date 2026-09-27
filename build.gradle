@@ -166,64 +166,54 @@ tasks.register("replicaCurseForge") {
 
 
 sourceSets {
-    curseForgePermissionCompat {
-        java.srcDir "compat/curseforge-permissions/src/main/java"
-        resources.srcDir "compat/curseforge-permissions/src/main/resources"
+    curseForgeCommandAccessCompat {
+        java.srcDir "compat/curseforge-command-access/src/main/java"
     }
 }
 
 dependencies {
-    def compatServerJarPath = System.getenv("HYTALE_SERVER_JAR") ?: "C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar"
-    curseForgePermissionCompatCompileOnly files(compatServerJarPath)
+    def commandCompatServerJarPath = System.getenv("HYTALE_SERVER_JAR") ?: "C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar"
+    curseForgeCommandAccessCompatCompileOnly files(commandCompatServerJarPath)
 }
-
-tasks.register("curseForgePermissionCompatJar", Jar) {
-    dependsOn("curseForgePermissionCompatClasses")
-    from(sourceSets.curseForgePermissionCompat.output)
-    archiveBaseName.set("AmigoNPC-PermissionCompat")
-    archiveVersion.set("1.0.1")
-    destinationDirectory.set(layout.buildDirectory.dir("libs"))
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
 
 def curseForgeSingleJarOutput = layout.buildDirectory.file("libs/AmigoNPC-2.0.1.jar")
-def curseForgeMergedManifest = file("compat/curseforge-permissions/src/merged/manifest.json")
 
 tasks.register("curseForgeSingleJar", Zip) {
-    dependsOn("verifyCurseForgeBaseline", "curseForgePermissionCompatClasses")
+    dependsOn("verifyCurseForgeBaseline", "curseForgeCommandAccessCompatClasses")
 
     archiveFileName.set("AmigoNPC-2.0.1.jar")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
+    // Preserve every byte/resource from the original JAR except the one legacy
+    // compatibility helper that must be adapted to Update 6.
     from(zipTree(curseForgeBaselineJar)) {
-        exclude("manifest.json")
+        exclude("br/tones/amigonpc/commands/CommandAccess.class")
     }
 
-    from(sourceSets.curseForgePermissionCompat.output.classesDirs)
-
-    from(curseForgeMergedManifest) {
-        rename { "manifest.json" }
-    }
+    // Overlay only the corrected CommandAccess.class under the original package/name.
+    from(sourceSets.curseForgeCommandAccessCompat.output.classesDirs)
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     doLast {
         def output = curseForgeSingleJarOutput.get().asFile
         if (!output.exists()) {
-            throw new GradleException("Patched single AmigoNPC JAR was not created: " + output)
+            throw new GradleException("Corrected AmigoNPC JAR was not created: " + output)
         }
 
         def zip = new java.util.zip.ZipFile(output)
         try {
             if (zip.getEntry("br/tones/amigonpc/AmigoNPCPlugin.class") == null) {
-                throw new GradleException("Original AmigoNPC main class is missing from patched JAR")
+                throw new GradleException("Original AmigoNPC main class is missing")
             }
-            if (zip.getEntry("br/tones/amigonpc/compat/AmigoNPCPermissionCompatPlugin.class") == null) {
-                throw new GradleException("Permission compatibility subplugin is missing from patched JAR")
+            if (zip.getEntry("br/tones/amigonpc/commands/CommandAccess.class") == null) {
+                throw new GradleException("Corrected CommandAccess.class is missing")
+            }
+            if (zip.getEntry("br/tones/amigonpc/compat/AmigoNPCPermissionCompatPlugin.class") != null) {
+                throw new GradleException("Obsolete PermissionCompat subplugin must not be packaged")
             }
             if (zip.getEntry("manifest.json") == null) {
-                throw new GradleException("manifest.json is missing from patched JAR")
+                throw new GradleException("Original manifest.json is missing")
             }
         } finally {
             zip.close()
