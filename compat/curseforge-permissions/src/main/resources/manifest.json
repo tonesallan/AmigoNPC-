@@ -1,7 +1,7 @@
 {
   "Group": "br.tones",
   "Name": "AmigoNPCPermissionCompat",
-  "Version": "1.0.0",
+  "Version": "1.0.1",
   "Description": "Compatibility shim that restores public AmigoNPC player commands on current Hytale builds.",
   "Authors": [
     {
