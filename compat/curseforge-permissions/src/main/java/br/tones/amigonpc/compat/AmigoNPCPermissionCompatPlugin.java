@@ -32,7 +32,15 @@ public final class AmigoNPCPermissionCompatPlugin extends JavaPlugin {
     }
 
     @Override
+    protected void setup() {
+        // Apply before command registration is finalized so current Hytale
+        // does not bake an implicit permission into these legacy commands.
+        patchPublicCommands();
+    }
+
+    @Override
     protected void start() {
+        // Safety pass for load-order differences between Hytale builds.
         patchPublicCommands();
     }
 
@@ -65,8 +73,21 @@ public final class AmigoNPCPermissionCompatPlugin extends JavaPlugin {
     }
 
     private static void clearPermission(AbstractCommand command) {
-        Class<?> type = command.getClass();
+        // Current Hytale explicitly requires requireNoPermission() for public commands.
+        // Use reflection so this compatibility shim can still compile against older
+        // server API snapshots that did not expose the method yet.
+        try {
+            command.getClass().getMethod("requireNoPermission").invoke(command);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fall back to the legacy field approach below.
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException(
+                "Could not invoke requireNoPermission for " + command.getName(), ex
+            );
+        }
 
+        Class<?> type = command.getClass();
         while (type != null) {
             try {
                 Field field = type.getDeclaredField("permission");
@@ -76,10 +97,14 @@ public final class AmigoNPCPermissionCompatPlugin extends JavaPlugin {
             } catch (NoSuchFieldException ignored) {
                 type = type.getSuperclass();
             } catch (ReflectiveOperationException ex) {
-                throw new IllegalStateException("Could not clear command permission for " + command.getName(), ex);
+                throw new IllegalStateException(
+                    "Could not clear legacy command permission for " + command.getName(), ex
+                );
             }
         }
 
-        throw new IllegalStateException("AbstractCommand permission field was not found for " + command.getName());
+        throw new IllegalStateException(
+            "No supported public-command permission mechanism found for " + command.getName()
+        );
     }
 }
