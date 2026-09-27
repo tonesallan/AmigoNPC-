@@ -2,7 +2,6 @@ package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoService;
 import br.tones.amigonpc.core.debug.ActionTraceService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.ui.lvlgui.AmigoLvlGuiService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -17,18 +16,23 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * CurseForge 2.0.1 AmigoCommand with only the current-Hytale sender bridge fixed.
- * Gameplay/UI routing is intentionally preserved.
+ * AmigoNPC CurseForge 2.0.1 command reconstructed from the exact baseline JAR.
+ *
+ * Compatibility delta only:
+ * - public command declaration for current Hytale
+ * - CommandContext player sender is now PlayerRef instead of Player
  */
 public final class AmigoCommand extends AbstractCommand {
+
     protected boolean canGeneratePermission() {
         return false;
     }
 
     public AmigoCommand(AmigoService service) {
-        super("amigo", AmigoText.text("cmd.desc.amigo"));
+        super("amigo", "Comandos do AmigoNPC");
 
-        // Current Hytale replacement for the legacy canGeneratePermission=false behavior.
+        // Current Hytale replacement for legacy canGeneratePermission() == false.
+        // Must happen before registration/subcommand completion.
         this.requireNoPermission();
 
         this.setAllowsExtraArguments(true);
@@ -54,20 +58,25 @@ public final class AmigoCommand extends AbstractCommand {
             String in = ctx.getInputString();
             if (in != null) {
                 in = in.trim();
+
                 if (in.startsWith("/")) {
                     in = in.substring(1);
                 }
 
                 if (!in.isBlank()) {
                     String[] parts = in.split("\\s+");
+
                     if (parts.length > 1 && "amigo".equalsIgnoreCase(parts[0])) {
                         String sub = parts[1].toLowerCase();
+
                         if (!"ui".equals(sub)
                                 && !"ui2".equals(sub)
                                 && !"lvl".equals(sub)
                                 && !"lvlup".equals(sub)
                                 && !"lvldown".equals(sub)) {
-                            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.unknown_subcommand")));
+                            ctx.sendMessage(Message.raw(
+                                    "§c[AmigoNPC] Subcomando desconhecido. Use apenas §f/amigo§c ou um subcomando válido."
+                            ));
                             return CompletableFuture.completedFuture(null);
                         }
 
@@ -78,48 +87,97 @@ public final class AmigoCommand extends AbstractCommand {
         } catch (Throwable ignored) {
         }
 
-        // Old 2.0.1 checked: ctx.sender() instanceof Player.
-        // Current Hytale exposes the command sender as PlayerRef.
+        /*
+         * Original 2.0.1:
+         *   CommandSender sender = ctx.sender();
+         *   if (!(sender instanceof Player)) -> "Este comando é apenas para players."
+         *
+         * Current Hytale:
+         *   player commands are sent by PlayerRef.
+         */
         Ref<EntityStore> ref = ctx.senderAsPlayerRef();
+
         if (ref == null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.only_players")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando é apenas para players."));
             return CompletableFuture.completedFuture(null);
         }
 
         if (!ref.isValid()) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados do player indisponíveis (Ref inválida)."));
             return CompletableFuture.completedFuture(null);
         }
 
         try {
-            ActionTraceService.getShared().record(ctx.sender().getUuid(), "command", "/amigo");
+            ActionTraceService.getShared().record(
+                    ctx.sender().getUuid(),
+                    "command",
+                    "/amigo"
+            );
         } catch (Throwable ignored) {
         }
 
         Store<EntityStore> store = ref.getStore();
-        World world;
+        Player player;
 
         try {
-            world = store.getExternalData().getWorld();
+            player = store.getComponent(ref, Player.getComponentType());
         } catch (Throwable ignored) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
+            player = null;
+        }
+
+        if (player == null) {
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados do player indisponíveis (Ref inválida)."));
             return CompletableFuture.completedFuture(null);
         }
 
-        return CompletableFuture.runAsync(() -> {
+        World world = null;
+
+        try {
+            Object externalData = store.getExternalData();
+            if (externalData instanceof EntityStore entityStore) {
+                world = entityStore.getWorld();
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (world == null) {
             try {
                 PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-                Player player = store.getComponent(ref, Player.getComponentType());
 
-                if (playerRef == null || player == null) {
-                    ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
-                    return;
+                if (playerRef != null) {
+                    AmigoLvlGuiService.getShared().toggle(
+                            player,
+                            ref,
+                            store,
+                            playerRef
+                    );
                 }
-
-                AmigoLvlGuiService.getShared().toggle(player, ref, store, playerRef);
             } catch (Throwable ignored) {
-                ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.invalid_player_ref")));
             }
-        }, world);
+
+            return CompletableFuture.completedFuture(null);
+        }
+
+        World executor = world;
+        Player finalPlayer = player;
+
+        return CompletableFuture.runAsync(() -> {
+            try {
+                PlayerRef playerRef = store.getComponent(
+                        ref,
+                        PlayerRef.getComponentType()
+                );
+
+                if (playerRef != null) {
+                    AmigoLvlGuiService.getShared().toggle(
+                            finalPlayer,
+                            ref,
+                            store,
+                            playerRef
+                    );
+                }
+            } catch (Throwable ignored) {
+            }
+        }, executor);
     }
 }
