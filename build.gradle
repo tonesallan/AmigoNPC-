@@ -91,3 +91,75 @@ jar {
         )
     }
 }
+
+
+/*
+ * CurseForge 2.0.1 exact baseline.
+ *
+ * This task does NOT rebuild the mod from recovered sources. It first establishes
+ * an immutable byte-for-byte runtime baseline from the JAR supplied by the author.
+ * Recovered source parity is validated against this artifact before new features
+ * are introduced.
+ */
+def curseForgeBaselineJar = file("reference/AmigoNPC-2.0.1-CurseForge.jar")
+def curseForgeBaselineSha256 = "31B3515FD5897F2D81818030EC9692B485B0850DEE0E452B1804D5630328ED17"
+def curseForgeReplicaOutput = layout.buildDirectory.file("libs/AmigoNPC-2.0.1-curseforge-replica.jar")
+
+def sha256File = { File input ->
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    input.withInputStream { stream ->
+        byte[] buffer = new byte[64 * 1024]
+        int read
+        while ((read = stream.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().collect { String.format("%02X", it & 0xff) }.join()
+}
+
+tasks.register("verifyCurseForgeBaseline") {
+    doLast {
+        if (!curseForgeBaselineJar.exists()) {
+            throw new GradleException(
+                "Missing CurseForge baseline JAR: " + curseForgeBaselineJar +
+                ". Place the supplied AmigoNPC-2.0.1.jar there before running this task."
+            )
+        }
+
+        def actual = sha256File(curseForgeBaselineJar)
+        if (actual != curseForgeBaselineSha256) {
+            throw new GradleException(
+                "Wrong CurseForge baseline JAR. Expected SHA-256 " +
+                curseForgeBaselineSha256 + ", got " + actual
+            )
+        }
+
+        println "CurseForge baseline verified: " + actual
+    }
+}
+
+tasks.register("replicaCurseForge") {
+    dependsOn("verifyCurseForgeBaseline")
+
+    doLast {
+        def output = curseForgeReplicaOutput.get().asFile
+        output.parentFile.mkdirs()
+
+        java.nio.file.Files.copy(
+            curseForgeBaselineJar.toPath(),
+            output.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+
+        def actual = sha256File(output)
+        if (actual != curseForgeBaselineSha256) {
+            throw new GradleException(
+                "Replica checksum mismatch. Expected " +
+                curseForgeBaselineSha256 + ", got " + actual
+            )
+        }
+
+        println "Exact CurseForge replica: " + output
+        println "SHA-256: " + actual
+    }
+}
