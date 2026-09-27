@@ -1,0 +1,27 @@
+{
+  "Group": "br.tones",
+  "Name": "AmigoNPC",
+  "Version": "2.0.1",
+  "Description": "AmigoNPC-v2.0.1",
+  "Authors": [
+    {
+      "Name": "Tones Allan de Oliveira Alves",
+      "Email": "",
+      "Url": ""
+    }
+  ],
+  "Website": "",
+  "ServerVersion": "2026.02.17-255364b8e",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "LoadBefore": {},
+  "DisabledByDefault": false,
+  "IncludesAssetPack": true,
+  "SubPlugins": [
+    {
+      "Name": "PermissionCompat",
+      "Main": "br.tones.amigonpc.compat.AmigoNPCPermissionCompatPlugin"
+    }
+  ],
+  "Main": "br.tones.amigonpc.AmigoNPCPlugin"
+}
