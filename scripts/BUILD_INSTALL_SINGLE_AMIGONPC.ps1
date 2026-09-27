@@ -8,7 +8,8 @@ $reference = Join-Path $repo "reference\AmigoNPC-2.0.1-CurseForge.jar"
 $built = Join-Path $repo "build\libs\AmigoNPC-2.0.1.jar"
 $mods = Join-Path $env:APPDATA "Hytale\UserData\Mods"
 $target = Join-Path $mods "AmigoNPC-2.0.1.jar"
-$oldCompat = Join-Path $mods "AmigoNPC-PermissionCompat-1.0.1.jar"
+$oldCompat10 = Join-Path $mods "AmigoNPC-PermissionCompat-1.0.0.jar"
+$oldCompat11 = Join-Path $mods "AmigoNPC-PermissionCompat-1.0.1.jar"
 $backupDir = Join-Path $env:APPDATA "Hytale\UserData\AmigoNPC_Jar_Backups"
 
 Set-Location $repo
@@ -55,8 +56,10 @@ if (Test-Path -LiteralPath $target) {
     Write-Host "Backup: $backup"
 }
 
-if (Test-Path -LiteralPath $oldCompat) {
-    Remove-Item -LiteralPath $oldCompat -Force
+foreach ($oldCompat in @($oldCompat10, $oldCompat11)) {
+    if (Test-Path -LiteralPath $oldCompat) {
+        Remove-Item -LiteralPath $oldCompat -Force
+    }
 }
 
 Write-Host ""
