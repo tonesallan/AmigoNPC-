@@ -181,7 +181,7 @@ tasks.register("curseForgePermissionCompatJar", Jar) {
     dependsOn("curseForgePermissionCompatClasses")
     from(sourceSets.curseForgePermissionCompat.output)
     archiveBaseName.set("AmigoNPC-PermissionCompat")
-    archiveVersion.set("1.0.0")
+    archiveVersion.set("1.0.1")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
