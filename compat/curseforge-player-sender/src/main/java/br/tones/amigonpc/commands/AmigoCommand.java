@@ -117,67 +117,50 @@ public final class AmigoCommand extends AbstractCommand {
         }
 
         Store<EntityStore> store = ref.getStore();
-        Player player;
+        World world;
 
         try {
-            player = store.getComponent(ref, Player.getComponentType());
+            world = store.getExternalData().getWorld();
         } catch (Throwable ignored) {
-            player = null;
-        }
-
-        if (player == null) {
-            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados do player indisponíveis (Ref inválida)."));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Mundo do player indisponível."));
             return CompletableFuture.completedFuture(null);
         }
 
-        World world = null;
-
-        try {
-            Object externalData = store.getExternalData();
-            if (externalData instanceof EntityStore entityStore) {
-                world = entityStore.getWorld();
-            }
-        } catch (Throwable ignored) {
-        }
-
-        if (world == null) {
-            try {
-                PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-
-                if (playerRef != null) {
-                    AmigoLvlGuiService.getShared().toggle(
-                            player,
-                            ref,
-                            store,
-                            playerRef
-                    );
-                }
-            } catch (Throwable ignored) {
-            }
-
-            return CompletableFuture.completedFuture(null);
-        }
-
-        World executor = world;
-        Player finalPlayer = player;
-
+        /*
+         * Current Hytale ECS rule:
+         * component access must happen on the world's execution thread.
+         * AbstractPlayerCommand follows this exact order as well.
+         */
         return CompletableFuture.runAsync(() -> {
+            if (!ref.isValid()) {
+                ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados do player indisponíveis (Ref inválida)."));
+                return;
+            }
+
             try {
                 PlayerRef playerRef = store.getComponent(
                         ref,
                         PlayerRef.getComponentType()
                 );
+                Player player = store.getComponent(
+                        ref,
+                        Player.getComponentType()
+                );
 
-                if (playerRef != null) {
-                    AmigoLvlGuiService.getShared().toggle(
-                            finalPlayer,
-                            ref,
-                            store,
-                            playerRef
-                    );
+                if (playerRef == null || player == null) {
+                    ctx.sendMessage(Message.raw("§c[AmigoNPC] Componentes do player indisponíveis."));
+                    return;
                 }
-            } catch (Throwable ignored) {
+
+                AmigoLvlGuiService.getShared().toggle(
+                        player,
+                        ref,
+                        store,
+                        playerRef
+                );
+            } catch (Throwable ex) {
+                ctx.sendMessage(Message.raw("§c[AmigoNPC] Não foi possível abrir o menu."));
             }
-        }, executor);
+        }, world);
     }
 }
