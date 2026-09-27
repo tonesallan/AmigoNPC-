@@ -163,3 +163,25 @@ tasks.register("replicaCurseForge") {
         println "SHA-256: " + actual
     }
 }
+
+
+sourceSets {
+    curseForgePermissionCompat {
+        java.srcDir "compat/curseforge-permissions/src/main/java"
+        resources.srcDir "compat/curseforge-permissions/src/main/resources"
+    }
+}
+
+dependencies {
+    def compatServerJarPath = System.getenv("HYTALE_SERVER_JAR") ?: "C:/Users/tones/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar"
+    curseForgePermissionCompatCompileOnly files(compatServerJarPath)
+}
+
+tasks.register("curseForgePermissionCompatJar", Jar) {
+    dependsOn("curseForgePermissionCompatClasses")
+    from(sourceSets.curseForgePermissionCompat.output)
+    archiveBaseName.set("AmigoNPC-PermissionCompat")
+    archiveVersion.set("1.0.0")
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
