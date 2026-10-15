@@ -1,6 +1,14 @@
 $C = "../Common.ui";
 $Nav = "Nav/AmigoNPC_Leveling_Sidebar.ui";
 
+@CustomButtonStyle = TextButtonStyle(
+  Default: (Background: $C.@DefaultSquareButtonDefaultBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Hovered: (Background: $C.@DefaultSquareButtonHoveredBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Pressed: (Background: $C.@DefaultSquareButtonPressedBackground, LabelStyle: $C.@DefaultButtonLabelStyle),
+  Disabled: (Background: $C.@DefaultSquareButtonDisabledBackground, LabelStyle: $C.@DefaultButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds,
+);
+
 $C.@PageOverlay {
   $C.@DecoratedContainer {
     Anchor: (Width: 900, Height: 700);
@@ -19,7 +27,6 @@ $C.@PageOverlay {
       LayoutMode: Left;
       Padding: (Left:7, Bottom: 7);
 
-      // BEGIN MainSidebar
       Group #Sidebar {
         Anchor: (Width: 180);
         LayoutMode: Top;
@@ -27,13 +34,10 @@ $C.@PageOverlay {
         FlexWeight: 0;
         Padding: (Full: 0);
         
-        // BEGIN MainSidebarTopSpacer
         Group {
           Anchor: (Height: 0);
         }
-        // END MainSidebarTopSpacer
         
-        // BEGIN MainSidebarStatsSection
         Group #NavStatsButtonGroup {
           LayoutMode: Top;
           
@@ -57,9 +61,7 @@ $C.@PageOverlay {
         Group {
           Anchor: (Height: 4);
         }
-        // END MainSidebarStatsSection
         
-        // BEGIN MainSidebarSettingsSection
         Group #NavLeaderboardButtonGroup {
           LayoutMode: Top;
           
@@ -83,9 +85,7 @@ $C.@PageOverlay {
         Group {
           Anchor: (Height: 4);
         }
-        // END MainSidebarSettingsSection
         
-        // BEGIN MainSidebarRewardsSection
         Group #NavRewardsButtonGroup {
           LayoutMode: Top;
           
@@ -105,11 +105,8 @@ $C.@PageOverlay {
             Visible: true;
           }
         }
-        // END MainSidebarRewardsSection
-      }
-      // END MainSidebar
+      } 
 
-      // BEGIN MainContentArea
       Group #ContentArea {
         FlexWeight: 1;
         LayoutMode: Top;
@@ -127,7 +124,6 @@ $C.@PageOverlay {
           LayoutMode: Top;
         }
       }
-      // END MainContentArea
     }
   }
 }

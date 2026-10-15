@@ -20,7 +20,6 @@ Group #RewardsPage {
     Group #PlayerHeaderContainer { }
   }
 
-  // BEGIN RewardsHeader
   Group #RewardsHeader {
     LayoutMode: Left;
     Anchor: (Width: 660, Height: 35);
@@ -76,7 +75,6 @@ Group #RewardsPage {
       }
     }
   }
-  // END RewardsHeader
 
   Group #RewardsList {
     Anchor: (Width: 660);
@@ -90,7 +88,6 @@ Group #RewardsPage {
     }
   }
 
-  // BEGIN RewardsFooter
   Group {
     LayoutMode: Left;
     Padding: (Top: 10);
@@ -107,5 +104,4 @@ Group #RewardsPage {
       Style: @CustomButtonStyle;
     }
   }
-  // END RewardsFooter
 }
