@@ -23,6 +23,11 @@ public final class AmigoGodmodSubCommand extends AbstractPlayerCommand {
    }
 
    protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+      if (!AdminCheck.isAdmin(ctx)) {
+         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigopvp.only_admin")));
+         return;
+      }
+
       UUID ownerId = playerRef.getUuid();
       AmigoNpcManager mgr = AmigoNpcManager.getShared();
       if (!mgr.hasNpc(ownerId)) {
