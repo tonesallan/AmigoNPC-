@@ -118,3 +118,11 @@ Achados:
 - O jar original recorre a reflexão para achar `spawnNPC` (5 parâmetros) e `spawnEntity` (7 parâmetros). É frágil. Os companheiros acima chamam `NPCPlugin.spawnNPC` pelo nome do role, com o comportamento definido em JSON de role. Recomendação: seguir esse padrão, conferido com `javap` no 0.7.2.
 - O jar original tem seis arquivos `.ui` e roles em `Server/NPC/Roles/`, incluindo `Amigo_Follow.json` em várias pastas. Antes de portar, confirmar qual é o role efetivamente usado.
 - Não depender de HyUI: o manifest exige servidor 0.5.x.
+
+## Decisões de implementação (tomadas pelo desenvolvedor)
+
+1. **UI:** páginas `.ui` próprias, portadas do jar original (`Common/UI/Custom/Pages/`). Sem HyUI.
+2. **Spawn:** `NPCPlugin.spawnNPC(store, roleName, null, posição, rotação)`, sem reflexão. Assinatura confirmada no `HytaleServer.jar` 0.7.2. A ordem dos argumentos segue o padrão observado no RPGCompanion (`spawnNPC(store, role, null, pos, rot)`). Role JSON começa a partir de `Server/NPC/Roles/Amigo_Follow.json` do jar original, validado no log do servidor.
+3. **XP (provisória):** XP para subir do nível `n` para `n+1` = `round(100 × n^1.5)`. Ganho: 10 XP por inimigo ajudado a derrotar, nenhum teto de nível. Esta fórmula é própria, não copiada de outro mod, e deve ser revisada depois de testar em jogo.
+4. **Atributos por nível:** +10 de vida e +5% de dano por nível. O nível do NPC nunca passa do nível do dono.
+5. **Revive com F:** implementar depois do companheiro e dos comandos básicos. Não bloqueia as demais partes.
