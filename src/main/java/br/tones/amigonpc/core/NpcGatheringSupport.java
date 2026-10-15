@@ -1,5 +1,7 @@
 package br.tones.amigonpc.core;
 
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockBreakingDropType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockGathering;
@@ -8,7 +10,9 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.modules.interaction.BlockHarvestUtils;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.BlockOperations;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -98,19 +102,18 @@ final class NpcGatheringSupport {
          return Result.FULL;
       }
 
-      WorldChunk chunk = chunkAt(world, target.x, target.z); // TODO(0.7.2): porta pendente
-      if (chunk == null) {
+      if (sectionAt(world, target.x, target.y, target.z) == null) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
 
-      BlockType current = blockTypeAt(chunk, target.x, target.y, target.z); // TODO(0.7.2)
+      BlockType current = blockTypeAt(world, target.x, target.y, target.z);
       if (current == null || current.getId() == null || !current.getId().equals(target.blockType.getId())) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
 
-      if (!breakBlockAt(chunk, target.x, target.y, target.z)) { // TODO(0.7.2)
+      if (!breakBlockAt(world, target.x, target.y, target.z)) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
@@ -128,18 +131,41 @@ final class NpcGatheringSupport {
       return Result.GATHERED;
    }
 
-   // TODO(0.7.2): a API de blocos mudou (ChunkStore/BlockSection/BlockOperations).
-   // Estes shims deixam a coleta desativada ate a porta ser feita.
-   private static WorldChunk chunkAt(World world, int x, int z) {
-      return null;
+   // API de blocos do servidor 0.7.2: ChunkStore -> secao (Ref) -> BlockSection.
+   // A secao e obtida pela coordenada de bloco; o id do bloco vem de BlockSection.get(x,y,z).
+   private static Ref<ChunkStore> sectionAt(World world, int x, int y, int z) {
+      ChunkStore chunkStore = world.getChunkStore();
+      if (chunkStore == null) {
+         return null;
+      }
+
+      Ref<ChunkStore> section = chunkStore.getChunkSectionReferenceAtBlock(x, y, z);
+      return section != null && section.isValid() ? section : null;
    }
 
-   private static BlockType blockTypeAt(WorldChunk chunk, int x, int y, int z) {
-      return null;
+   private static BlockType blockTypeAt(World world, int x, int y, int z) {
+      Ref<ChunkStore> section = sectionAt(world, x, y, z);
+      if (section == null) {
+         return null;
+      }
+
+      Store<ChunkStore> store = world.getChunkStore().getStore();
+      BlockSection blockSection = (BlockSection)store.getComponent(section, BlockSection.getComponentType());
+      if (blockSection == null) {
+         return null;
+      }
+
+      return (BlockType)BlockType.getAssetMap().getAsset(blockSection.get(x, y, z));
    }
 
-   private static boolean breakBlockAt(WorldChunk chunk, int x, int y, int z) {
-      return false;
+   // Quebra o bloco: id 0 / BlockType.EMPTY, flags 256 (com fisica de bloco), como o servidor faz em quebras normais.
+   private static boolean breakBlockAt(World world, int x, int y, int z) {
+      Ref<ChunkStore> section = sectionAt(world, x, y, z);
+      if (section == null) {
+         return false;
+      }
+
+      return BlockOperations.setBlock(world.getChunkStore(), section, x, y, z, 0, BlockType.EMPTY, 0, 0, 256);
    }
 
    private static ResourceBlock findNearestResource(World world, Vector3d npcPos) {
@@ -164,14 +190,9 @@ final class NpcGatheringSupport {
 
                int x = cx + dx;
                int z = cz + dz;
-               WorldChunk chunk = chunkAt(world, x, z);
-               if (chunk == null) {
-                  continue;
-               }
-
                BlockType type;
                try {
-                  type = blockTypeAt(chunk, x, y, z);
+                  type = blockTypeAt(world, x, y, z);
                } catch (Throwable ignored) {
                   continue;
                }

@@ -69,6 +69,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Field;
@@ -4796,7 +4798,7 @@ public final class AmigoNpcManager {
          int startY = y + 2;
 
          for (int i = 0; i < 12; i++) {
-            int blockId = blockIdAt(world, x, startY + i, z); // TODO(0.7.2): porta pendente
+            int blockId = blockIdAt(world, x, startY + i, z);
             if (blockId != 0) {
                return true;
             }
@@ -4807,9 +4809,19 @@ public final class AmigoNpcManager {
       return false;
    }
 
-   // TODO(0.7.2): leitura de bloco ainda nao portada para a API 0.7.2.
    private static int blockIdAt(World world, int x, int y, int z) {
-      return 0;
+      ChunkStore chunkStore = world.getChunkStore();
+      if (chunkStore == null) {
+         return 0;
+      }
+
+      Ref<ChunkStore> section = chunkStore.getChunkSectionReferenceAtBlock(x, y, z);
+      if (section == null || !section.isValid()) {
+         return 0;
+      }
+
+      BlockSection blockSection = (BlockSection)chunkStore.getStore().getComponent(section, BlockSection.getComponentType());
+      return blockSection == null ? 0 : blockSection.get(x, y, z);
    }
 
    private static void spawnParticleToOwner(Store<EntityStore> store, Object ownerRefObj, Vector3d pos, String particleId) {

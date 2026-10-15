@@ -15,7 +15,6 @@ public final class AmigoDespawnCommand extends AbstractCommand {
 
    public AmigoDespawnCommand(AmigoService service) {
       super("amigodespawn", AmigoText.text("cmd.desc.amigodespawn"));
-      this.requireNoPermission();
       this.service = service;
    }
 

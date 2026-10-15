@@ -22,7 +22,6 @@ public final class AmigoCommand extends AbstractCommand {
 
    public AmigoCommand(AmigoService service) {
       super("amigo", AmigoText.text("cmd.desc.amigo"));
-      this.requireNoPermission();
       this.setAllowsExtraArguments(true);
       this.addSubCommand(new AmigoSpawnSubCommand(service));
       this.addSubCommand(new AmigoDespawnSubCommand(service));
