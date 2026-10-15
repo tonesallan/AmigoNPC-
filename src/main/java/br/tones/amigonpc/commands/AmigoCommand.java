@@ -28,6 +28,7 @@ public final class AmigoCommand extends AbstractCommand {
       this.addSubCommand(new AmigoModeloSubCommand());
       this.addSubCommand(new AmigoModeloOffSubCommand());
       this.addSubCommand(new AmigoDefenderSubCommand());
+      this.addSubCommand(new AmigoGodmodSubCommand());
       this.addSubCommand(new AmigoLogSubCommand());
       this.addSubCommand(new AmigoHudSubCommand());
       this.addSubCommand(new AmigoStatsSubCommand());
