@@ -389,7 +389,7 @@ public final class AmigoNpcManager {
       AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
       if (rec != null) {
          rec.combatMode = mode;
-         rec.defendeEnabled = mode == CombatMode.PROTECT_OWNER;
+         rec.defendeEnabled = mode == CombatMode.WEAKEST_ENEMY;
          rec.chaseDisengaged = false;
          rec.targetLostSinceMillis = 0L;
          rec.targetStuckSinceMillis = 0L;
@@ -397,11 +397,11 @@ public final class AmigoNpcManager {
    }
 
    public boolean isDefendeEnabled(UUID owner) {
-      return getCombatMode(owner) == CombatMode.PROTECT_OWNER;
+      return getCombatMode(owner) == CombatMode.WEAKEST_ENEMY;
    }
 
    public void setDefendeEnabled(UUID owner, boolean enabled) {
-      setCombatMode(owner, enabled ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY);
+      setCombatMode(owner, enabled ? CombatMode.WEAKEST_ENEMY : CombatMode.PROTECT_OWNER);
    }
 
    public boolean isAutoWeaponSwitchEnabled(UUID ownerId) {
@@ -823,7 +823,7 @@ public final class AmigoNpcManager {
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
             rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
-            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
+            rec.defendeEnabled = rec.combatMode == CombatMode.WEAKEST_ENEMY;
             rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
             rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
@@ -1097,7 +1097,7 @@ public final class AmigoNpcManager {
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
             rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
-            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
+            rec.defendeEnabled = rec.combatMode == CombatMode.WEAKEST_ENEMY;
             rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
             rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);

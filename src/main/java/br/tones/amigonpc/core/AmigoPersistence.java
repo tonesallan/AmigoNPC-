@@ -143,14 +143,14 @@ public final class AmigoPersistence {
          return CombatMode.fromString(saved);
       }
 
-      return loadDefenderEnabled(ownerId) ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY;
+      return loadDefenderEnabled(ownerId) ? CombatMode.WEAKEST_ENEMY : CombatMode.PROTECT_OWNER;
    }
 
    public static void saveCombatMode(UUID ownerId, CombatMode mode) {
       if (ownerId != null && mode != null) {
          try {
             AmigoPersistenceProfileSupport.saveOptionalString(fileFor(ownerId), FORMAT_VERSION, KEY_COMBAT_MODE, mode.name());
-            saveDefenderEnabled(ownerId, mode == CombatMode.PROTECT_OWNER);
+            saveDefenderEnabled(ownerId, mode == CombatMode.WEAKEST_ENEMY);
          } catch (Throwable ignored) {
          }
       }
