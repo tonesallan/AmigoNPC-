@@ -1,26 +1,17 @@
 package br.tones.amigonpc.core.rpgleveling.stage1;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public final class RpgLevelingStage1Config {
-   private final int maxLevel;
-   private final double rateExp;
-   private final double baseXP;
-   private final double levelBaseXP;
-   private final double levelOffset;
-   private final boolean enableGapLevelXpReducer;
-   private final List<String> blacklistedEntityRoles;
-
-   public RpgLevelingStage1Config() {
-      RpgStage1ConfigSupport.Defaults defaults = RpgStage1ConfigSupport.createDefaults();
-      this.maxLevel = defaults.maxLevel;
-      this.rateExp = defaults.rateExp;
-      this.baseXP = defaults.baseXP;
-      this.levelBaseXP = defaults.levelBaseXP;
-      this.levelOffset = defaults.levelOffset;
-      this.enableGapLevelXpReducer = defaults.enableGapLevelXpReducer;
-      this.blacklistedEntityRoles = defaults.blacklistedEntityRoles;
-   }
+   private final int maxLevel = 100;
+   private final double rateExp = (double)3.0F;
+   private final double baseXP = (double)1.0F;
+   private final double levelBaseXP = (double)150.0F;
+   private final double levelOffset = (double)0.0F;
+   private final boolean enableGapLevelXpReducer = true;
+   private final List blacklistedEntityRoles = new ArrayList(Collections.singletonList("Citizen_"));
 
    public int getMaxLevel() {
       return this.maxLevel;
@@ -46,11 +37,36 @@ public final class RpgLevelingStage1Config {
       return this.enableGapLevelXpReducer;
    }
 
-   public List<String> getBlacklistedEntityRoles() {
+   public List getBlacklistedEntityRoles() {
       return this.blacklistedEntityRoles;
    }
 
    public boolean isEntityRoleLevelingBlacklisted(String roleName) {
-      return RpgStage1ConfigSupport.isEntityRoleLevelingBlacklisted(this.getBlacklistedEntityRoles(), roleName);
+      if (roleName != null && !roleName.isEmpty()) {
+         List<String> list = this.getBlacklistedEntityRoles();
+         if (list != null && !list.isEmpty()) {
+            String trimmed = roleName.trim();
+            if (trimmed.isEmpty()) {
+               return false;
+            } else {
+               String lower = trimmed.toLowerCase();
+
+               for(String entry : list) {
+                  if (entry != null) {
+                     String e = entry.trim();
+                     if (!e.isEmpty() && lower.contains(e.toLowerCase())) {
+                        return true;
+                     }
+                  }
+               }
+
+               return false;
+            }
+         } else {
+            return false;
+         }
+      } else {
+         return false;
+      }
    }
 }

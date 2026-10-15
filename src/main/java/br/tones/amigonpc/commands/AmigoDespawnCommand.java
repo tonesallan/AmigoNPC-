@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import java.util.concurrent.CompletableFuture;
@@ -14,13 +13,12 @@ public final class AmigoDespawnCommand extends AbstractCommand {
    }
 
    public AmigoDespawnCommand(AmigoService service) {
-      super("amigodespawn", AmigoText.text("cmd.desc.amigodespawn"));
-      this.requireNoPermission();
+      super("amigodespawn", "Remove o NPC do AmigoNPC");
       this.service = service;
    }
 
-   protected CompletableFuture<Void> execute(CommandContext ctx) {
+   protected CompletableFuture execute(CommandContext ctx) {
       this.service.despawn(ctx);
-      return CompletableFuture.completedFuture(null);
+      return CompletableFuture.completedFuture((Object)null);
    }
 }

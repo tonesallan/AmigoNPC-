@@ -65,16 +65,16 @@ public final class SwordProgression {
       int b = clampLevel(newLevel);
       if (b <= a) {
          return false;
-      }
+      } else {
+         int[] ms = new int[]{10, 15, 20, 25, 30, 35, 40, 55, 75};
 
-      int[] ms = new int[]{10, 15, 20, 25, 30, 35, 40, 55, 75};
-
-      for (int m : ms) {
-         if (a < m && b >= m) {
-            return true;
+         for(int m : ms) {
+            if (a < m && b >= m) {
+               return true;
+            }
          }
-      }
 
-      return false;
+         return false;
+      }
    }
 }

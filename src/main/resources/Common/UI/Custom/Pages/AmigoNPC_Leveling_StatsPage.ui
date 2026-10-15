@@ -12,7 +12,6 @@ Group #StatsPage {
   LayoutMode: Top;
   Padding: (Full: 0);
 
-  // BEGIN StatsHeader
   Group #PlayerHeaderRow {
     LayoutMode: Top;
     Padding: (Top: 8, Bottom: 10);
@@ -30,7 +29,6 @@ Group #StatsPage {
       Padding: (Top: 2, Bottom: 5);
     }
   }
-  // END StatsHeader
 
 Group #StatsList {
 Anchor: (Width: 720);
@@ -39,12 +37,9 @@ LayoutMode: TopScrolling;
 Padding: (Left: 7, Top: 2, Right: 12, Bottom: 4);
 ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-// BEGIN StatsCards
 Group {
   LayoutMode: Top;
 
-  // BEGIN StatsCardsSurvivalSection
-  // BEGIN StatsSurvivalHealthCard
   Group #HealthGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -198,9 +193,7 @@ Group {
       }
     }
   }
-  // END StatsSurvivalHealthCard
 
-  // BEGIN StatsSurvivalStaminaCard
   Group #StaminaGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -355,9 +348,7 @@ Group {
       }
     }
   }
-  // END StatsSurvivalStaminaCard
 
-  // BEGIN StatsSurvivalStaminaRegenCard
   Group #StaminaRegenDelayGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -512,9 +503,7 @@ Group {
       }
     }
   }
-  // END StatsSurvivalStaminaRegenCard
 
-  // BEGIN StatsSurvivalStaminaConsumptionCard
   Group #StaminaConsumptionGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -669,11 +658,7 @@ Group {
       }
     }
   }
-  // END StatsSurvivalStaminaConsumptionCard
-  // END StatsCardsSurvivalSection
 
-  // BEGIN StatsCardsCombatSection
-  // BEGIN StatsCombatDefenseCard
   Group #DefenseGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -827,9 +812,7 @@ Group {
       }
     }
   }
-  // END StatsCombatDefenseCard
 
-  // BEGIN StatsCombatDamageCard
   Group #DamageGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -983,9 +966,7 @@ Group {
       }
     }
   }
-  // END StatsCombatDamageCard
 
-  // BEGIN StatsCombatCriticalDamageCard
   Group #CriticalDamageGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1139,11 +1120,7 @@ Group {
       }
     }
   }
-  // END StatsCombatCriticalDamageCard
-  // END StatsCardsCombatSection
 
-  // BEGIN StatsCardsResourcesSection
-  // BEGIN StatsResourcesManaCard
   Group #ManaGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1298,9 +1275,7 @@ Group {
       }
     }
   }
-  // END StatsResourcesManaCard
 
-  // BEGIN StatsResourcesAmmoCard
   Group #AmmoGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1455,9 +1430,7 @@ Group {
       }
     }
   }
-  // END StatsResourcesAmmoCard
 
-  // BEGIN StatsResourcesOxygenCard
   Group #OxygenGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1611,11 +1584,7 @@ Group {
       }
     }
   }
-  // END StatsResourcesOxygenCard
-  // END StatsCardsResourcesSection
 
-  // BEGIN StatsCardsGatheringSection
-  // BEGIN StatsGatheringMiningCard
   Group #MiningGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1769,9 +1738,7 @@ Group {
       }
     }
   }
-  // END StatsGatheringMiningCard
 
-  // BEGIN StatsGatheringWoodcuttingCard
   Group #WoodcuttingGroup {
     Anchor: (Width: 680, Height: 86, Bottom: 3);
     LayoutMode: Left;
@@ -1925,14 +1892,10 @@ Group {
       }
     }
   }
-  // END StatsGatheringWoodcuttingCard
-  // END StatsCardsGatheringSection
 
 }
-// END StatsCards
       }
 
-// BEGIN StatsFooter
 Label #ErrorLabel {
 Style: (
   FontSize: 16,
@@ -1983,5 +1946,4 @@ $C.@TextButton #SaveButton {
   Visible: false;
 }
       }
-// END StatsFooter
 }

@@ -6,11 +6,12 @@ import com.google.gson.GsonBuilder;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 public final class NpcXpSourcesConfigService {
-   private static final Gson GSON = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
-   private static final Path CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("NpcXpSourcesConfig.json");
+   private static final Gson GSON;
+   private static final Path CONFIG_PATH;
    private static volatile NpcXpSourcesConfig CACHED;
 
    private NpcXpSourcesConfigService() {
@@ -19,7 +20,7 @@ public final class NpcXpSourcesConfigService {
    public static NpcXpSourcesConfig get() {
       NpcXpSourcesConfig c = CACHED;
       if (c == null) {
-         synchronized (NpcXpSourcesConfigService.class) {
+         synchronized(NpcXpSourcesConfigService.class) {
             c = CACHED;
             if (c == null) {
                c = reloadNow();
@@ -34,7 +35,7 @@ public final class NpcXpSourcesConfigService {
       NpcXpSourcesConfig cfg = null;
 
       try {
-         if (Files.isRegularFile(CONFIG_PATH)) {
+         if (Files.isRegularFile(CONFIG_PATH, new LinkOption[0])) {
             String txt = Files.readString(CONFIG_PATH, StandardCharsets.UTF_8);
             cfg = (NpcXpSourcesConfig)GSON.fromJson(txt, NpcXpSourcesConfig.class);
          }
@@ -65,12 +66,12 @@ public final class NpcXpSourcesConfigService {
             cfg.pickupBaseXP = 0;
          }
 
-         if (cfg.levelFactor < 0.0) {
-            cfg.levelFactor = 0.0;
+         if (cfg.levelFactor < (double)0.0F) {
+            cfg.levelFactor = (double)0.0F;
          }
 
-         if (cfg.levelFactor > 10.0) {
-            cfg.levelFactor = 10.0;
+         if (cfg.levelFactor > (double)10.0F) {
+            cfg.levelFactor = (double)10.0F;
          }
       }
 
@@ -85,6 +86,12 @@ public final class NpcXpSourcesConfigService {
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg), StandardCharsets.UTF_8);
          } catch (Throwable var2) {
          }
+
       }
+   }
+
+   static {
+      GSON = (new GsonBuilder()).setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
+      CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("NpcXpSourcesConfig.json");
    }
 }

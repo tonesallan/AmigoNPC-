@@ -2,7 +2,6 @@ package br.tones.amigonpc.ui;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.HytaleBridge;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
@@ -23,61 +22,60 @@ public final class AmigoUiActions {
 
    public static boolean handle(Object commandContext, Object playerSender, String actionId) {
       if (playerSender == null) {
-         setError(AmigoText.text("ui.legacy.actions.error.player_sender_null"));
+         setError("playerSender é null.");
          return false;
-      }
-
-      if (actionId != null && !actionId.isBlank()) {
+      } else if (actionId != null && !actionId.isBlank()) {
          try {
             UUID ownerId = tryGetUuid(playerSender);
             if (ownerId == null) {
-               setError(AmigoText.text("ui.legacy.actions.error.player_uuid_unavailable"));
+               setError("Não consegui obter UUID do playerSender.");
                return false;
-            }
+            } else {
+               Object world = null;
+               if (commandContext != null) {
+                  world = HytaleBridge.tryGetWorldFromCommandContext(commandContext);
+               }
 
-            Object world = null;
-            if (commandContext != null) {
-               world = HytaleBridge.tryGetWorldFromCommandContext(commandContext);
-            }
+               if (world == null) {
+                  world = tryGetWorldFromSender(playerSender);
+               }
 
-            if (world == null) {
-               world = tryGetWorldFromSender(playerSender);
-            }
-
-            if (world == null) {
-               setError(AmigoText.text("ui.legacy.actions.error.world_unavailable"));
-               return false;
-            }
-
-            switch (actionId.toLowerCase()) {
-               case "spawn":
-                  boolean spawnOk = MANAGER.spawn(world, ownerId);
-                  if (!spawnOk) {
-                     setError(AmigoText.format("ui.legacy.actions.error.spawn_failed", MANAGER.getLastError()));
-                     return false;
-                  }
-
-                  return true;
-               case "despawn":
-                  boolean despawnOk = MANAGER.despawn(world, ownerId);
-                  if (!despawnOk) {
-                     setError(AmigoText.format("ui.legacy.actions.error.despawn_failed", MANAGER.getLastError()));
-                     return false;
-                  }
-
-                  return true;
-               case "close":
-                  return true;
-               default:
-                  setError(AmigoText.format("ui.legacy.actions.error.unknown_action", actionId));
+               if (world == null) {
+                  setError("Não consegui obter World para executar a ação.");
                   return false;
+               } else {
+                  switch (actionId.toLowerCase()) {
+                     case "spawn":
+                        boolean ok = MANAGER.spawn(world, ownerId);
+                        if (!ok) {
+                           setError("Spawn falhou: " + MANAGER.getLastError());
+                           return false;
+                        }
+
+                        return true;
+                     case "despawn":
+                        boolean ok = MANAGER.despawn(world, ownerId);
+                        if (!ok) {
+                           setError("Despawn falhou: " + MANAGER.getLastError());
+                           return false;
+                        }
+
+                        return true;
+                     case "close":
+                        return true;
+                     default:
+                        setError("ActionId desconhecido: " + actionId);
+                        return false;
+                  }
+               }
             }
          } catch (Throwable t) {
-            setError(AmigoText.format("ui.legacy.actions.error.handle_failed", t.getClass().getSimpleName(), t.getMessage()));
+            String var10000 = t.getClass().getSimpleName();
+            setError("handle falhou: " + var10000 + " - " + t.getMessage());
             return false;
          }
       } else {
-         setError(AmigoText.text("ui.legacy.actions.error.action_id_empty"));
+         setError("actionId vazio.");
          return false;
       }
    }
@@ -85,7 +83,8 @@ public final class AmigoUiActions {
    private static UUID tryGetUuid(Object sender) {
       try {
          Method m = sender.getClass().getMethod("getUuid");
-         if (m.invoke(sender) instanceof UUID u) {
+         Object r = m.invoke(sender);
+         if (r instanceof UUID u) {
             return u;
          }
       } catch (Throwable var4) {
@@ -97,7 +96,7 @@ public final class AmigoUiActions {
    private static Object tryGetWorldFromSender(Object sender) {
       String[] names = new String[]{"getWorld", "world", "getCurrentWorld", "getPlayerWorld"};
 
-      for (String n : names) {
+      for(String n : names) {
          try {
             Method m = sender.getClass().getMethod(n);
             Object r = m.invoke(sender);

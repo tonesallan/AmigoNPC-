@@ -1,6 +1,5 @@
 package br.tones.amigonpc.core;
 
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -13,72 +12,74 @@ import java.util.UUID;
 public final class AmigoService {
    private final AmigoNpcManager manager = AmigoNpcManager.getShared();
 
-   public void spawn(CommandContext ctx, World world, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef) {
+   public void spawn(CommandContext ctx, World world, Store store, Ref playerEntityRef, PlayerRef playerRef) {
       if (ctx != null && world != null && store != null && playerEntityRef != null && playerRef != null) {
          UUID ownerId = playerRef.getUuid();
-         boolean ok = this.manager.isDowned(ownerId)
-            ? this.manager.requestRespawn(world, ownerId, playerRef)
-            : this.manager.spawnWithStore(world, store, playerEntityRef, ownerId, playerRef);
+         boolean ok = this.manager.spawnWithStore(world, store, playerEntityRef, ownerId, playerRef);
          if (!ok) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Falha ao spawnar o NPC."));
             String err = this.manager.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawned")));
+            ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC criado! Use §f/amigo despawn §apara remover."));
          }
       } else {
          if (ctx != null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.invalid_spawn_data")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados inválidos para spawn."));
          }
+
       }
    }
 
-   public void despawn(CommandContext ctx, World world, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef) {
+   public void despawn(CommandContext ctx, World world, Store store, Ref playerEntityRef, PlayerRef playerRef) {
       if (ctx != null && world != null && store != null && playerEntityRef != null && playerRef != null) {
          UUID ownerId = playerRef.getUuid();
          boolean ok = this.manager.despawnWithStore(store, ownerId);
          if (!ok) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawn_failed")));
+            ctx.sendMessage(Message.raw("§e[AmigoNPC] Não foi possível remover o NPC agora."));
             String err = this.manager.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawned")));
+            ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC removido!"));
          }
       } else {
          if (ctx != null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.invalid_despawn_data")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados inválidos para despawn."));
          }
+
       }
    }
 
    public void spawn(CommandContext ctx) {
       if (!ctx.isPlayer()) {
-         ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.only_players")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por jogadores."));
       } else {
          UUID ownerId = ctx.sender().getUuid();
          Object world = HytaleBridge.tryGetWorldFromCommandContext(ctx);
          if (world == null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.world_unavailable")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Não consegui obter o World do jogador nesta build."));
             String err = HytaleBridge.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
-            boolean ok = this.manager.isDowned(ownerId)
-               ? this.manager.requestRespawn(world, ownerId, ctx.sender())
-               : this.manager.spawn(world, ownerId, ctx.sender());
+            boolean ok = this.manager.spawn(world, ownerId, ctx.sender());
             if (!ok) {
-               ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
+               ctx.sendMessage(Message.raw("§c[AmigoNPC] Falha ao spawnar o NPC."));
                String err = this.manager.getLastError();
                if (err != null) {
-                  ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+                  ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
                }
+
             } else {
-               ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawned")));
+               ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC criado! Use §f/amigo despawn §apara remover."));
             }
          }
       }
@@ -86,26 +87,28 @@ public final class AmigoService {
 
    public void despawn(CommandContext ctx) {
       if (!ctx.isPlayer()) {
-         ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.only_players")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por jogadores."));
       } else {
          UUID ownerId = ctx.sender().getUuid();
          Object world = HytaleBridge.tryGetWorldFromCommandContext(ctx);
          if (world == null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.world_unavailable")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Não consegui obter o World do jogador nesta build."));
             String err = HytaleBridge.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
             boolean ok = this.manager.despawn(world, ownerId);
             if (!ok) {
-               ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawn_failed")));
+               ctx.sendMessage(Message.raw("§e[AmigoNPC] Não foi possível remover o NPC agora."));
                String err = this.manager.getLastError();
                if (err != null) {
-                  ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+                  ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
                }
+
             } else {
-               ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawned")));
+               ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC removido!"));
             }
          }
       }
@@ -114,22 +117,22 @@ public final class AmigoService {
    public void spawn(CommandContext ctx, World world, PlayerRef playerRef) {
       if (ctx != null && world != null && playerRef != null) {
          UUID ownerId = playerRef.getUuid();
-         boolean ok = this.manager.isDowned(ownerId)
-            ? this.manager.requestRespawn(world, ownerId, playerRef)
-            : this.manager.spawn(world, ownerId, playerRef);
+         boolean ok = this.manager.spawn(world, ownerId, playerRef);
          if (!ok) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawn_failed")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Falha ao spawnar o NPC."));
             String err = this.manager.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.spawned")));
+            ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC criado! Use §f/amigo despawn §apara remover."));
          }
       } else {
          if (ctx != null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.invalid_spawn_data")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados inválidos para spawn."));
          }
+
       }
    }
 
@@ -138,18 +141,20 @@ public final class AmigoService {
          UUID ownerId = playerRef.getUuid();
          boolean ok = this.manager.despawn(world, ownerId);
          if (!ok) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawn_failed")));
+            ctx.sendMessage(Message.raw("§e[AmigoNPC] Não foi possível remover o NPC agora."));
             String err = this.manager.getLastError();
             if (err != null) {
-               ctx.sendMessage(Message.raw(AmigoText.format("svc.amigo.debug", err)));
+               ctx.sendMessage(Message.raw("§7[AmigoNPC] Debug: " + err));
             }
+
          } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.despawned")));
+            ctx.sendMessage(Message.raw("§a[AmigoNPC] NPC removido!"));
          }
       } else {
          if (ctx != null) {
-            ctx.sendMessage(Message.raw(AmigoText.text("svc.amigo.invalid_despawn_data")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Dados inválidos para despawn."));
          }
+
       }
    }
 }

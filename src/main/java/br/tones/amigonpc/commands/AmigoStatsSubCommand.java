@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.npcstats.NpcAttribute;
 import br.tones.amigonpc.core.npcstats.NpcStatsService;
 import br.tones.amigonpc.core.npcstats.NpcStatsState;
@@ -23,29 +22,36 @@ import java.util.Locale;
 import java.util.UUID;
 
 public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
-   private final OptionalArg actionArg = this.withOptionalArg("action", AmigoText.text("cmd.arg.amigo.stats.action"), ArgTypes.STRING);
-   private final OptionalArg attrArg = this.withOptionalArg("attribute", AmigoText.text("cmd.arg.amigo.stats.attribute"), ArgTypes.STRING);
-   private final OptionalArg amountArg = this.withOptionalArg("amount", AmigoText.text("cmd.arg.amigo.stats.amount"), ArgTypes.INTEGER);
+   private final OptionalArg actionArg;
+   private final OptionalArg attrArg;
+   private final OptionalArg amountArg;
 
    protected boolean canGeneratePermission() {
       return false;
    }
 
    public AmigoStatsSubCommand() {
-      super("stats", AmigoText.text("cmd.desc.amigo.stats"));
+      super("stats", "Gerencia pontos de atributo do NPC");
+      this.actionArg = this.withOptionalArg("action", "info|add|reset", ArgTypes.STRING);
+      this.attrArg = this.withOptionalArg("attribute", "HEALTH|DAMAGE|CRITICAL_DAMAGE|DEFENSE", ArgTypes.STRING);
+      this.amountArg = this.withOptionalArg("amount", "Quantidade (default 1)", ArgTypes.INTEGER);
       this.setAllowsExtraArguments(true);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       String action = this.actionArg.provided(ctx) ? String.valueOf(this.actionArg.get(ctx)) : null;
       String attrInput = this.attrArg.provided(ctx) ? String.valueOf(this.attrArg.get(ctx)) : null;
       Integer amtInput = null;
-      if (this.amountArg.provided(ctx) && this.amountArg.get(ctx) instanceof Integer i) {
-         amtInput = i;
+      if (this.amountArg.provided(ctx)) {
+         Object v = this.amountArg.get(ctx);
+         if (v instanceof Integer) {
+            Integer i = (Integer)v;
+            amtInput = i;
+         }
       }
 
       if (action == null) {
-         AmigoStatsSubCommand.ParsedArgs fb = parseFallback(ctx);
+         ParsedArgs fb = parseFallback(ctx);
          if (fb != null) {
             action = fb.action;
             if (attrInput == null) {
@@ -67,7 +73,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
          if (attrInput != null && !attrInput.isBlank()) {
             NpcAttribute a = NpcAttribute.parse(attrInput);
             if (a == null) {
-               ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.invalid_attribute")));
+               ctx.sendMessage(Message.raw("§cAtributo inválido. Use: HEALTH | DAMAGE | CRITICAL_DAMAGE | DEFENSE (aceita aliases: hp,dmg,crit,def)."));
             } else {
                int amt = 1;
                if (amtInput != null) {
@@ -86,14 +92,13 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
                      int earned = svc.totalEarnedPoints(lvl);
                      int spent = st.spentPoints();
                      int avail = Math.max(0, earned - spent);
-                     ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.stats.no_points", lvl, earned, spent, avail)));
+                     ctx.sendMessage(Message.raw(String.format(Locale.ROOT, "§c[AmigoNPC] Sem pontos disponíveis. Level=%d Earned=%d Spent=%d Available=%d", lvl, earned, spent, avail)));
                   } else {
-                     ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.stats.add.failed", res.error())));
+                     ctx.sendMessage(Message.raw("§c[AmigoNPC] Não foi possível alocar: " + res.error()));
                   }
+
                } else {
-                  ctx.sendMessage(
-                     Message.raw(AmigoText.format(op ? "cmd.amigo.stats.add.success_admin" : "cmd.amigo.stats.add.success", res.applied(), a.name()))
-                  );
+                  ctx.sendMessage(Message.raw(op ? "§a[AmigoNPC] +" + res.applied() + " em " + a.name() + " (admin)." : "§a[AmigoNPC] +" + res.applied() + " em " + a.name() + "."));
 
                   try {
                      NpcStatsState st2 = res.state() != null ? res.state() : svc.load(ownerId);
@@ -101,7 +106,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
                      int spent = st2.spentPoints();
                      int avail = Math.max(0, earned - spent);
                      int cur = st2.getAllocated(a);
-                     ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.stats.current_value", a.name(), cur, avail, earned, spent)));
+                     ctx.sendMessage(Message.raw(String.format(Locale.ROOT, "§7[AmigoNPC] %s=%d | Available=%d (Earned=%d Spent=%d)", a.name(), cur, avail, earned, spent)));
                   } catch (Throwable var23) {
                   }
 
@@ -109,14 +114,14 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
                }
             }
          } else {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.add.usage")));
+            ctx.sendMessage(Message.raw("§cUso: /amigo stats add <atributo> [qtd]"));
          }
       } else if (action.equals("reset")) {
          if (!op && !RewardsStateService.getShared().consumeResetPoint(ownerId)) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.reset.no_points")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Você não tem ResetPoints. Claim rewards para ganhar."));
          } else {
             NpcStatsService.getShared().resetAll(ownerId);
-            ctx.sendMessage(Message.raw(AmigoText.text(op ? "cmd.amigo.stats.reset.admin" : "cmd.amigo.stats.reset.player")));
+            ctx.sendMessage(Message.raw(op ? "§e[AmigoNPC] Stats resetados (admin)." : "§e[AmigoNPC] Stats resetados (1 ResetPoint consumido)."));
             mgr.requestRescale(ownerId);
          }
       } else {
@@ -125,16 +130,17 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
          int spent = st.spentPoints();
          int avail = Math.max(0, earned - spent);
          int resetPts = RewardsStateService.getShared().getResetPoints(ownerId);
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.info.header")));
-         ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.stats.info.summary", lvl, earned, spent, avail, resetPts)));
+         ctx.sendMessage(Message.raw("§7--- §fAmigoNPC Stats §7---"));
+         ctx.sendMessage(Message.raw(String.format(Locale.ROOT, "§fLevel: §e%d §7| §fEarned: §e%d §7| §fSpent: §e%d §7| §fAvailable: §a%d §7| §fResetPoints: §e%d", lvl, earned, spent, avail, resetPts)));
 
-         for (NpcAttribute a : NpcAttribute.values()) {
+         for(NpcAttribute a : NpcAttribute.values()) {
             int v = st.getAllocated(a);
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.stats.info.row", a.name(), v)));
+            String var10001 = a.name();
+            ctx.sendMessage(Message.raw("§f" + var10001 + "§7: §e" + v));
          }
 
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.info.usage")));
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.stats.info.reset_usage")));
+         ctx.sendMessage(Message.raw("§7Use: §f/amigo stats add <atributo> [qtd]"));
+         ctx.sendMessage(Message.raw("§7Reset: §f/amigo stats reset §7(consome 1 ResetPoint; admin bypass)"));
       }
    }
 
@@ -143,28 +149,22 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
          CommandSender sender = ctx != null ? ctx.sender() : null;
          if (sender == null) {
             return false;
+         } else {
+            String opNode = HytalePermissions.fromCommand("op");
+            return sender.hasPermission(opNode, false) || sender.hasPermission("hytale.command.op", false) || sender.hasPermission("hytale.*", false) || sender.hasPermission("*", false) || sender.hasPermission("OP") || sender.hasPermission("op") || sender.hasPermission("operator") || sender.hasPermission("admin");
          }
-
-         String opNode = HytalePermissions.fromCommand("op");
-         return sender.hasPermission(opNode, false)
-            || sender.hasPermission("hytale.command.op", false)
-            || sender.hasPermission("hytale.*", false)
-            || sender.hasPermission("*", false)
-            || sender.hasPermission("OP")
-            || sender.hasPermission("op")
-            || sender.hasPermission("operator")
-            || sender.hasPermission("admin");
-      } catch (Throwable t) {
+      } catch (Throwable var12) {
          try {
             CommandSender sender = ctx != null ? ctx.sender() : null;
             if (sender == null) {
                return false;
             }
 
-            for (String m : new String[]{"isOp", "isOperator", "isAdmin"}) {
+            for(String m : new String[]{"isOp", "isOperator", "isAdmin"}) {
                try {
                   Method mm = sender.getClass().getMethod(m);
-                  if (mm.invoke(sender) instanceof Boolean b) {
+                  Object r = mm.invoke(sender);
+                  if (r instanceof Boolean b) {
                      return b;
                   }
                } catch (Throwable var10) {
@@ -177,7 +177,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
       }
    }
 
-   private static AmigoStatsSubCommand.ParsedArgs parseFallback(CommandContext ctx) {
+   private static ParsedArgs parseFallback(CommandContext ctx) {
       try {
          if (ctx == null) {
             return null;
@@ -204,7 +204,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
 
          int idxStats = -1;
 
-         for (int i = 0; i < t.length; i++) {
+         for(int i = 0; i < t.length; ++i) {
             if ("stats".equalsIgnoreCase(t[i])) {
                idxStats = i;
                break;
@@ -223,7 +223,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
             }
 
             if (action != null) {
-               return new AmigoStatsSubCommand.ParsedArgs(action, attr, amt);
+               return new ParsedArgs(action, attr, amt);
             }
          }
 
@@ -238,7 +238,7 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
                }
             }
 
-            return new AmigoStatsSubCommand.ParsedArgs(action, attr, amt);
+            return new ParsedArgs(action, attr, amt);
          }
       } catch (Throwable var10) {
       }
@@ -246,6 +246,6 @@ public final class AmigoStatsSubCommand extends AbstractPlayerCommand {
       return null;
    }
 
-   private record ParsedArgs(String action, String attr, Integer amount) {
+   private static record ParsedArgs(String action, String attr, Integer amount) {
    }
 }

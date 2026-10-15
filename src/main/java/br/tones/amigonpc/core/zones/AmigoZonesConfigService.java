@@ -6,14 +6,15 @@ import com.google.gson.GsonBuilder;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 public final class AmigoZonesConfigService {
-   private static final Gson GSON = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
-   private static final Path CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_Zones.json");
-   private static final Path LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("ZonesMobLevelConfig.json");
-   private static volatile AmigoZonesConfig CACHED = null;
-   private static volatile long lastLoadMillis = 0L;
+   private static final Gson GSON;
+   private static final Path CONFIG_PATH;
+   private static final Path LEGACY_PATH;
+   private static volatile AmigoZonesConfig CACHED;
+   private static volatile long lastLoadMillis;
 
    private AmigoZonesConfigService() {
    }
@@ -33,9 +34,9 @@ public final class AmigoZonesConfigService {
       Path loadedFrom = null;
 
       try {
-         if (Files.isRegularFile(CONFIG_PATH)) {
+         if (Files.isRegularFile(CONFIG_PATH, new LinkOption[0])) {
             loadedFrom = CONFIG_PATH;
-         } else if (Files.isRegularFile(LEGACY_PATH)) {
+         } else if (Files.isRegularFile(LEGACY_PATH, new LinkOption[0])) {
             loadedFrom = LEGACY_PATH;
          }
 
@@ -86,6 +87,15 @@ public final class AmigoZonesConfigService {
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg), StandardCharsets.UTF_8);
          } catch (Throwable var2) {
          }
+
       }
+   }
+
+   static {
+      GSON = (new GsonBuilder()).setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
+      CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_Zones.json");
+      LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("ZonesMobLevelConfig.json");
+      CACHED = null;
+      lastLoadMillis = 0L;
    }
 }

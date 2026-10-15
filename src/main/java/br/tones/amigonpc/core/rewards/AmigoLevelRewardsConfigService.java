@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,7 +16,7 @@ import java.util.List;
 
 public final class AmigoLevelRewardsConfigService {
    private static final AmigoLevelRewardsConfigService SHARED = new AmigoLevelRewardsConfigService();
-   private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+   private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().create();
    private volatile AmigoLevelRewardsConfig config = new AmigoLevelRewardsConfig();
 
    public static AmigoLevelRewardsConfigService getShared() {
@@ -44,11 +45,12 @@ public final class AmigoLevelRewardsConfigService {
 
       if (backupExisting) {
          try {
-            if (Files.isRegularFile(p)) {
+            if (Files.isRegularFile(p, new LinkOption[0])) {
                Path bak = p.resolveSibling(p.getFileName().toString() + ".bak");
 
-               for (int i = 1; Files.exists(bak); i++) {
-                  bak = p.resolveSibling(p.getFileName().toString() + ".bak" + i);
+               for(int i = 1; Files.exists(bak, new LinkOption[0]); ++i) {
+                  String var10001 = p.getFileName().toString();
+                  bak = p.resolveSibling(var10001 + ".bak" + i);
                }
 
                Files.copy(p, bak);
@@ -63,6 +65,7 @@ public final class AmigoLevelRewardsConfigService {
          this.config = def;
       } catch (Throwable var5) {
       }
+
    }
 
    public Path path() {
@@ -73,7 +76,7 @@ public final class AmigoLevelRewardsConfigService {
       Path p = this.path();
 
       try {
-         if (!Files.isRegularFile(p)) {
+         if (!Files.isRegularFile(p, new LinkOption[0])) {
             Files.createDirectories(p.getParent());
             AmigoLevelRewardsConfig def = defaultConfig();
             Files.writeString(p, GSON.toJson(def), StandardCharsets.UTF_8);
@@ -123,9 +126,10 @@ public final class AmigoLevelRewardsConfigService {
          }
 
          this.config = cfg;
-      } catch (Throwable t) {
+      } catch (Throwable var11) {
          this.config = defaultConfig();
       }
+
    }
 
    private static AmigoLevelRewardsConfig defaultConfig() {
@@ -133,7 +137,7 @@ public final class AmigoLevelRewardsConfigService {
       cfg.Version = "amigonpc-1";
       cfg.RewardTarget = "NPC";
       cfg.DebugRewardsLogging = false;
-      cfg.Rewards = new ArrayList<>();
+      cfg.Rewards = new ArrayList();
       cfg.Rewards.add(rewardItems(10, item("Ore_Copper", 10), item("Rock_Gem_Emerald", 4), item("Ingredient_Life_Essence", 10)));
       cfg.Rewards.add(rewardReset(15, 1));
       cfg.Rewards.add(rewardItems(20, item("Ore_Iron", 10), item("Rock_Gem_Emerald", 4), item("Ingredient_Void_Essence", 10)));
@@ -161,7 +165,7 @@ public final class AmigoLevelRewardsConfigService {
       AmigoLevelRewardsConfig.RewardEntry r = new AmigoLevelRewardsConfig.RewardEntry();
       r.Level = level;
       r.ResetPoints = resetPoints;
-      r.Items = new ArrayList<>();
+      r.Items = new ArrayList();
       r.Command = "";
       r.CommandTitle = "";
       return r;
@@ -171,9 +175,9 @@ public final class AmigoLevelRewardsConfigService {
       AmigoLevelRewardsConfig.RewardEntry r = new AmigoLevelRewardsConfig.RewardEntry();
       r.Level = level;
       r.ResetPoints = 0;
-      r.Items = new ArrayList<>();
+      r.Items = new ArrayList();
       if (items != null) {
-         for (AmigoLevelRewardsConfig.ItemEntry it : items) {
+         for(AmigoLevelRewardsConfig.ItemEntry it : items) {
             if (it != null) {
                r.Items.add(it);
             }
@@ -203,18 +207,18 @@ public final class AmigoLevelRewardsConfigService {
 
       cfg.RewardTarget = rt;
       if (cfg.Rewards == null) {
-         cfg.Rewards = new ArrayList<>();
+         cfg.Rewards = new ArrayList();
       }
 
-      List<AmigoLevelRewardsConfig.RewardEntry> out = new ArrayList<>();
+      List<AmigoLevelRewardsConfig.RewardEntry> out = new ArrayList();
 
-      for (AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
+      for(AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
          if (r != null) {
             if (r.Level <= 0) {
                System.out.println("[AmigoNPC][Rewards] Ignorando reward com Level invalido: " + r.Level);
             } else {
                if (r.Items == null) {
-                  r.Items = new ArrayList<>();
+                  r.Items = new ArrayList();
                }
 
                if (r.Command == null) {
@@ -229,9 +233,9 @@ public final class AmigoLevelRewardsConfigService {
                   r.ResetPoints = 0;
                }
 
-               List<AmigoLevelRewardsConfig.ItemEntry> items = new ArrayList<>();
+               List<AmigoLevelRewardsConfig.ItemEntry> items = new ArrayList();
 
-               for (AmigoLevelRewardsConfig.ItemEntry it : r.Items) {
+               for(AmigoLevelRewardsConfig.ItemEntry it : r.Items) {
                   if (it != null && it.Quantity > 0 && it.ItemId != null && !it.ItemId.isBlank()) {
                      items.add(it);
                   }
@@ -243,7 +247,7 @@ public final class AmigoLevelRewardsConfigService {
          }
       }
 
-      out.sort(Comparator.comparingInt(a -> a.Level));
+      out.sort(Comparator.comparingInt((a) -> a.Level));
       cfg.Rewards = out;
    }
 }

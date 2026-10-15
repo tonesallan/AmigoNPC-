@@ -3,7 +3,6 @@ package br.tones.amigonpc.commands;
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.HytaleBridge;
 import br.tones.amigonpc.core.debug.BuildInfo;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.ui.AmigoUiFactory;
 import br.tones.amigonpc.ui.UiBridge;
 import com.hypixel.hytale.server.core.Message;
@@ -18,7 +17,7 @@ public final class AmigoDebugCommand extends AbstractCommand {
    }
 
    public AmigoDebugCommand() {
-      super("amigo", AmigoText.text("cmd.desc.amigodebug"));
+      super("amigo", "Debug do AmigoNPC");
    }
 
    public static AmigoDebugCommand createAsStandalone() {
@@ -30,38 +29,26 @@ public final class AmigoDebugCommand extends AbstractCommand {
       this.setAllowsExtraArguments(false);
    }
 
-   protected CompletableFuture<Void> execute(CommandContext ctx) {
-      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.title")));
+   protected CompletableFuture execute(CommandContext ctx) {
+      ctx.sendMessage(Message.raw("§b[AmigoNPC] Debug"));
       String v = BuildInfo.getModVersion();
       String bid = BuildInfo.getBuildId();
-      ctx.sendMessage(
-         Message.raw(
-            AmigoText.format(
-               "cmd.amigodebug.version_build",
-               v == null ? AmigoText.text("cmd.amigodebug.unknown") : v,
-               bid == null ? AmigoText.text("cmd.amigodebug.unknown") : bid
-            )
-         )
-      );
+      ctx.sendMessage(Message.raw("§7- Version: " + (v == null ? "(unknown)" : v) + " §8| BuildId: " + (bid == null ? "(unknown)" : bid)));
       if (ctx.isPlayer()) {
          UUID ownerId = ctx.sender().getUuid();
          boolean enabled = AmigoNpcManager.getShared().toggleDebugLog(ownerId);
-         ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigodebug.debuglog", AmigoText.coloredOnOff(enabled))));
+         ctx.sendMessage(Message.raw("§7- DebugLog: " + (enabled ? "§aON" : "§cOFF")));
       } else {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.debuglog_players_only")));
+         ctx.sendMessage(Message.raw("§7- DebugLog: §8(apenas players)"));
       }
 
       String hb = HytaleBridge.getLastError();
-      ctx.sendMessage(
-         Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "HytaleBridge", hb == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : hb))
-      );
+      ctx.sendMessage(Message.raw("§7- HytaleBridge: " + (hb == null ? "OK/sem erro" : hb)));
       String ub = UiBridge.getLastError();
-      ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "UiBridge", ub == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : ub)));
+      ctx.sendMessage(Message.raw("§7- UiBridge: " + (ub == null ? "OK/sem erro" : ub)));
       String uf = AmigoUiFactory.getLastError();
-      ctx.sendMessage(
-         Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "AmigoUiFactory", uf == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : uf))
-      );
-      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.tip")));
-      return CompletableFuture.completedFuture(null);
+      ctx.sendMessage(Message.raw("§7- AmigoUiFactory: " + (uf == null ? "OK/sem erro" : uf)));
+      ctx.sendMessage(Message.raw("§7Dica: teste §f/amigo spawn§7, §f/amigo despawn§7, §f/amigo defender§7."));
+      return CompletableFuture.completedFuture((Object)null);
    }
 }

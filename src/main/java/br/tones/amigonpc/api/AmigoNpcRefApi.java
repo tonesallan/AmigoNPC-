@@ -10,84 +10,87 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class AmigoNpcRefApi {
-   private static volatile AmigoNpcRefApi.Provider provider;
-   private static final CopyOnWriteArrayList<BiConsumer<UUID, Ref<EntityStore>>> npcRefListeners = new CopyOnWriteArrayList<>();
-   private static final CopyOnWriteArrayList<Consumer<UUID>> despawnListeners = new CopyOnWriteArrayList<>();
+   private static volatile Provider provider;
+   private static final CopyOnWriteArrayList npcRefListeners = new CopyOnWriteArrayList();
+   private static final CopyOnWriteArrayList despawnListeners = new CopyOnWriteArrayList();
 
    private AmigoNpcRefApi() {
    }
 
-   public static void register(AmigoNpcRefApi.Provider p) {
-      provider = Objects.requireNonNull(p, "provider");
+   public static void register(Provider p) {
+      provider = (Provider)Objects.requireNonNull(p, "provider");
    }
 
-   public static void unregister(AmigoNpcRefApi.Provider p) {
+   public static void unregister(Provider p) {
       if (provider == p) {
          provider = null;
       }
+
    }
 
-   public static Optional<Ref<EntityStore>> getNpcRef(UUID ownerUuid) {
-      AmigoNpcRefApi.Provider p = provider;
+   public static Optional getNpcRef(UUID ownerUuid) {
+      Provider p = provider;
       return p == null ? Optional.empty() : p.getNpcRef(ownerUuid);
    }
 
-   public static Optional<Ref<EntityStore>> ensureNpcSpawned(UUID ownerUuid) {
-      AmigoNpcRefApi.Provider p = provider;
+   public static Optional ensureNpcSpawned(UUID ownerUuid) {
+      Provider p = provider;
       return p == null ? Optional.empty() : p.ensureNpcSpawned(ownerUuid);
    }
 
    public static boolean isNpcReady(UUID ownerUuid) {
-      AmigoNpcRefApi.Provider p = provider;
+      Provider p = provider;
       return p != null && p.isNpcReady(ownerUuid);
    }
 
-   public static Optional<Long> getNpcEntityId(UUID ownerUuid) {
-      AmigoNpcRefApi.Provider p = provider;
+   public static Optional getNpcEntityId(UUID ownerUuid) {
+      Provider p = provider;
       return p == null ? Optional.empty() : p.getNpcEntityId(ownerUuid);
    }
 
-   public static void addNpcRefListener(BiConsumer<UUID, Ref<EntityStore>> listener) {
-      npcRefListeners.add(Objects.requireNonNull(listener, "listener"));
+   public static void addNpcRefListener(BiConsumer listener) {
+      npcRefListeners.add((BiConsumer)Objects.requireNonNull(listener, "listener"));
    }
 
-   public static void removeNpcRefListener(BiConsumer<UUID, Ref<EntityStore>> listener) {
+   public static void removeNpcRefListener(BiConsumer listener) {
       npcRefListeners.remove(listener);
    }
 
-   public static void addNpcDespawnListener(Consumer<UUID> listener) {
-      despawnListeners.add(Objects.requireNonNull(listener, "listener"));
+   public static void addNpcDespawnListener(Consumer listener) {
+      despawnListeners.add((Consumer)Objects.requireNonNull(listener, "listener"));
    }
 
-   public static void removeNpcDespawnListener(Consumer<UUID> listener) {
+   public static void removeNpcDespawnListener(Consumer listener) {
       despawnListeners.remove(listener);
    }
 
-   public static void notifyNpcRef(UUID ownerUuid, Ref<EntityStore> npcRef) {
-      for (BiConsumer<UUID, Ref<EntityStore>> l : npcRefListeners) {
+   public static void notifyNpcRef(UUID ownerUuid, Ref npcRef) {
+      for(BiConsumer l : npcRefListeners) {
          try {
             l.accept(ownerUuid, npcRef);
          } catch (Throwable var5) {
          }
       }
+
    }
 
    public static void notifyNpcDespawn(UUID ownerUuid) {
-      for (Consumer<UUID> l : despawnListeners) {
+      for(Consumer l : despawnListeners) {
          try {
             l.accept(ownerUuid);
          } catch (Throwable var4) {
          }
       }
+
    }
 
    public interface Provider {
-      Optional<Ref<EntityStore>> getNpcRef(UUID var1);
+      Optional getNpcRef(UUID var1);
 
-      Optional<Ref<EntityStore>> ensureNpcSpawned(UUID var1);
+      Optional ensureNpcSpawned(UUID var1);
 
       boolean isNpcReady(UUID var1);
 
-      Optional<Long> getNpcEntityId(UUID var1);
+      Optional getNpcEntityId(UUID var1);
    }
 }

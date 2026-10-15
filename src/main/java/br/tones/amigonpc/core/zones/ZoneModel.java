@@ -15,15 +15,18 @@ public final class ZoneModel {
    }
 
    public static String zoneName(int zoneId) {
-      return switch (zoneId) {
-         case 1 -> "Bosque Esmeralda";
-         case 2 -> "Areias Uivantes";
-         case 3 -> "Borea";
-         case 4 -> "Terras Devastadas";
-         case 5 -> "Terras Celestes";
-         case 6 -> "Terras Venenosas";
-         default -> zoneId > 0 ? "Zona " + zoneId : "";
-      };
+      String var10000;
+      switch (zoneId) {
+         case 1 -> var10000 = "Bosque Esmeralda";
+         case 2 -> var10000 = "Areias Uivantes";
+         case 3 -> var10000 = "Borea";
+         case 4 -> var10000 = "Terras Devastadas";
+         case 5 -> var10000 = "Terras Celestes";
+         case 6 -> var10000 = "Terras Venenosas";
+         default -> var10000 = zoneId > 0 ? "Zona " + zoneId : "";
+      }
+
+      return var10000;
    }
 
    public static int expectedZoneForLevel(int lvl) {
@@ -71,25 +74,29 @@ public final class ZoneModel {
    public static AmigoZonesConfig.ZoneRange findZoneRange(int zoneId) {
       if (zoneId <= 0) {
          return null;
-      }
-
-      AmigoZonesConfig cfg = AmigoZonesConfigService.get();
-      if (cfg != null && cfg.zoneRanges != null && !cfg.zoneRanges.isEmpty()) {
-         for (AmigoZonesConfig.ZoneRange r : cfg.zoneRanges) {
-            if (r != null && r.zoneId() == zoneId) {
-               return r;
+      } else {
+         AmigoZonesConfig cfg = AmigoZonesConfigService.get();
+         if (cfg != null && cfg.zoneRanges != null && !cfg.zoneRanges.isEmpty()) {
+            for(AmigoZonesConfig.ZoneRange r : cfg.zoneRanges) {
+               if (r != null && r.zoneId() == zoneId) {
+                  return r;
+               }
             }
          }
+
+         AmigoZonesConfig.ZoneRange var10000;
+         switch (zoneId) {
+            case 1 -> var10000 = new AmigoZonesConfig.ZoneRange(1, 1, 15);
+            case 2 -> var10000 = new AmigoZonesConfig.ZoneRange(2, 15, 50);
+            case 3 -> var10000 = new AmigoZonesConfig.ZoneRange(3, 50, 65);
+            case 4 -> var10000 = new AmigoZonesConfig.ZoneRange(4, 65, 80);
+            case 5 -> var10000 = new AmigoZonesConfig.ZoneRange(5, 80, 95);
+            case 6 -> var10000 = new AmigoZonesConfig.ZoneRange(6, 95, 100);
+            default -> var10000 = null;
+         }
+
+         return var10000;
       }
-      return switch (zoneId) {
-         case 1 -> new AmigoZonesConfig.ZoneRange(1, 1, 15);
-         case 2 -> new AmigoZonesConfig.ZoneRange(2, 15, 50);
-         case 3 -> new AmigoZonesConfig.ZoneRange(3, 50, 65);
-         case 4 -> new AmigoZonesConfig.ZoneRange(4, 65, 80);
-         case 5 -> new AmigoZonesConfig.ZoneRange(5, 80, 95);
-         case 6 -> new AmigoZonesConfig.ZoneRange(6, 95, 100);
-         default -> null;
-      };
    }
 
    public static Color colorForNpcLevel(int npcLevel, int zoneId) {
@@ -100,7 +107,7 @@ public final class ZoneModel {
       if (zoneId > 0) {
          return zoneId;
       } else if (instanceLevelMin > 0 && instanceLevelMax > 0) {
-         int avg = Math.round(((float)instanceLevelMin + instanceLevelMax) / 2.0F);
+         int avg = Math.round(((float)instanceLevelMin + (float)instanceLevelMax) / 2.0F);
          return expectedZoneForLevel(avg);
       } else {
          return null;

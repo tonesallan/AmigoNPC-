@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoPersistence;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -17,13 +16,13 @@ public final class AmigoModeloOffSubCommand extends AbstractPlayerCommand {
    }
 
    public AmigoModeloOffSubCommand() {
-      super("modelooff", AmigoText.text("cmd.desc.amigo.modelooff"));
+      super("modelooff", "Remove o modelo custom do AmigoNPC");
       this.setAllowsExtraArguments(false);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
-      AmigoPersistence.saveModel(playerRef.getUuid(), null, 1.0);
-      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.modelo.removed")));
-      ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.common.apply_respawn")));
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
+      AmigoPersistence.saveModel(playerRef.getUuid(), (String)null, (double)1.0F);
+      ctx.sendMessage(Message.raw("§a[AmigoNPC] Modelo custom removido."));
+      ctx.sendMessage(Message.raw("§7[AmigoNPC] Para aplicar: use §f/amigo despawn§7 e depois §f/amigo spawn§7."));
    }
 }

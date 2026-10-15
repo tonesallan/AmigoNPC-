@@ -2,7 +2,6 @@ package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.api.NpcXpContext;
 import br.tones.amigonpc.api.NpcXpSource;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.xp.sources.NpcXpAwardService;
 import br.tones.amigonpc.core.xp.sources.NpcXpSourcesConfig;
 import br.tones.amigonpc.core.xp.sources.NpcXpSourcesConfigService;
@@ -21,29 +20,35 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 
 public final class AmigoAddNpcXpSubCommand extends AbstractPlayerCommand {
-   private final OptionalArg amountArg = this.withOptionalArg("amount", AmigoText.text("cmd.arg.amigo.addnpcxp.amount"), ArgTypes.INTEGER);
-   private final OptionalArg sourceArg = this.withOptionalArg("source", AmigoText.text("cmd.arg.amigo.addnpcxp.source"), ArgTypes.STRING);
+   private final OptionalArg amountArg;
+   private final OptionalArg sourceArg;
 
    protected boolean canGeneratePermission() {
       return false;
    }
 
    public AmigoAddNpcXpSubCommand() {
-      super("addnpcxp", AmigoText.text("cmd.desc.amigo.addnpcxp"));
+      super("addnpcxp", "Adiciona XP ao NPC (admin/debug)");
+      this.amountArg = this.withOptionalArg("amount", "Quantidade de XP", ArgTypes.INTEGER);
+      this.sourceArg = this.withOptionalArg("source", "Fonte (COMMAND/QUEST/...)", ArgTypes.STRING);
       this.setAllowsExtraArguments(true);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       if (!isAdmin(ctx)) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.addnpcxp.only_op")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Apenas OP."));
       } else {
          NpcXpSourcesConfig cfg = NpcXpSourcesConfigService.get();
          if (!cfg.enableCommandXP) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.addnpcxp.disabled")));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Command XP está desativado (EnableCommandXP=false)."));
          } else {
             Integer amt = null;
-            if (this.amountArg.provided(ctx) && this.amountArg.get(ctx) instanceof Integer i) {
-               amt = i;
+            if (this.amountArg.provided(ctx)) {
+               Object v = this.amountArg.get(ctx);
+               if (v instanceof Integer) {
+                  Integer i = (Integer)v;
+                  amt = i;
+               }
             }
 
             String srcTxt = null;
@@ -64,7 +69,7 @@ public final class AmigoAddNpcXpSubCommand extends AbstractPlayerCommand {
 
                      String[] t = in.trim().split("\\s+");
 
-                     for (int i = 0; i < t.length; i++) {
+                     for(int i = 0; i < t.length; ++i) {
                         if ("addnpcxp".equalsIgnoreCase(t[i]) && i + 1 < t.length) {
                            try {
                               amt = Integer.parseInt(t[i + 1]);
@@ -87,7 +92,7 @@ public final class AmigoAddNpcXpSubCommand extends AbstractPlayerCommand {
                if (srcTxt != null && !srcTxt.isBlank()) {
                   try {
                      src = NpcXpSource.valueOf(srcTxt.trim().toUpperCase(Locale.ROOT));
-                  } catch (Throwable ignored) {
+                  } catch (Throwable var14) {
                      src = NpcXpSource.COMMAND;
                   }
                }
@@ -101,15 +106,15 @@ public final class AmigoAddNpcXpSubCommand extends AbstractPlayerCommand {
                } catch (Throwable var13) {
                }
 
-               NpcXpContext ctxObj = new NpcXpContext(wn, wn, null, 0, null, 0, System.currentTimeMillis());
-               boolean ok = NpcXpAwardService.getShared().awardFixed(playerRef.getUuid(), amt.intValue(), src, ctxObj);
+               NpcXpContext ctxObj = new NpcXpContext(wn, wn, (String)null, 0, (String)null, 0, System.currentTimeMillis());
+               boolean ok = NpcXpAwardService.getShared().awardFixed(playerRef.getUuid(), (long)amt, src, ctxObj);
                if (!ok) {
-                  ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.addnpcxp.failed")));
+                  ctx.sendMessage(Message.raw("§c[AmigoNPC] Não foi possível adicionar XP (throttle ou inválido)."));
                } else {
-                  ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.addnpcxp.success", amt, src.name())));
+                  ctx.sendMessage(Message.raw("§a[AmigoNPC] +" + amt + " XP para o NPC (" + src.name() + ")."));
                }
             } else {
-               ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.addnpcxp.usage")));
+               ctx.sendMessage(Message.raw("§cUso: /amigo addnpcxp <amount> [source]"));
             }
          }
       }
@@ -120,18 +125,11 @@ public final class AmigoAddNpcXpSubCommand extends AbstractPlayerCommand {
          CommandSender sender = ctx != null ? ctx.sender() : null;
          if (sender == null) {
             return false;
+         } else {
+            String opNode = HytalePermissions.fromCommand("op");
+            return sender.hasPermission(opNode, false) || sender.hasPermission("hytale.command.op", false) || sender.hasPermission("hytale.*", false) || sender.hasPermission("*", false) || sender.hasPermission("OP") || sender.hasPermission("op") || sender.hasPermission("operator") || sender.hasPermission("admin");
          }
-
-         String opNode = HytalePermissions.fromCommand("op");
-         return sender.hasPermission(opNode, false)
-            || sender.hasPermission("hytale.command.op", false)
-            || sender.hasPermission("hytale.*", false)
-            || sender.hasPermission("*", false)
-            || sender.hasPermission("OP")
-            || sender.hasPermission("op")
-            || sender.hasPermission("operator")
-            || sender.hasPermission("admin");
-      } catch (Throwable t) {
+      } catch (Throwable var3) {
          return false;
       }
    }

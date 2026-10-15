@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.npcstats.NpcStatsConfigService;
 import br.tones.amigonpc.core.playerstats.PlayerStatTweaksConfigService;
 import br.tones.amigonpc.core.playerstats.PlayerStatTweaksService;
@@ -28,51 +27,46 @@ public final class AmigoReloadSubCommand extends AbstractPlayerCommand {
    }
 
    public AmigoReloadSubCommand() {
-      super("reload", AmigoText.text("cmd.desc.amigo.reload"));
+      super("reload", "Recarrega configs do AmigoNPC (namespaced)");
       this.setAllowsExtraArguments(true);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       if (!isAdmin(ctx)) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.reload.only_op")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Apenas OP."));
       } else {
          try {
             AmigoZonesConfigService.reload();
-         } catch (Throwable var16) {
-         }
-
-         try {
-            NpcStatsConfigService.getShared().reloadNow();
          } catch (Throwable var15) {
          }
 
          try {
-            AmigoLevelRewardsConfigService.getShared().reload();
+            NpcStatsConfigService.getShared().reloadNow();
          } catch (Throwable var14) {
          }
 
          try {
-            NpcXpSourcesConfigService.reloadNow();
+            AmigoLevelRewardsConfigService.getShared().reload();
          } catch (Throwable var13) {
          }
 
          try {
-            PlayerStatTweaksConfigService.reloadNow();
+            NpcXpSourcesConfigService.reloadNow();
          } catch (Throwable var12) {
          }
 
          try {
-            WorldMobScalingConfigService.reloadNow();
+            PlayerStatTweaksConfigService.reloadNow();
          } catch (Throwable var11) {
          }
 
          try {
-            AutoLootConfigService.reloadNow();
+            WorldMobScalingConfigService.reloadNow();
          } catch (Throwable var10) {
          }
 
          try {
-            AmigoText.reloadConfiguredLocale();
+            AutoLootConfigService.reloadNow();
          } catch (Throwable var9) {
          }
 
@@ -89,7 +83,7 @@ public final class AmigoReloadSubCommand extends AbstractPlayerCommand {
          } catch (Throwable var7) {
          }
 
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.reload.ok")));
+         ctx.sendMessage(Message.raw("§a[AmigoNPC] Reload OK."));
       }
    }
 
@@ -98,18 +92,11 @@ public final class AmigoReloadSubCommand extends AbstractPlayerCommand {
          CommandSender sender = ctx != null ? ctx.sender() : null;
          if (sender == null) {
             return false;
+         } else {
+            String opNode = HytalePermissions.fromCommand("op");
+            return sender.hasPermission(opNode, false) || sender.hasPermission("hytale.command.op", false) || sender.hasPermission("hytale.*", false) || sender.hasPermission("*", false) || sender.hasPermission("OP") || sender.hasPermission("op") || sender.hasPermission("operator") || sender.hasPermission("admin");
          }
-
-         String opNode = HytalePermissions.fromCommand("op");
-         return sender.hasPermission(opNode, false)
-            || sender.hasPermission("hytale.command.op", false)
-            || sender.hasPermission("hytale.*", false)
-            || sender.hasPermission("*", false)
-            || sender.hasPermission("OP")
-            || sender.hasPermission("op")
-            || sender.hasPermission("operator")
-            || sender.hasPermission("admin");
-      } catch (Throwable t) {
+      } catch (Throwable var3) {
          return false;
       }
    }

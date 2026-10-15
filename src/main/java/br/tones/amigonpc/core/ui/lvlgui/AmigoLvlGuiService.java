@@ -11,8 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AmigoLvlGuiService {
    private static final AmigoLvlGuiService SHARED = new AmigoLvlGuiService();
-   private final Map<UUID, AmigoLvlGuiPage> openPages = new ConcurrentHashMap<>();
-   private final Map<UUID, Long> nextUpdateNanos = new ConcurrentHashMap<>();
+   private final Map openPages = new ConcurrentHashMap();
+   private final Map nextUpdateNanos = new ConcurrentHashMap();
 
    public static AmigoLvlGuiService getShared() {
       return SHARED;
@@ -25,20 +25,49 @@ public final class AmigoLvlGuiService {
       return this.openPages.containsKey(ownerId);
    }
 
-   public void toggle(Player player, Ref<EntityStore> playerEntityRef, Store<EntityStore> store, PlayerRef playerRef) {
-      UUID ownerId = AmigoLvlGuiPageOpenSupport.ownerIdOrNull(playerRef);
-      if (ownerId != null) {
-         if (!AmigoLvlGuiPageOpenSupport.closeIfOpen(ownerId, this.openPages)) {
-            AmigoLvlGuiPageOpenSupport.open(player, playerEntityRef, store, playerRef, this.openPages, this);
+   public void toggle(Player player, Ref playerEntityRef, Store store, PlayerRef playerRef) {
+      if (player != null && playerRef != null) {
+         UUID ownerId = playerRef.getUuid();
+         if (ownerId != null) {
+            AmigoLvlGuiPage existing = (AmigoLvlGuiPage)this.openPages.get(ownerId);
+            if (existing != null) {
+               try {
+                  existing.requestClose();
+               } catch (Throwable var9) {
+               }
+
+               this.openPages.remove(ownerId);
+            } else {
+               AmigoLvlGuiPage page = new AmigoLvlGuiPage(playerRef, this);
+               this.openPages.put(ownerId, page);
+
+               try {
+                  player.getPageManager().openCustomPage(playerEntityRef, store, page);
+               } catch (Throwable var10) {
+                  this.openPages.remove(ownerId);
+               }
+
+            }
          }
       }
    }
 
-   public void open(Player player, Ref<EntityStore> playerEntityRef, Store<EntityStore> store, PlayerRef playerRef) {
-      UUID ownerId = AmigoLvlGuiPageOpenSupport.ownerIdOrNull(playerRef);
-      if (ownerId != null) {
-         if (!AmigoLvlGuiPageOpenSupport.isAlreadyOpen(ownerId, this.openPages)) {
-            AmigoLvlGuiPageOpenSupport.open(player, playerEntityRef, store, playerRef, this.openPages, this);
+   public void open(Player player, Ref playerEntityRef, Store store, PlayerRef playerRef) {
+      if (player != null && playerRef != null) {
+         UUID ownerId = playerRef.getUuid();
+         if (ownerId != null) {
+            AmigoLvlGuiPage existing = (AmigoLvlGuiPage)this.openPages.get(ownerId);
+            if (existing == null) {
+               AmigoLvlGuiPage page = new AmigoLvlGuiPage(playerRef, this);
+               this.openPages.put(ownerId, page);
+
+               try {
+                  player.getPageManager().openCustomPage(playerEntityRef, store, page);
+               } catch (Throwable var9) {
+                  this.openPages.remove(ownerId);
+               }
+
+            }
          }
       }
    }
@@ -47,9 +76,27 @@ public final class AmigoLvlGuiService {
       if (ownerId != null) {
          this.openPages.remove(ownerId);
       }
+
    }
 
    public void notifyNpcXpChanged(UUID ownerId) {
-      AmigoLvlGuiPageRefreshSupport.notifyNpcXpChanged(ownerId, this.openPages, this.nextUpdateNanos);
+      if (ownerId != null) {
+         AmigoLvlGuiPage p = (AmigoLvlGuiPage)this.openPages.get(ownerId);
+         if (p != null) {
+            long now = System.nanoTime();
+            long next = (Long)this.nextUpdateNanos.getOrDefault(ownerId, 0L);
+            if (now < next) {
+               return;
+            }
+
+            this.nextUpdateNanos.put(ownerId, now + 250000000L);
+
+            try {
+               p.requestHeaderRefresh();
+            } catch (Throwable var8) {
+            }
+         }
+
+      }
    }
 }

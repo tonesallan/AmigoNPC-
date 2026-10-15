@@ -45,16 +45,16 @@ public final class SwordProgression {
    public static int lastMilestoneCrossed(int oldLvl, int newLvl) {
       if (newLvl <= oldLvl) {
          return -1;
-      }
+      } else {
+         int last = -1;
 
-      int last = -1;
-
-      for (int m : MILESTONES) {
-         if (oldLvl < m && newLvl >= m) {
-            last = m;
+         for(int m : MILESTONES) {
+            if (oldLvl < m && newLvl >= m) {
+               last = m;
+            }
          }
-      }
 
-      return last;
+         return last;
+      }
    }
 }

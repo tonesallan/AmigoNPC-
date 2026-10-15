@@ -15,26 +15,27 @@ public final class CommandAccess {
 
    public static void makePublicRecursive(Object cmd) {
       if (cmd != null) {
-         tryInvoke(cmd, "setRequiresPermission", boolean.class, false);
-         tryInvoke(cmd, "setPermissionRequired", boolean.class, false);
-         tryInvoke(cmd, "setRequiresPermissions", boolean.class, false);
-         tryInvoke(cmd, "setRequirePermission", boolean.class, false);
-         tryInvoke(cmd, "setRequiresOp", boolean.class, false);
-         tryInvoke(cmd, "setOpOnly", boolean.class, false);
-         tryInvoke(cmd, "setAdminOnly", boolean.class, false);
+         tryInvoke(cmd, "setRequiresPermission", Boolean.TYPE, false);
+         tryInvoke(cmd, "setPermissionRequired", Boolean.TYPE, false);
+         tryInvoke(cmd, "setRequiresPermissions", Boolean.TYPE, false);
+         tryInvoke(cmd, "setRequirePermission", Boolean.TYPE, false);
+         tryInvoke(cmd, "setRequiresOp", Boolean.TYPE, false);
+         tryInvoke(cmd, "setOpOnly", Boolean.TYPE, false);
+         tryInvoke(cmd, "setAdminOnly", Boolean.TYPE, false);
          tryInvoke(cmd, "setPermission", String.class, (String)null);
          tryInvoke(cmd, "setPermissionNode", String.class, (String)null);
          tryInvoke(cmd, "setPermission", String.class, "");
          tryInvoke(cmd, "setPermissionNode", String.class, "");
          tryClearPermissionFields(cmd);
 
-         for (Object sub : findSubCommands(cmd)) {
+         for(Object sub : findSubCommands(cmd)) {
             makePublicRecursive(sub);
          }
+
       }
    }
 
-   private static void tryInvoke(Object target, String methodName, Class<?> paramType, Object arg) {
+   private static void tryInvoke(Object target, String methodName, Class paramType, Object arg) {
       try {
          Method m = target.getClass().getMethod(methodName, paramType);
          m.setAccessible(true);
@@ -46,6 +47,7 @@ public final class CommandAccess {
             m.invoke(target, arg);
          } catch (Throwable var5) {
          }
+
       }
    }
 
@@ -53,7 +55,7 @@ public final class CommandAccess {
       try {
          Field[] fields = cmd.getClass().getDeclaredFields();
 
-         for (Field f : fields) {
+         for(Field f : fields) {
             String n = f.getName();
             if (n != null) {
                String ln = n.toLowerCase(Locale.ROOT);
@@ -61,12 +63,12 @@ public final class CommandAccess {
                   try {
                      f.setAccessible(true);
                      Class<?> t = f.getType();
-                     if (t == boolean.class) {
+                     if (t == Boolean.TYPE) {
                         f.setBoolean(cmd, false);
                      } else if (t == Boolean.class) {
                         f.set(cmd, Boolean.FALSE);
                      } else if (t == String.class) {
-                        f.set(cmd, null);
+                        f.set(cmd, (Object)null);
                      }
                   } catch (Throwable var9) {
                   }
@@ -75,94 +77,97 @@ public final class CommandAccess {
          }
       } catch (Throwable var10) {
       }
+
    }
 
-   private static List<Object> findSubCommands(Object cmd) {
+   private static List findSubCommands(Object cmd) {
       if (cmd == null) {
          return Collections.emptyList();
-      }
-
-      try {
-         Method m = cmd.getClass().getMethod("getSubCommands");
-         Object v = m.invoke(cmd);
-         List<Object> out = toList(v);
-         if (!out.isEmpty()) {
-            return out;
-         }
-      } catch (Throwable var10) {
-      }
-
-      for (String mn : new String[]{"getChildren", "children", "subCommands", "subcommands"}) {
+      } else {
          try {
-            Method m = cmd.getClass().getMethod(mn);
+            Method m = cmd.getClass().getMethod("getSubCommands");
             Object v = m.invoke(cmd);
             List<Object> out = toList(v);
             if (!out.isEmpty()) {
                return out;
             }
-         } catch (Throwable var9) {
+         } catch (Throwable var10) {
          }
-      }
 
-      for (String fn : new String[]{"subCommands", "subcommands", "children", "subCommandList", "subCommandMap"}) {
-         try {
-            Field f = cmd.getClass().getDeclaredField(fn);
-            f.setAccessible(true);
-            Object v = f.get(cmd);
-            List<Object> out = toList(v);
-            if (!out.isEmpty()) {
-               return out;
+         for(String mn : new String[]{"getChildren", "children", "subCommands", "subcommands"}) {
+            try {
+               Method m = cmd.getClass().getMethod(mn);
+               Object v = m.invoke(cmd);
+               List<Object> out = toList(v);
+               if (!out.isEmpty()) {
+                  return out;
+               }
+            } catch (Throwable var9) {
             }
-         } catch (Throwable var8) {
          }
-      }
 
-      return Collections.emptyList();
-   }
+         for(String fn : new String[]{"subCommands", "subcommands", "children", "subCommandList", "subCommandMap"}) {
+            try {
+               Field f = cmd.getClass().getDeclaredField(fn);
+               f.setAccessible(true);
+               Object v = f.get(cmd);
+               List<Object> out = toList(v);
+               if (!out.isEmpty()) {
+                  return out;
+               }
+            } catch (Throwable var8) {
+            }
+         }
 
-   private static List<Object> toList(Object v) {
-      if (v == null) {
          return Collections.emptyList();
       }
+   }
 
-      List<Object> out = new ArrayList<>();
+   private static List toList(Object v) {
+      if (v == null) {
+         return Collections.emptyList();
+      } else {
+         List<Object> out = new ArrayList();
 
-      try {
-         if (v instanceof Iterable) {
-            for (Object o : (Iterable)v) {
-               if (o != null) {
-                  out.add(o);
+         try {
+            if (v instanceof Iterable) {
+               for(Object o : (Iterable)v) {
+                  if (o != null) {
+                     out.add(o);
+                  }
                }
+
+               return out;
             }
 
-            return out;
-         }
+            if (v instanceof Map) {
+               Map<?, ?> map = (Map)v;
 
-         if (v instanceof Map<?, ?> map) {
-            for (Object o : map.values()) {
-               if (o != null) {
-                  out.add(o);
+               for(Object o : map.values()) {
+                  if (o != null) {
+                     out.add(o);
+                  }
                }
+
+               return out;
             }
 
-            return out;
-         }
+            if (v.getClass().isArray()) {
+               int n = Array.getLength(v);
 
-         if (v.getClass().isArray()) {
-            int n = Array.getLength(v);
-
-            for (int i = 0; i < n; i++) {
-               Object o = Array.get(v, i);
-               if (o != null) {
-                  out.add(o);
+               for(int i = 0; i < n; ++i) {
+                  Object o = Array.get(v, i);
+                  if (o != null) {
+                     out.add(o);
+                  }
                }
-            }
 
-            return out;
+               return out;
+            }
+         } catch (Throwable var5) {
          }
-      } catch (Throwable var5) {
+
+         return out;
       }
-
-      return out;
    }
 }

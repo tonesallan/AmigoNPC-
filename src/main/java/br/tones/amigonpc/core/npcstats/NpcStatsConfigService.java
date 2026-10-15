@@ -5,12 +5,13 @@ import com.google.gson.GsonBuilder;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
 public final class NpcStatsConfigService {
    private static final NpcStatsConfigService SHARED = new NpcStatsConfigService();
-   private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+   private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().create();
    private volatile NpcStatsConfig cfg = new NpcStatsConfig();
    private volatile long nextReloadAtMs = 0L;
 
@@ -47,7 +48,7 @@ public final class NpcStatsConfigService {
       Path p = path();
 
       try {
-         if (!Files.isRegularFile(p)) {
+         if (!Files.isRegularFile(p, new LinkOption[0])) {
             Files.createDirectories(p.getParent());
             Files.writeString(p, GSON.toJson(new NpcStatsConfig()), StandardCharsets.UTF_8);
          }
@@ -60,13 +61,14 @@ public final class NpcStatsConfigService {
             }
 
             if (loaded.BlacklistedStats == null) {
-               loaded.BlacklistedStats = new ArrayList<>();
+               loaded.BlacklistedStats = new ArrayList();
             }
 
             this.cfg = loaded;
          }
-      } catch (Throwable ignored) {
+      } catch (Throwable var4) {
          this.cfg = new NpcStatsConfig();
       }
+
    }
 }

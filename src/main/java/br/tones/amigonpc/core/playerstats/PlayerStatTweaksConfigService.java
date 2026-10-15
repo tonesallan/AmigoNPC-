@@ -6,12 +6,13 @@ import com.google.gson.GsonBuilder;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 public final class PlayerStatTweaksConfigService {
-   private static final Gson GSON = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
-   private static final Path CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_StatTweaks.json");
-   private static final Path LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("PlayerStatTweaksConfig.json");
+   private static final Gson GSON;
+   private static final Path CONFIG_PATH;
+   private static final Path LEGACY_PATH;
    private static volatile PlayerStatTweaksConfig CACHED;
 
    private PlayerStatTweaksConfigService() {
@@ -20,7 +21,7 @@ public final class PlayerStatTweaksConfigService {
    public static PlayerStatTweaksConfig get() {
       PlayerStatTweaksConfig c = CACHED;
       if (c == null) {
-         synchronized (PlayerStatTweaksConfigService.class) {
+         synchronized(PlayerStatTweaksConfigService.class) {
             c = CACHED;
             if (c == null) {
                c = reloadNow();
@@ -36,9 +37,9 @@ public final class PlayerStatTweaksConfigService {
       Path loadedFrom = null;
 
       try {
-         if (Files.isRegularFile(CONFIG_PATH)) {
+         if (Files.isRegularFile(CONFIG_PATH, new LinkOption[0])) {
             loadedFrom = CONFIG_PATH;
-         } else if (Files.isRegularFile(LEGACY_PATH)) {
+         } else if (Files.isRegularFile(LEGACY_PATH, new LinkOption[0])) {
             loadedFrom = LEGACY_PATH;
          }
 
@@ -67,6 +68,13 @@ public final class PlayerStatTweaksConfigService {
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg), StandardCharsets.UTF_8);
          } catch (Throwable var2) {
          }
+
       }
+   }
+
+   static {
+      GSON = (new GsonBuilder()).setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
+      CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_StatTweaks.json");
+      LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("PlayerStatTweaksConfig.json");
    }
 }

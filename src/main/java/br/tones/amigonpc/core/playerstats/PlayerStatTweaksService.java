@@ -27,7 +27,7 @@ public final class PlayerStatTweaksService {
    private static final String KEY_OXY_MUL = "amigonpc_player_oxygen_mul";
    private static final String KEY_AMMO_ADD = "amigonpc_player_ammo_add";
    private static final String KEY_AMMO_MUL = "amigonpc_player_ammo_mul";
-   private final ConcurrentHashMap<String, Boolean> applied = new ConcurrentHashMap<>();
+   private final ConcurrentHashMap applied = new ConcurrentHashMap();
 
    public static PlayerStatTweaksService getShared() {
       return SHARED;
@@ -43,12 +43,21 @@ public final class PlayerStatTweaksService {
    }
 
    public void onPlayerLeave(Player player, PlayerRef pref) {
-      try {
-         UUID uuid = pref != null ? pref.getUuid() : null;
-         if (uuid != null) {
-            this.applied.remove(uuid.toString());
+      if (player != null) {
+         try {
+            UUID uuid = null;
+
+            try {
+               uuid = pref != null ? pref.getUuid() : null;
+            } catch (Throwable var5) {
+            }
+
+            if (uuid != null) {
+               this.applied.remove(uuid.toString());
+            }
+         } catch (Throwable var6) {
          }
-      } catch (Throwable ignored) {
+
       }
    }
 
@@ -61,7 +70,7 @@ public final class PlayerStatTweaksService {
          }
 
          String k = uuid.toString();
-         Boolean was = this.applied.get(k);
+         Boolean was = (Boolean)this.applied.get(k);
          if (force || was == null || was != enabled) {
             Ref<EntityStore> ref = player.getReference();
             if (ref != null && ref.isValid()) {
@@ -87,7 +96,7 @@ public final class PlayerStatTweaksService {
             return false;
          }
 
-         for (PluginBase p : pm.getPlugins()) {
+         for(PluginBase p : pm.getPlugins()) {
             if (p != null) {
                String name = null;
 
@@ -118,12 +127,12 @@ public final class PlayerStatTweaksService {
       return false;
    }
 
-   private static void applyNow(PlayerStatTweaksConfig cfg, Store<EntityStore> store, Ref<EntityStore> playerRef) {
+   private static void applyNow(PlayerStatTweaksConfig cfg, Store store, Ref playerRef) {
       if (cfg != null && store != null && playerRef != null) {
          EntityStatMap stats;
          try {
             stats = (EntityStatMap)store.ensureAndGetComponent(playerRef, EntityStatMap.getComponentType());
-         } catch (Throwable t) {
+         } catch (Throwable var11) {
             return;
          }
 
@@ -164,10 +173,11 @@ public final class PlayerStatTweaksService {
             store.putComponent(playerRef, EntityStatMap.getComponentType(), stats);
          } catch (Throwable var9) {
          }
+
       }
    }
 
-   private static void removeAll(Store<EntityStore> store, Ref<EntityStore> playerRef) {
+   private static void removeAll(Store store, Ref playerRef) {
       if (store != null && playerRef != null) {
          try {
             EntityStatMap stats = (EntityStatMap)store.getComponent(playerRef, EntityStatMap.getComponentType());
@@ -206,6 +216,7 @@ public final class PlayerStatTweaksService {
             }
          } catch (Throwable var10) {
          }
+
       }
    }
 
@@ -219,6 +230,7 @@ public final class PlayerStatTweaksService {
          stats.removeModifier(idx, mulKey);
       } catch (Throwable var5) {
       }
+
    }
 
    private static void applyOne(EntityStatMap stats, int idx, String addKey, String mulKey, float add, float mul) {
@@ -236,13 +248,14 @@ public final class PlayerStatTweaksService {
          } catch (Throwable var7) {
          }
       }
+
    }
 
-   private static int safeIndex(PlayerStatTweaksService.IntSupplier s) {
+   private static int safeIndex(IntSupplier s) {
       try {
          int v = s.get();
          return v >= 0 ? v : -1;
-      } catch (Throwable t) {
+      } catch (Throwable var2) {
          return -1;
       }
    }

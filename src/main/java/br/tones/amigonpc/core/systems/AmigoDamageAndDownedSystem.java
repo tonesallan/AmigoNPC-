@@ -1,7 +1,6 @@
 package br.tones.amigonpc.core.systems;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.worldscaling.WorldMobScalingService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -19,23 +18,67 @@ import com.hypixel.hytale.server.core.modules.entity.component.ActiveAnimationCo
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage.EntitySource;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
-   public SystemGroup<EntityStore> getGroup() {
+   private static Ref extractAttackerRef(Damage.Source src) {
+      if (src == null) {
+         return null;
+      } else {
+         try {
+            if (src instanceof Damage.EntitySource) {
+               Damage.EntitySource es = (Damage.EntitySource)src;
+               return es.getRef();
+            }
+         } catch (Throwable var11) {
+         }
+
+         String[] methods = new String[]{"getRef", "getEntityRef", "getSourceRef", "getOwnerRef", "getShooterRef", "getAttackerRef"};
+
+         for(String mname : methods) {
+            try {
+               Method m = src.getClass().getMethod(mname);
+               Object v = m.invoke(src);
+               if (v instanceof Ref) {
+                  return (Ref)v;
+               }
+            } catch (Throwable var10) {
+            }
+         }
+
+         String[] fields = new String[]{"ref", "entityRef", "sourceRef", "ownerRef", "shooterRef", "attackerRef"};
+
+         for(String fname : fields) {
+            try {
+               Field f = src.getClass().getDeclaredField(fname);
+               f.setAccessible(true);
+               Object v = f.get(src);
+               if (v instanceof Ref) {
+                  return (Ref)v;
+               }
+            } catch (Throwable var9) {
+            }
+         }
+
+         return null;
+      }
+   }
+
+   public SystemGroup getGroup() {
       return DamageModule.get().getFilterDamageGroup();
    }
 
-   public Query<EntityStore> getQuery() {
+   public Query getQuery() {
       return Query.any();
    }
 
-   public void handle(int entityIndex, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store, CommandBuffer<EntityStore> buffer, Damage damage) {
+   public void handle(int entityIndex, ArchetypeChunk chunk, Store store, CommandBuffer buffer, Damage damage) {
       if (damage != null && !damage.isCancelled()) {
          Ref<EntityStore> targetRef = chunk.getReferenceTo(entityIndex);
          if (targetRef != null) {
@@ -43,22 +86,28 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
             World world = null;
 
             try {
-               if (store.getExternalData() instanceof EntityStore es) {
+               Object ext = store.getExternalData();
+               if (ext instanceof EntityStore) {
+                  EntityStore es = (EntityStore)ext;
                   world = es.getWorld();
                }
             } catch (Throwable var31) {
             }
 
             try {
-               if (damage.getSource() instanceof EntitySource es && es.getRef() != null) {
-                  Ref<EntityStore> srcRef = es.getRef();
-                  Player srcPlayer = (Player)store.getComponent(srcRef, Player.getComponentType());
-                  if (srcPlayer != null) {
-                     UUIDComponent uuidComp = (UUIDComponent)store.getComponent(srcRef, UUIDComponent.getComponentType());
-                     UUID ownerId = uuidComp == null ? null : uuidComp.getUuid();
-                     if (ownerId != null && manager.hasNpc(ownerId)) {
-                        manager.startAssist(ownerId, targetRef);
-                        manager.recordCombatTag(ownerId, targetRef, store);
+               Damage.Source src = damage.getSource();
+               if (src instanceof Damage.EntitySource) {
+                  Damage.EntitySource es = (Damage.EntitySource)src;
+                  if (es.getRef() != null) {
+                     Ref<EntityStore> srcRef = es.getRef();
+                     Player srcPlayer = (Player)store.getComponent(srcRef, Player.getComponentType());
+                     if (srcPlayer != null) {
+                        UUIDComponent uuidComp = (UUIDComponent)store.getComponent(srcRef, UUIDComponent.getComponentType());
+                        UUID ownerId = uuidComp == null ? null : uuidComp.getUuid();
+                        if (ownerId != null && manager.hasNpc(ownerId)) {
+                           manager.startAssist(ownerId, targetRef);
+                           manager.recordCombatTag(ownerId, targetRef, store);
+                        }
                      }
                   }
                }
@@ -71,14 +120,13 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                   UUIDComponent uuidComp = (UUIDComponent)store.getComponent(targetRef, UUIDComponent.getComponentType());
                   UUID ownerId = uuidComp == null ? null : uuidComp.getUuid();
                   if (ownerId != null && manager.hasNpc(ownerId)) {
-                     Ref<EntityStore> attackerRef = DamageSourceRefSupport.extractAttackerRef(damage.getSource());
+                     Ref<EntityStore> attackerRef = extractAttackerRef(damage.getSource());
                      if (attackerRef != null) {
                         manager.startCombat(ownerId, attackerRef);
-                        manager.tryInterruptOwnerAttacker(store, ownerId, attackerRef);
                      } else {
                         try {
                            String srcName = damage.getSource() == null ? "null" : damage.getSource().getClass().getSimpleName();
-                           manager.debugDamage(ownerId, AmigoText.format("core.debug.damage.player_missing_attacker", srcName));
+                           manager.debugDamage(ownerId, "player tomou dano, mas não consegui extrair attackerRef (src=" + srcName + ")");
                         } catch (Throwable var28) {
                         }
                      }
@@ -86,7 +134,7 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
 
                   try {
                      if (world != null) {
-                        Ref<EntityStore> attackerRef = DamageSourceRefSupport.extractAttackerRef(damage.getSource());
+                        Ref<EntityStore> attackerRef = extractAttackerRef(damage.getSource());
                         if (attackerRef != null) {
                            float scaled = WorldMobScalingService.getShared().scaleOutgoingDamage(store, attackerRef, world, damage.getAmount());
                            damage.setAmount(scaled);
@@ -108,12 +156,13 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                   }
                } catch (Throwable var19) {
                }
+
             } else {
                UUID owner = manager.getOwnerFromRef(targetRef);
 
                try {
                   if (owner != null) {
-                     Ref<EntityStore> attackerRef = DamageSourceRefSupport.extractAttackerRef(damage.getSource());
+                     Ref<EntityStore> attackerRef = extractAttackerRef(damage.getSource());
                      if (attackerRef != null) {
                         UUIDComponent attackerUuid = (UUIDComponent)store.getComponent(attackerRef, UUIDComponent.getComponentType());
                         if (attackerUuid != null && owner.equals(attackerUuid.getUuid())) {
@@ -132,7 +181,7 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                } else {
                   try {
                      if (owner != null) {
-                        Ref<EntityStore> attackerRef = DamageSourceRefSupport.extractAttackerRef(damage.getSource());
+                        Ref<EntityStore> attackerRef = extractAttackerRef(damage.getSource());
                         if (attackerRef != null) {
                            try {
                               if (world != null) {
@@ -144,21 +193,13 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                            }
 
                            Player maybePlayerAttacker = (Player)store.getComponent(attackerRef, Player.getComponentType());
-                           if (maybePlayerAttacker != null) {
-                              damage.setCancelled(true);
-                              return;
+                           if (maybePlayerAttacker == null || manager.isPvpEnabled()) {
+                              manager.startNpcCombat(owner, attackerRef);
                            }
-
-                           if (manager.isAmigoRef(attackerRef) && !manager.isPvpEnabled()) {
-                              damage.setCancelled(true);
-                              return;
-                           }
-
-                           manager.startNpcCombat(owner, attackerRef);
                         } else {
                            try {
                               String srcName = damage.getSource() == null ? "null" : damage.getSource().getClass().getSimpleName();
-                              manager.debugDamage(owner, AmigoText.format("core.debug.damage.npc_missing_attacker", srcName));
+                              manager.debugDamage(owner, "NPC tomou dano, mas não consegui extrair attackerRef (src=" + srcName + ")");
                            } catch (Throwable var24) {
                            }
                         }
@@ -181,7 +222,7 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                   float currentHp;
                   try {
                      currentHp = stats.get(healthIdx).get();
-                  } catch (Throwable t) {
+                  } catch (Throwable var22) {
                      stats.maximizeStatValue(healthIdx);
                      currentHp = stats.get(healthIdx).get();
                   }
@@ -191,52 +232,51 @@ public final class AmigoDamageAndDownedSystem extends DamageEventSystem {
                      incoming = manager.mitigateIncomingDamage(owner, incoming);
                   }
 
-                  incoming = Math.max(0.0F, incoming);
-                  if (incoming <= 0.0F) {
+                  float newHp = currentHp - incoming;
+                  ActiveAnimationComponent anim = (ActiveAnimationComponent)buffer.ensureAndGetComponent(targetRef, ActiveAnimationComponent.getComponentType());
+                  MovementStatesComponent move = (MovementStatesComponent)buffer.ensureAndGetComponent(targetRef, MovementStatesComponent.getComponentType());
+                  MovementStates states = move.getMovementStates();
+                  if (states == null) {
+                     states = new MovementStates();
+                     states.idle = true;
+                     states.onGround = true;
+                     move.setMovementStates(states);
+                     buffer.replaceComponent(targetRef, MovementStatesComponent.getComponentType(), move);
+                  }
+
+                  if (newHp <= 0.0F) {
+                     stats.setStatValue(healthIdx, 1.0F);
+                     buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
+
+                     try {
+                        String[] deathIds = DefaultAnimations.getDeathAnimationIds(states, damage.getCause());
+                        if (deathIds != null && deathIds.length > 0 && deathIds[0] != null) {
+                           anim.setPlayingAnimation(AnimationSlot.Action, deathIds[0]);
+                           buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
+                        }
+                     } catch (Throwable var20) {
+                     }
+
+                     if (owner != null) {
+                        manager.markDowned(owner);
+                     }
+
                      damage.setCancelled(true);
-                     return;
-                  }
+                  } else {
+                     stats.setStatValue(healthIdx, newHp);
+                     buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
 
-                  // Preserve Hytale's normal damage pipeline for every non-lethal
-                  // hit. Only a lethal hit is intercepted so the companion can
-                  // transition to DOWNED instead of entering the normal death flow.
-                  if (currentHp - incoming > 0.0F) {
-                     damage.setAmount(incoming);
-                     return;
-                  }
-
-                  stats.setStatValue(healthIdx, 1.0F);
-                  buffer.replaceComponent(targetRef, EntityStatMap.getComponentType(), stats);
-
-                  try {
-                     ActiveAnimationComponent anim = (ActiveAnimationComponent)buffer.ensureAndGetComponent(
-                        targetRef, ActiveAnimationComponent.getComponentType()
-                     );
-                     MovementStatesComponent move = (MovementStatesComponent)buffer.ensureAndGetComponent(
-                        targetRef, MovementStatesComponent.getComponentType()
-                     );
-                     MovementStates states = move.getMovementStates();
-                     if (states == null) {
-                        states = new MovementStates();
-                        states.idle = true;
-                        states.onGround = true;
-                        move.setMovementStates(states);
-                        buffer.replaceComponent(targetRef, MovementStatesComponent.getComponentType(), move);
+                     try {
+                        String[] hurtIds = DefaultAnimations.getHurtAnimationIds(states, damage.getCause());
+                        if (hurtIds != null && hurtIds.length > 0 && hurtIds[0] != null) {
+                           anim.setPlayingAnimation(AnimationSlot.Action, hurtIds[0]);
+                           buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
+                        }
+                     } catch (Throwable var21) {
                      }
 
-                     String[] deathIds = DefaultAnimations.getDeathAnimationIds(states, damage.getCause());
-                     if (deathIds != null && deathIds.length > 0 && deathIds[0] != null) {
-                        anim.setPlayingAnimation(AnimationSlot.Action, deathIds[0]);
-                        buffer.replaceComponent(targetRef, ActiveAnimationComponent.getComponentType(), anim);
-                     }
-                  } catch (Throwable ignored) {
+                     damage.setCancelled(true);
                   }
-
-                  if (owner != null) {
-                     manager.markDowned(owner);
-                  }
-
-                  damage.setCancelled(true);
                }
             }
          }

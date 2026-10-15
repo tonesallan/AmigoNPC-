@@ -4,20 +4,16 @@ import br.tones.amigonpc.api.NpcXpContext;
 import br.tones.amigonpc.api.NpcXpSource;
 import br.tones.amigonpc.api.events.NpcExperienceGainedEvent;
 import br.tones.amigonpc.api.events.NpcLevelUpEvent;
+import br.tones.amigonpc.core.autoloot.AutoLootConfig;
+import br.tones.amigonpc.core.autoloot.AutoLootConfigService;
 import br.tones.amigonpc.core.debug.ActionTraceService;
-import br.tones.amigonpc.core.debug.DebugVec3;
-import br.tones.amigonpc.core.debug.NpcDebugSnapshot;
-import br.tones.amigonpc.core.debug.NpcDebugSnapshotSupport;
 import br.tones.amigonpc.core.events.AmigoEventBus;
 import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.core.npcstats.AttributeModifierService;
 import br.tones.amigonpc.core.npcstats.NpcStatsConfigService;
 import br.tones.amigonpc.core.npcstats.NpcStatsService;
 import br.tones.amigonpc.core.npcstats.NpcStatsState;
 import br.tones.amigonpc.core.optional.AmigoWardrobePersistence;
-import br.tones.amigonpc.core.progress.NpcLevelProgressSnapshot;
-import br.tones.amigonpc.core.progress.NpcProgressionSupport;
 import br.tones.amigonpc.core.progress.StatScaling;
 import br.tones.amigonpc.core.progress.XpProgression;
 import br.tones.amigonpc.core.rpgleveling.stage1.RpgLevelingStage1Config;
@@ -25,39 +21,50 @@ import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1Formulas;
 import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1MobLevelCalculator;
 import br.tones.amigonpc.core.rpgleveling.stage1.RpgStage1MobLevelHelper;
 import br.tones.amigonpc.core.ui.lvlgui.AmigoLvlGuiService;
+import br.tones.amigonpc.core.xp.sources.NpcCollectXpSource;
 import br.tones.amigonpc.core.zones.AmigoZonesConfigService;
 import br.tones.amigonpc.core.zones.MobLevelVarianceCalculator;
 import br.tones.amigonpc.core.zones.ZoneMobService;
 import br.tones.amigonpc.core.zones.ZoneModel;
 import com.hypixel.hytale.component.Archetype;
+import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
-import org.joml.Vector3d;
+import com.hypixel.hytale.math.shape.Box;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.Color;
+import com.hypixel.hytale.protocol.Direction;
 import com.hypixel.hytale.protocol.ItemAnimation;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.protocol.Vector3f;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.itemanimation.config.ItemPlayerAnimations;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle;
 import com.hypixel.hytale.server.core.asset.type.particle.config.WorldParticle;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
+import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
+import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.modules.entity.component.ActiveAnimationComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
 import com.hypixel.hytale.server.core.modules.entity.component.RespondToHit;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage.EntitySource;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage.Particles;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
@@ -65,7 +72,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntitySta
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier.ModifierTarget;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier.CalculationType;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -82,7 +88,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
@@ -91,57 +96,46 @@ import java.util.concurrent.TimeUnit;
 public final class AmigoNpcManager {
    private static final AmigoNpcManager SHARED = new AmigoNpcManager();
    private static final String DEFAULT_MODEL_ID = "PlayerTestModel_V";
-   private static final double DEFAULT_MODEL_SCALE = 1.0;
+   private static final double DEFAULT_MODEL_SCALE = (double)1.0F;
    private static final String DEFAULT_ROLE_NAME = "Amigo_Follow";
    private static final boolean DEBUG_COMBAT_DEFAULT = false;
-   private static final Map<String, String> WEAPON_ATTACK_ANIM_CACHE = new ConcurrentHashMap<>();
-   private final Map<UUID, AmigoNpcManager.NpcRecord> npcRefPorPlayer = new ConcurrentHashMap<>();
-   private final Map<UUID, Boolean> debugLogByOwner = new ConcurrentHashMap<>();
-   private final Map<UUID, PendingRespawn> pendingRespawns = new ConcurrentHashMap<>();
-   private final Map<Object, UUID> amigoRefs = new ConcurrentHashMap<>();
+   private static final Map WEAPON_ATTACK_ANIM_CACHE = new ConcurrentHashMap();
+   private final Map npcRefPorPlayer = new ConcurrentHashMap();
+   private final Map debugLogByOwner = new ConcurrentHashMap();
+   private final Map pendingRespawns = new ConcurrentHashMap();
+   private final Map amigoRefs = new ConcurrentHashMap();
    private static volatile String LAST_ERROR;
    private volatile boolean pvpEnabled = false;
    private static final long COMBAT_WINDOW_MILLIS = 3000L;
    private static final long ASSIST_GRACE_MILLIS = 3000L;
    private static final long MELEE_COOLDOWN_MILLIS = 850L;
-   private static final double DEFENDER_AUTO_ACQUIRE_RADIUS = 12.0;
-   private static final double DEFENDER_AUTO_ACQUIRE_MAX_DY = 2.5;
-   private static final double CHASE_MAX_DISTANCE = 30.0;
-   private static final double CHASE_REACQUIRE_DISTANCE = 10.0;
-   private static final double RANGED_AIR_MAX_DISTANCE = 20.0;
-   private static final double RANGED_AIR_MAX_DY = 35.0;
+   private static final double DEFENDER_AUTO_ACQUIRE_RADIUS = (double)12.0F;
+   private static final double DEFENDER_AUTO_ACQUIRE_MAX_DY = (double)2.5F;
+   private static final double CHASE_MAX_DISTANCE = (double)30.0F;
+   private static final double CHASE_REACQUIRE_DISTANCE = (double)10.0F;
+   private static final double RANGED_AIR_MAX_DISTANCE = (double)20.0F;
+   private static final double RANGED_AIR_MAX_DY = (double)35.0F;
    private static final long RANGED_COOLDOWN_MILLIS = 1150L;
    private static final long LEVEL_UP_FX_MILLIS = 1000L;
    private static final long LEVEL_UP_FX_TICK_MILLIS = 250L;
-   private static final double AUTOLOOT_RADIUS = 5.0;
-   private static final double AUTOLOOT_OWNER_RADIUS = 20.0;
+   private static final double AUTOLOOT_RADIUS = (double)5.0F;
+   private static final double AUTOLOOT_OWNER_RADIUS = (double)20.0F;
    private static final long AUTOLOOT_INTERVAL_MS = 250L;
    private static final int AUTOLOOT_MAX_ITEMS_PER_SCAN = 8;
    private static final long AUTOLOOT_FULL_MSG_COOLDOWN_MS = 30000L;
-   private static final long DOWNED_AUTO_REVIVE_MILLIS = 40000L;
-   private static final double DOWNED_BODY_HIDE_DISTANCE = 25.0;
-   private static final long DOWNED_CHAT_MIN_INTERVAL_MILLIS = 8000L;
-   private static final long DOWNED_CHAT_MAX_INTERVAL_MILLIS = 14000L;
-   private static final String[] DOWNED_CHAT_MESSAGES = new String[]{
-      "Ainda estou morto :x",
-      "Desculpa, morto não fala…..",
-      "Mortinho da Silva :x"
-   };
-   private static final Archetype<EntityStore> AUTOLOOT_QUERY = Archetype.of(
-      new ComponentType[]{TransformComponent.getComponentType(), ItemComponent.getComponentType()}
-   );
+   private static final Archetype AUTOLOOT_QUERY = Archetype.of(new ComponentType[]{TransformComponent.getComponentType(), ItemComponent.getComponentType()});
    private static final long BACKPACK_SAVE_DEBOUNCE_MS = 400L;
    private static final long UNDERGROUND_CHECK_INTERVAL_MS = 500L;
    private static final int UNDERGROUND_CEILING_SCAN_BLOCKS = 12;
-   private static final double UNDERGROUND_TELEPORT_DISTANCE = 10.0;
+   private static final double UNDERGROUND_TELEPORT_DISTANCE = (double)10.0F;
    private static final String LOCKED_TARGET_CLOSE_SLOT = "LockedTargetClose";
-   private static final double LOOTING_NO_ENEMY_RADIUS = 4.0;
-   private static final double LOOT_TAG_SCAN_RADIUS = 6.0;
-   private static final double LOOT_PICKUP_DISTANCE = 5.0;
+   private static final double LOOTING_NO_ENEMY_RADIUS = (double)4.0F;
+   private static final double LOOT_TAG_SCAN_RADIUS = (double)6.0F;
+   private static final double LOOT_PICKUP_DISTANCE = (double)5.0F;
    private static final String LOOT_CHAT_TEMPLATE = "{quantidade} {item} Coletado.";
    private static final long LOOT_CHAT_SUMMARY_DELAY_MS = 500L;
    private static final long COMBAT_TAG_CLEAR_MS = 25000L;
-   private static final double COMBAT_TAG_CLEAR_DISTANCE = 25.0;
+   private static final double COMBAT_TAG_CLEAR_DISTANCE = (double)25.0F;
    private static final long LOOT_SKIP_RETRY_MS = 4000L;
    private static final long LOOT_TARGET_TIMEOUT_MS = 12000L;
    private static final long LOOT_POST_COMBAT_STICK_MS = 500L;
@@ -150,19 +144,13 @@ public final class AmigoNpcManager {
    private static final long XP_PER_HIT = 0L;
    private static final long XP_PER_KILL = 40L;
    private static final RpgLevelingStage1Config RPG_STAGE1_CFG = new RpgLevelingStage1Config();
-   private static final RpgStage1MobLevelCalculator RPG_STAGE1_MOB_CALC = new RpgStage1MobLevelCalculator(RPG_STAGE1_CFG);
+   private static final RpgStage1MobLevelCalculator RPG_STAGE1_MOB_CALC;
    private static final long SPAWN_FX_FOLLOW_MS = 1800L;
    private static final long SPAWN_FX_FOLLOW_INTERVAL_MS = 180L;
    private static final long REGEN_DELAY_MS = 3000L;
    private static final float REGEN_RATE_PER_SECOND = 0.12F;
-
-   private AmigoNpcManager() {
-      try {
-         this.pvpEnabled = AmigoPersistence.loadPvpEnabledGlobal();
-      } catch (Throwable ignored) {
-         this.pvpEnabled = false;
-      }
-   }
+   private static volatile Integer DEF_STAT_INDEX;
+   private static volatile String RESOLVED_BOW_ID;
 
    public static AmigoNpcManager getShared() {
       return SHARED;
@@ -171,108 +159,166 @@ public final class AmigoNpcManager {
    public static boolean saveNpcWardrobeNow(UUID ownerId) {
       try {
          return SHARED.saveNpcWardrobeNowInternal(ownerId);
-      } catch (Throwable ignored) {
+      } catch (Throwable var2) {
          return false;
       }
    }
 
    public NpcDebugSnapshot getNpcDebugSnapshot(UUID ownerId) {
-      String ownerUuid = ownerId != null ? String.valueOf(ownerId) : null;
       NpcDebugSnapshot s = new NpcDebugSnapshot();
-      s.ownerUuid = ownerUuid;
+      s.ownerUuid = ownerId != null ? String.valueOf(ownerId) : null;
       if (ownerId == null) {
-         return NpcDebugSnapshotSupport.emptySnapshot(ownerUuid, "NONE");
-      }
+         s.hasRecord = false;
+         s.hasNpcRef = false;
+         s.state = "NONE";
+         return s;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            s.hasRecord = false;
+            s.hasNpcRef = false;
+            s.state = "MISSING";
+            return s;
+         } else {
+            s.hasRecord = true;
+            s.hasNpcRef = rec.refObj != null;
+            s.state = rec.state != null ? rec.state.name() : "UNKNOWN";
+            s.downed = rec.downed;
+            s.downedUntilMillis = rec.downedUntilMillis;
+            s.deathDespawnAtMillis = rec.deathDespawnAtMillis;
+            s.npcLevel = rec.npcLevelCached;
+            s.totalXp = rec.totalXp;
+            s.xpRemainder = rec.stage1XpRemainder;
+            s.inCombatRecently = rec.wasInCombat;
+            s.lastCombatTagMillis = rec.lastCombatTagMillis;
+            s.lastCombatEndMillis = rec.lastCombatEndMillis;
+            s.lootingActive = rec.lootingActive;
+            s.lootStickUntilMillis = rec.lootStickUntilMillis;
+            s.regenStartAtMillis = rec.regenStartAtMillis;
+            s.regenLastApplyMillis = rec.regenLastApplyMillis;
+            s.regenActive = rec.regenStartAtMillis > 0L;
+            s.lootPausedInventoryFull = rec.lootPausedInventoryFull;
+            s.lastOwnerPos = vec(rec.lastOwnerPos);
+            s.lastNpcPos = vec(rec.lastNpcPos);
+            s.lastBattleCenter = vec(rec.lastBattleCenter);
 
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null) {
-         return NpcDebugSnapshotSupport.emptySnapshot(ownerUuid, "MISSING");
-      }
+            try {
+               if (rec.backpack != null) {
+                  s.backpackSlotsTotal = 45;
+                  int used = 0;
+                  Object items = null;
 
-      s.hasRecord = true;
-      s.hasNpcRef = rec.refObj != null;
-      s.state = rec.state != null ? rec.state.name() : "UNKNOWN";
-      s.downed = rec.downed;
-      s.downedUntilMillis = rec.downedUntilMillis;
-      s.deathDespawnAtMillis = rec.deathDespawnAtMillis;
-      s.npcLevel = rec.npcLevelCached;
-      s.totalXp = rec.totalXp;
-      s.xpRemainder = rec.stage1XpRemainder;
-      s.inCombatRecently = rec.wasInCombat;
-      s.lastCombatTagMillis = rec.lastCombatTagMillis;
-      s.lastCombatEndMillis = rec.lastCombatEndMillis;
-      s.lootingActive = rec.lootingActive;
-      s.lootStickUntilMillis = rec.lootStickUntilMillis;
-      s.regenStartAtMillis = rec.regenStartAtMillis;
-      s.regenLastApplyMillis = rec.regenLastApplyMillis;
-      s.regenActive = rec.regenStartAtMillis > 0L;
-      s.lootPausedInventoryFull = rec.lootPausedInventoryFull;
-      s.lastOwnerPos = vec(rec.lastOwnerPos);
-      s.lastNpcPos = vec(rec.lastNpcPos);
-      s.lastBattleCenter = vec(rec.lastBattleCenter);
-      NpcDebugSnapshotSupport.populateBackpackSummary(s, rec.backpack);
-      return s;
+                  try {
+                     Method m = rec.backpack.getClass().getMethod("getItems");
+                     items = m.invoke(rec.backpack);
+                  } catch (Throwable var11) {
+                  }
+
+                  if (items instanceof List) {
+                     for(Object it : (List)items) {
+                        if (it != null) {
+                           boolean empty = false;
+
+                           try {
+                              Method m2 = it.getClass().getMethod("isEmpty");
+                              empty = Boolean.TRUE.equals(m2.invoke(it));
+                           } catch (Throwable var10) {
+                           }
+
+                           if (!empty) {
+                              ++used;
+                           }
+                        }
+                     }
+                  }
+
+                  s.backpackSlotsUsed = used;
+               } else {
+                  s.backpackSlotsTotal = 45;
+                  s.backpackSlotsUsed = 0;
+               }
+            } catch (Throwable var12) {
+               s.backpackSlotsTotal = 45;
+            }
+
+            return s;
+         }
+      }
    }
 
-   private static DebugVec3 vec(Vector3d v) {
-      return NpcDebugSnapshotSupport.toVec3(v);
+   private static Vec3 vec(Vector3d v) {
+      if (v == null) {
+         return null;
+      } else {
+         try {
+            return new Vec3(v.x, v.y, v.z);
+         } catch (Throwable var2) {
+            return null;
+         }
+      }
    }
 
    private boolean saveNpcWardrobeNowInternal(UUID ownerId) {
       if (ownerId == null) {
          return false;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null || rec.worldObj == null || !(rec.refObj instanceof Ref)) {
-         return false;
-      }
-
-      if (this.executeWardrobeSaveNow(rec, ownerId)) {
-         return true;
-      }
-
-      CountDownLatch latch = new CountDownLatch(1);
-      boolean[] result = new boolean[]{false};
-      boolean queued = HytaleBridge.worldExecute(rec.worldObj, () -> {
-         try {
-            result[0] = this.executeWardrobeSaveNow(rec, ownerId);
-         } finally {
-            latch.countDown();
-         }
-      });
-      if (!queued) {
-         return false;
-      }
-
-      try {
-         latch.await(400L, TimeUnit.MILLISECONDS);
-      } catch (InterruptedException ignored) {
-         Thread.currentThread().interrupt();
-      }
-
-      return result[0];
-   }
-
-   private boolean executeWardrobeSaveNow(AmigoNpcManager.NpcRecord rec, UUID ownerId) {
-      if (rec != null && ownerId != null && rec.worldObj != null && rec.refObj instanceof Ref<?> npcRefRaw) {
-         try {
-            if (getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> storeRaw) {
-               Store<EntityStore> store = (Store<EntityStore>)storeRaw;
-               Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
-               return AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null && rec.worldObj != null && rec.refObj instanceof Ref) {
+            if (this.executeWardrobeSaveNow(rec, ownerId)) {
+               return true;
             } else {
-               return false;
+               CountDownLatch latch = new CountDownLatch(1);
+               boolean[] result = new boolean[]{false};
+               boolean queued = HytaleBridge.worldExecute(rec.worldObj, () -> {
+                  try {
+                     result[0] = this.executeWardrobeSaveNow(rec, ownerId);
+                  } finally {
+                     latch.countDown();
+                  }
+
+               });
+               if (!queued) {
+                  return false;
+               } else {
+                  try {
+                     latch.await(400L, TimeUnit.MILLISECONDS);
+                  } catch (InterruptedException var7) {
+                     Thread.currentThread().interrupt();
+                  }
+
+                  return result[0];
+               }
             }
-         } catch (Throwable ignored) {
+         } else {
             return false;
          }
-      } else {
-         return false;
       }
    }
 
-   private static void armWardrobeRestoreRetry(AmigoNpcManager.NpcRecord rec, UUID ownerId) {
+   private boolean executeWardrobeSaveNow(NpcRecord rec, UUID ownerId) {
+      if (rec != null && ownerId != null && rec.worldObj != null) {
+         Object componentStore = rec.refObj;
+         if (componentStore instanceof Ref) {
+            Ref<?> npcRefRaw = (Ref)componentStore;
+
+            try {
+               componentStore = getComponentStoreFromWorld(rec.worldObj);
+               if (componentStore instanceof Store) {
+                  Store<?> storeRaw = (Store)componentStore;
+                  return AmigoWardrobePersistence.saveNpcWardrobe(ownerId, storeRaw, npcRefRaw);
+               }
+
+               return false;
+            } catch (Throwable var8) {
+               return false;
+            }
+         }
+      }
+
+      return false;
+   }
+
+   private static void armWardrobeRestoreRetry(NpcRecord rec, UUID ownerId) {
       if (rec != null && ownerId != null) {
          boolean hasSaved = false;
 
@@ -287,7 +333,7 @@ public final class AmigoNpcManager {
       }
    }
 
-   private static void clearWardrobeRestoreRetry(AmigoNpcManager.NpcRecord rec) {
+   private static void clearWardrobeRestoreRetry(NpcRecord rec) {
       if (rec != null) {
          rec.wardrobeRestorePending = false;
          rec.wardrobeRestoreAttempts = 0;
@@ -295,50 +341,61 @@ public final class AmigoNpcManager {
       }
    }
 
-   private static void tickWardrobeRestore(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
+   private static void tickWardrobeRestore(Store store, NpcRecord rec, Object ownerRefObj, long now) {
       if (store != null && rec != null && rec.wardrobeRestorePending) {
-         if (rec.refObj instanceof Ref<?> npcRefRaw && ownerRefObj instanceof Ref<?> ownerRefRaw) {
-            if (rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
-               if (rec.nextWardrobeRestoreMillis <= now) {
+         Object var7 = rec.refObj;
+         if (var7 instanceof Ref) {
+            Ref<?> npcRefRaw = (Ref)var7;
+            if (ownerRefObj instanceof Ref) {
+               Ref<?> ownerRefRaw = (Ref)ownerRefObj;
+               if (rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
+                  if (rec.nextWardrobeRestoreMillis > now) {
+                     return;
+                  }
+
                   boolean restored = false;
 
                   try {
-                     Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
-                     Ref<EntityStore> ownerRef = (Ref<EntityStore>)ownerRefRaw;
-                     restored = AmigoWardrobePersistence.restoreNpcWardrobe(rec.ownerId, store, ownerRef, npcRef);
+                     restored = AmigoWardrobePersistence.restoreNpcWardrobe(rec.ownerId, store, ownerRefRaw, npcRefRaw);
                   } catch (Throwable var10) {
                   }
 
-                  rec.wardrobeRestoreAttempts++;
+                  ++rec.wardrobeRestoreAttempts;
                   if (restored) {
                      clearWardrobeRestoreRetry(rec);
-                  } else if (rec.wardrobeRestoreAttempts >= 12) {
-                     clearWardrobeRestoreRetry(rec);
-                  } else {
-                     rec.nextWardrobeRestoreMillis = now + 250L;
+                     return;
                   }
+
+                  if (rec.wardrobeRestoreAttempts >= 12) {
+                     clearWardrobeRestoreRetry(rec);
+                     return;
+                  }
+
+                  rec.nextWardrobeRestoreMillis = now + 250L;
+                  return;
                }
+
+               return;
             }
          }
+
       }
    }
 
-   private static long coerceStage1XpGainToLong(AmigoNpcManager.NpcRecord rec, double xpGainDouble) {
+   private static long coerceStage1XpGainToLong(NpcRecord rec, double xpGainDouble) {
       if (rec == null) {
          return 0L;
-      }
-
-      if (xpGainDouble > 0.0 && !Double.isNaN(xpGainDouble) && !Double.isInfinite(xpGainDouble)) {
+      } else if (xpGainDouble > (double)0.0F && !Double.isNaN(xpGainDouble) && !Double.isInfinite(xpGainDouble)) {
          double rem = rec.stage1XpRemainder;
-         if (Double.isNaN(rem) || Double.isInfinite(rem) || rem < 0.0) {
-            rem = 0.0;
+         if (Double.isNaN(rem) || Double.isInfinite(rem) || rem < (double)0.0F) {
+            rem = (double)0.0F;
          }
 
          double sum = xpGainDouble + rem;
          long whole = (long)Math.floor(sum);
-         double newRem = sum - whole;
-         if (!(newRem >= 0.0) || Double.isNaN(newRem) || Double.isInfinite(newRem)) {
-            newRem = 0.0;
+         double newRem = sum - (double)whole;
+         if (!(newRem >= (double)0.0F) || Double.isNaN(newRem) || Double.isInfinite(newRem)) {
+            newRem = (double)0.0F;
          }
 
          rec.stage1XpRemainder = newRem;
@@ -367,90 +424,39 @@ public final class AmigoNpcManager {
          AmigoPersistence.savePvpEnabledGlobal(enabled);
       } catch (Throwable var3) {
       }
-   }
 
-   public CombatMode getCombatMode(UUID owner) {
-      if (owner == null) {
-         return CombatMode.PROTECT_OWNER;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
-      return rec != null ? rec.combatMode : AmigoPersistence.loadCombatMode(owner);
-   }
-
-   public void setCombatMode(UUID owner, CombatMode mode) {
-      if (owner == null || mode == null) {
-         return;
-      }
-
-      AmigoPersistence.saveCombatMode(owner, mode);
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
-      if (rec != null) {
-         rec.combatMode = mode;
-         rec.defendeEnabled = mode == CombatMode.PROTECT_OWNER;
-         rec.chaseDisengaged = false;
-         rec.targetLostSinceMillis = 0L;
-         rec.targetStuckSinceMillis = 0L;
-      }
    }
 
    public boolean isDefendeEnabled(UUID owner) {
-      return getCombatMode(owner) == CombatMode.PROTECT_OWNER;
+      if (owner == null) {
+         return false;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(owner);
+         return rec != null ? rec.defendeEnabled : AmigoPersistence.loadDefenderEnabled(owner);
+      }
    }
 
    public void setDefendeEnabled(UUID owner, boolean enabled) {
-      setCombatMode(owner, enabled ? CombatMode.PROTECT_OWNER : CombatMode.WEAKEST_ENEMY);
-   }
+      if (owner != null) {
+         AmigoPersistence.saveDefenderEnabled(owner, enabled);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(owner);
+         if (rec != null) {
+            rec.defendeEnabled = enabled;
+            if (!enabled) {
+               this.clearAssist(rec);
+            }
+         }
 
-   public boolean isAutoWeaponSwitchEnabled(UUID ownerId) {
-      if (ownerId == null) {
-         return true;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null ? rec.autoWeaponSwitchEnabled : AmigoPersistence.loadAutoWeaponSwitch(ownerId);
-   }
-
-   public void setAutoWeaponSwitchEnabled(UUID ownerId, boolean enabled) {
-      if (ownerId == null) {
-         return;
-      }
-
-      AmigoPersistence.saveAutoWeaponSwitch(ownerId, enabled);
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec != null) {
-         rec.autoWeaponSwitchEnabled = enabled;
-      }
-   }
-
-   public boolean isInterruptAttacksEnabled(UUID ownerId) {
-      if (ownerId == null) {
-         return true;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null ? rec.interruptAttacksEnabled : AmigoPersistence.loadInterruptAttacks(ownerId);
-   }
-
-   public void setInterruptAttacksEnabled(UUID ownerId, boolean enabled) {
-      if (ownerId == null) {
-         return;
-      }
-
-      AmigoPersistence.saveInterruptAttacks(ownerId, enabled);
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec != null) {
-         rec.interruptAttacksEnabled = enabled;
       }
    }
 
    public boolean isAutoLootEnabled(UUID ownerId) {
       if (ownerId == null) {
          return true;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         return rec != null ? rec.autoLootEnabled : AmigoPersistence.loadAutoLootEnabled(ownerId);
       }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null ? rec.autoLootEnabled : AmigoPersistence.loadAutoLootEnabled(ownerId);
    }
 
    public boolean toggleAutoLoot(UUID ownerId) {
@@ -462,7 +468,7 @@ public final class AmigoNpcManager {
    public void setAutoLootEnabled(UUID ownerId, boolean enabled) {
       if (ownerId != null) {
          AmigoPersistence.saveAutoLootEnabled(ownerId, enabled);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
             rec.autoLootEnabled = enabled;
             if (!enabled) {
@@ -472,157 +478,138 @@ public final class AmigoNpcManager {
                rec.lootChatSendAtMillis = 0L;
             }
          }
+
       }
-   }
-
-   public String getCustomName(UUID ownerId) {
-      if (ownerId == null) {
-         return null;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null ? normalizeCustomName(rec.customName) : normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
-   }
-
-   public void setCustomNameWithStore(Store<EntityStore> store, UUID ownerId, String customName) {
-      if (ownerId != null) {
-         String normalizedName = normalizeCustomName(customName);
-         AmigoPersistence.saveCustomName(ownerId, normalizedName);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         if (rec != null) {
-            rec.customName = normalizedName;
-            if (store != null && rec.refObj instanceof Ref<?> rawNpcRef) {
-               @SuppressWarnings("unchecked")
-               Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
-
-               try {
-                  NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
-               } catch (Throwable var7) {
-               }
-            }
-         }
-      }
-   }
-
-   private static String normalizeCustomName(String customName) {
-      if (customName == null) {
-         return null;
-      }
-
-      String normalized = customName.trim();
-      if (normalized.isBlank()) {
-         return null;
-      }
-
-      if (normalized.length() > 20) {
-         normalized = normalized.substring(0, 20);
-      }
-
-      return normalized;
    }
 
    public String getAutoLootStatus(UUID ownerId) {
       if (ownerId == null) {
-         return AmigoText.text("core.autoloot.status.unknown");
-      }
+         return "AutoLoot: unknown";
+      } else {
+         boolean enabled = this.isAutoLootEnabled(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         long now = System.currentTimeMillis();
+         String state = rec == null ? "NO_NPC" : String.valueOf(rec.state);
+         boolean downed = rec != null && rec.downed;
+         boolean pausedFull = rec != null && rec.lootPausedInventoryFull;
+         int pending = 0;
 
-      boolean enabled = this.isAutoLootEnabled(ownerId);
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      long now = System.currentTimeMillis();
-      String state = rec == null ? "NO_NPC" : String.valueOf(rec.state);
-      boolean downed = rec != null && rec.downed;
-      boolean pausedFull = rec != null && rec.lootPausedInventoryFull;
-      int pending = 0;
-
-      try {
-         pending = rec != null && rec.pendingLootRefObjs != null ? rec.pendingLootRefObjs.size() : 0;
-      } catch (Throwable var16) {
-      }
-
-      long stickLeft = 0L;
-
-      try {
-         stickLeft = rec != null ? Math.max(0L, rec.autoLootStickUntilMillis - now) : 0L;
-      } catch (Throwable var15) {
-      }
-
-      int freeSlots = -1;
-
-      try {
-         SimpleItemContainer bag = rec != null ? rec.backpack : null;
-         if (bag == null && rec != null) {
-            bag = this.getOrLoadBackpack(ownerId);
-            rec.backpack = bag;
+         try {
+            pending = rec != null && rec.pendingLootRefObjs != null ? rec.pendingLootRefObjs.size() : 0;
+         } catch (Throwable var16) {
          }
 
-         if (bag != null) {
-            freeSlots = countFreeSlots(bag);
-         }
-      } catch (Throwable var14) {
-      }
+         long stickLeft = 0L;
 
-      return AmigoText.format("core.autoloot.status.summary", AmigoText.onOff(enabled), state, downed, pausedFull, pending, stickLeft, freeSlots);
+         try {
+            stickLeft = rec != null ? Math.max(0L, rec.autoLootStickUntilMillis - now) : 0L;
+         } catch (Throwable var15) {
+         }
+
+         int freeSlots = -1;
+
+         try {
+            SimpleItemContainer bag = rec != null ? rec.backpack : null;
+            if (bag == null && rec != null) {
+               bag = this.getOrLoadBackpack(ownerId);
+               rec.backpack = bag;
+            }
+
+            if (bag != null) {
+               freeSlots = countFreeSlots(bag);
+            }
+         } catch (Throwable var14) {
+         }
+
+         return String.format(Locale.ROOT, "AutoLoot=%s | NPC=%s | downed=%s | pausedFull=%s | pending=%d | stick=%dms | freeSlots=%d", enabled ? "ON" : "OFF", state, downed, pausedFull, pending, stickLeft, freeSlots);
+      }
    }
 
    private static int countFreeSlots(SimpleItemContainer bag) {
       if (bag == null) {
          return -1;
-      }
-
-      short cap;
-      try {
-         cap = bag.getCapacity();
-      } catch (Throwable t) {
-         return -1;
-      }
-
-      int free = 0;
-
-      for (short slot = 0; slot < cap; slot++) {
-         ItemStack st;
+      } else {
+         short cap;
          try {
-            st = bag.getItemStack(slot);
-         } catch (Throwable t) {
-            continue;
+            cap = bag.getCapacity();
+         } catch (Throwable var6) {
+            return -1;
          }
 
-         if (st == null || st.isEmpty()) {
-            free++;
+         int free = 0;
+
+         for(short slot = 0; slot < cap; ++slot) {
+            ItemStack st;
+            try {
+               st = bag.getItemStack(slot);
+            } catch (Throwable var7) {
+               continue;
+            }
+
+            if (st == null || st.isEmpty()) {
+               ++free;
+            }
          }
+
+         return free;
       }
-
-      return free;
    }
 
    public boolean isGodMode(UUID ownerId) {
-      return false;
-   }
-
-   public boolean toggleGodModeWithStore(Store<EntityStore> store, UUID ownerId) {
-      if (ownerId != null) {
-         AmigoPersistence.saveGodMode(ownerId, false);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         if (rec != null) {
-            rec.godMode = false;
-         }
+      if (ownerId == null) {
+         return false;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         return rec != null ? rec.godMode : AmigoPersistence.loadGodMode(ownerId);
       }
-
-      return false;
    }
 
-   public void setGodModeWithStore(Store<EntityStore> store, UUID ownerId, boolean enabled) {
+   public boolean toggleGodModeWithStore(Store store, UUID ownerId) {
+      if (ownerId == null) {
+         return false;
+      } else {
+         boolean newVal = !this.isGodMode(ownerId);
+         this.setGodModeWithStore(store, ownerId, newVal);
+         return true;
+      }
+   }
+
+   public void setGodModeWithStore(Store store, UUID ownerId, boolean enabled) {
       if (ownerId != null) {
-         AmigoPersistence.saveGodMode(ownerId, false);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         AmigoPersistence.saveGodMode(ownerId, enabled);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
-            rec.godMode = false;
+            rec.godMode = enabled;
+            if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref) {
+               try {
+                  Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                  EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                  if (stats != null) {
+                     int healthIdx = DefaultEntityStatTypes.getHealth();
+
+                     try {
+                        float max = stats.get(healthIdx).getMax();
+                        stats.setStatValue(healthIdx, max);
+                     } catch (Throwable var9) {
+                        stats.maximizeStatValue(healthIdx);
+                     }
+
+                     store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+                  }
+               } catch (Throwable var10) {
+               }
+            }
+
+            rec.regenStartAtMillis = 0L;
+            rec.regenLastApplyMillis = 0L;
          }
+
       }
    }
 
    public void notifyNpcDamaged(UUID ownerId, long now) {
       if (ownerId != null) {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
             rec.regenWasInCombat = true;
             rec.regenStartAtMillis = 0L;
@@ -631,67 +618,188 @@ public final class AmigoNpcManager {
       }
    }
 
-   private static void endCombatTaggedLooting(AmigoNpcManager.NpcRecord rec) {
-      NpcCombatLootFlowSupport.endCombatTaggedLooting(rec);
+   private static void endCombatTaggedLooting(NpcRecord rec) {
+      if (rec != null) {
+         rec.lootingActive = false;
+         rec.lootTargetRefObj = null;
+         rec.lootTargetSinceMillis = 0L;
+         if (rec.pendingLootRefObjs != null) {
+            rec.pendingLootRefObjs.clear();
+         }
+
+         if (rec.lootProcessedUntil != null) {
+            rec.lootProcessedUntil.clear();
+         }
+
+         if (rec.combatTags != null) {
+            rec.combatTags.clear();
+         }
+
+         rec.lastBattleCenter = null;
+         rec.lastCombatEndMillis = 0L;
+         rec.lootPausedInventoryFull = false;
+         rec.nextAutoLootMillis = 0L;
+         rec.autoLootStickUntilMillis = 0L;
+         rec.autoLootStickDeadRefObj = null;
+         rec.autoLootStickAnchorPos = null;
+      }
    }
 
-   private void tickSpawnFollowFx(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
-      NpcRecoveryEffectSupport.tickSpawnFollowFx(store, rec, ownerRefObj, now, 180L, AmigoNpcManager::spawnParticleToOwner);
+   private void tickSpawnFollowFx(Store store, NpcRecord rec, Object ownerRefObj, long now) {
+      if (store != null && rec != null) {
+         if (!rec.downed) {
+            if (rec.refObj instanceof Ref) {
+               long until = rec.spawnFxUntilMillis;
+               if (until > 0L) {
+                  if (now >= until) {
+                     rec.spawnFxUntilMillis = 0L;
+                     rec.spawnFxNextMillis = 0L;
+                  } else {
+                     long next = rec.spawnFxNextMillis;
+                     if (next <= 0L || now >= next) {
+                        rec.spawnFxNextMillis = now + 180L;
+
+                        try {
+                           Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                           TransformComponent tc = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+                           if (tc == null || tc.getPosition() == null) {
+                              return;
+                           }
+
+                           spawnParticleToOwner(store, ownerRefObj, tc.getPosition(), "PlayerSpawn_Spawn");
+                        } catch (Throwable var12) {
+                        }
+
+                     }
+                  }
+               }
+            }
+         }
+      }
    }
 
-   private void tickAutoRegen(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, long now) {
-      NpcRecoveryEffectSupport.tickAutoRegen(store, rec, ownerRefObj, now, 0.12F, AmigoNpcManager::spawnParticleToOwner);
+   private void tickAutoRegen(Store store, NpcRecord rec, Object ownerRefObj, long now) {
+      if (store != null && rec != null) {
+         if (!rec.godMode) {
+            if (!rec.downed) {
+               if (rec.refObj instanceof Ref) {
+                  boolean inCombatNow = now < rec.combatUntilMillis || now < rec.assistUntilMillis || now < rec.npcCombatUntilMillis || rec.combatTargetRefObj != null || rec.assistTargetRefObj != null || rec.npcCombatTargetRefObj != null;
+                  if (inCombatNow) {
+                     rec.regenStartAtMillis = 0L;
+                     rec.regenLastApplyMillis = 0L;
+                  } else if (rec.regenStartAtMillis > 0L) {
+                     if (now >= rec.regenStartAtMillis) {
+                        long last = rec.regenLastApplyMillis;
+                        long dt = last <= 0L ? 200L : now - last;
+                        if (dt <= 0L) {
+                           dt = 1L;
+                        }
+
+                        if (dt > 2000L) {
+                           dt = 2000L;
+                        }
+
+                        rec.regenLastApplyMillis = now;
+
+                        try {
+                           Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                           EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                           if (stats == null) {
+                              return;
+                           }
+
+                           int healthIdx = DefaultEntityStatTypes.getHealth();
+                           float cur = stats.get(healthIdx).get();
+                           float max = stats.get(healthIdx).getMax();
+                           if (cur >= max) {
+                              rec.regenStartAtMillis = 0L;
+                              rec.regenLastApplyMillis = 0L;
+                              return;
+                           }
+
+                           float add = max * 0.12F * ((float)dt / 1000.0F);
+                           if (add < 1.0F) {
+                              add = 1.0F;
+                           }
+
+                           float next = cur + add;
+                           if (next >= max) {
+                              next = max;
+                              rec.regenStartAtMillis = 0L;
+                              rec.regenLastApplyMillis = 0L;
+                           }
+
+                           stats.setStatValue(healthIdx, next);
+                           store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+
+                           try {
+                              TransformComponent tc = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+                              if (tc != null && tc.getPosition() != null) {
+                                 spawnParticleToOwner(store, ownerRefObj, tc.getPosition(), "BEAM_HEAL_GREEN_OLD");
+                              }
+                           } catch (Throwable var19) {
+                           }
+                        } catch (Throwable var20) {
+                        }
+
+                     }
+                  }
+               }
+            }
+         }
+      }
    }
 
    public boolean isDebugLogEnabled(UUID owner) {
       if (owner == null) {
          return false;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(owner);
+         if (rec != null) {
+            return rec.debugLogEnabled;
+         } else {
+            Boolean v = (Boolean)this.debugLogByOwner.get(owner);
+            return v != null && v;
+         }
       }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
-      if (rec != null) {
-         return rec.debugLogEnabled;
-      }
-
-      Boolean v = this.debugLogByOwner.get(owner);
-      return v != null && v;
    }
 
    public boolean toggleDebugLog(UUID owner) {
       if (owner == null) {
          return false;
+      } else {
+         boolean enabled = !this.isDebugLogEnabled(owner);
+         this.setDebugLogEnabled(owner, enabled);
+         return enabled;
       }
-
-      boolean enabled = !this.isDebugLogEnabled(owner);
-      this.setDebugLogEnabled(owner, enabled);
-      return enabled;
    }
 
    public void setDebugLogEnabled(UUID owner, boolean enabled) {
       if (owner != null) {
          this.debugLogByOwner.put(owner, enabled);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(owner);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(owner);
          if (rec != null) {
             rec.debugLogEnabled = enabled;
          }
+
       }
    }
 
    private static String choosePreferredNpcType(Object npcPlugin) {
       String[] FORCED_PASSIVE = new String[]{"citizen", "villager", "merchant", "trader", "worker", "farmer"};
-      Object rolesObj = invokeOneArg(npcPlugin, "getRoleTemplateNames", boolean.class, true);
+      Object rolesObj = invokeOneArg(npcPlugin, "getRoleTemplateNames", Boolean.TYPE, true);
       List<String> roles = toStringList(rolesObj);
 
-      for (String want : FORCED_PASSIVE) {
-         for (String r : roles) {
+      for(String want : FORCED_PASSIVE) {
+         for(String r : roles) {
             if (r != null && r.equalsIgnoreCase(want)) {
                return r;
             }
          }
       }
 
-      for (String want : FORCED_PASSIVE) {
-         for (String r : roles) {
+      for(String want : FORCED_PASSIVE) {
+         for(String r : roles) {
             if (r != null && r.toLowerCase().contains(want)) {
                return r;
             }
@@ -701,16 +809,18 @@ public final class AmigoNpcManager {
       String pick = pickHumanLike(roles);
       if (pick != null) {
          return pick;
+      } else if (!roles.isEmpty()) {
+         return (String)roles.get(0);
       } else {
-         return !roles.isEmpty() ? roles.get(0) : firstStringFromArray(invokeNoArg(npcPlugin, "getPresetCoverageTestNPCs"));
+         return firstStringFromArray(invokeNoArg(npcPlugin, "getPresetCoverageTestNPCs"));
       }
    }
 
-   private static List<String> toStringList(Object listObj) {
-      if (listObj instanceof List<?> list) {
-         ArrayList<String> out = new ArrayList<>();
+   private static List toStringList(Object listObj) {
+      if (listObj instanceof List list) {
+         ArrayList<String> out = new ArrayList();
 
-         for (Object v : list) {
+         for(Object v : list) {
             if (v != null) {
                out.add(String.valueOf(v));
             }
@@ -722,15 +832,13 @@ public final class AmigoNpcManager {
       }
    }
 
-   private static String pickHumanLike(List<String> candidates) {
+   private static String pickHumanLike(List candidates) {
       if (candidates != null && !candidates.isEmpty()) {
-         String[] deny = new String[]{
-            "crow", "raven", "bird", "avian", "bat", "eagle", "hawk", "falcon", "vulture", "owl", "pigeon", "duck", "seagull", "test"
-         };
+         String[] deny = new String[]{"crow", "raven", "bird", "avian", "bat", "eagle", "hawk", "falcon", "vulture", "owl", "pigeon", "duck", "seagull", "test"};
          String[] prefer = new String[]{"citizen", "human", "villager", "guard", "soldier", "merchant", "trader", "worker", "farmer", "npc"};
 
-         for (String p : prefer) {
-            for (String s : candidates) {
+         for(String p : prefer) {
+            for(String s : candidates) {
                String low = s.toLowerCase();
                if (low.contains(p) && !containsAny(low, deny)) {
                   return s;
@@ -738,7 +846,7 @@ public final class AmigoNpcManager {
             }
          }
 
-         for (String s : candidates) {
+         for(String s : candidates) {
             String low = s.toLowerCase();
             if (!containsAny(low, deny)) {
                return s;
@@ -752,7 +860,7 @@ public final class AmigoNpcManager {
    }
 
    private static boolean containsAny(String low, String[] needles) {
-      for (String n : needles) {
+      for(String n : needles) {
          if (low.contains(n)) {
             return true;
          }
@@ -768,15 +876,15 @@ public final class AmigoNpcManager {
    public boolean isNpcActive(UUID ownerId) {
       if (ownerId == null) {
          return false;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         return rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj instanceof Ref && rec.worldObj != null && !rec.downed;
       }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      return rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj instanceof Ref && rec.worldObj != null && !rec.downed;
    }
 
    public void scheduleAutoLootSecondScan(UUID ownerId, Vector3d anchorPos, Object deadRefObjOrNull) {
       if (ownerId != null) {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec != null) {
             if (rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
                if (rec.autoLootEnabled) {
@@ -789,6 +897,7 @@ public final class AmigoNpcManager {
                   if (deadRefObjOrNull != null) {
                      rec.autoLootStickDeadRefObj = deadRefObjOrNull;
                   }
+
                }
             }
          }
@@ -796,17 +905,25 @@ public final class AmigoNpcManager {
    }
 
    public boolean spawn(Object worldObj, UUID ownerId) {
-      return this.spawn(worldObj, ownerId, null);
+      return this.spawn(worldObj, ownerId, (Object)null);
    }
 
    public boolean spawn(Object worldObj, UUID ownerId, Object senderObj) {
       if (worldObj != null && ownerId != null) {
-         AmigoNpcManager.NpcRecord existing = this.npcRefPorPlayer.get(ownerId);
-         if (existing == null) {
-            AmigoNpcManager.NpcRecord rec = new AmigoNpcManager.NpcRecord(worldObj, ownerId, null, AmigoNpcManager.State.SPAWNING);
+         NpcRecord existing = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (existing != null) {
+            if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
+               setError("NPC está em processo de remoção. Tente novamente em instantes.");
+               return false;
+            } else {
+               setError("NPC já existe para este player (evitando duplicação).");
+               return false;
+            }
+         } else {
+            NpcRecord rec = new NpcRecord(worldObj, ownerId, (Object)null, AmigoNpcManager.State.SPAWNING);
 
             try {
-               Boolean dbg = this.debugLogByOwner.get(ownerId);
+               Boolean dbg = (Boolean)this.debugLogByOwner.get(ownerId);
                rec.debugLogEnabled = dbg != null ? dbg : false;
             } catch (Throwable var12) {
             }
@@ -816,22 +933,20 @@ public final class AmigoNpcManager {
             boolean hasSavedWardrobeCosmetics = hasSavedWardrobeCosmetics(ownerId);
             rec.modelId = savedModel != null && !savedModel.isBlank() ? savedModel : (hasSavedWardrobeCosmetics ? null : "PlayerTestModel_V");
             double savedScale = AmigoPersistence.loadModelScale(ownerId);
-            rec.modelScale = savedScale <= 0.0 ? 1.0 : savedScale;
-            rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
+            rec.modelScale = savedScale <= (double)0.0F ? (double)1.0F : savedScale;
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-            rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
-            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
-            rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
-            rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
+            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
-            rec.godMode = false;
+            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
             rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
             int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
             if (computedSwordLevel != rec.level) {
                rec.level = computedSwordLevel;
-               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+               String expectedWeapon = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(rec.level);
+               rec.equippedWeaponId = expectedWeapon;
+               AmigoPersistence.saveSwordState(ownerId, rec.level, expectedWeapon);
             }
 
             rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
@@ -845,14 +960,14 @@ public final class AmigoNpcManager {
 
                   Object componentStore = getComponentStoreFromWorld(worldObj);
                   if (componentStore == null) {
-                     setError(AmigoText.text("core.error.store.unavailable"));
+                     setError("Não consegui obter Store via world.getEntityStore().getStore().");
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
 
                   Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
                   if (npcPlugin == null) {
-                     setError(AmigoText.text("core.error.npcplugin.unavailable"));
+                     setError("NPCPlugin.get() não disponível nesta build.");
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
@@ -864,7 +979,7 @@ public final class AmigoNpcManager {
 
                   pos = coerceToVector3d(pos);
                   if (pos == null) {
-                     setError(AmigoText.text("core.error.player_position.unavailable"));
+                     setError("Não consegui obter posição Vector3d do player.");
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
@@ -874,7 +989,7 @@ public final class AmigoNpcManager {
                      yaw = tryGetSenderYaw(senderObj);
                   }
 
-                  pos = offsetInFrontOfYaw(pos, yaw, 4.0);
+                  pos = offsetInFrontOfYaw(pos, yaw, (double)4.0F);
                   Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
                   if (rot == null) {
                      rot = newVector3f(0.0F, 0.0F, 0.0F);
@@ -883,21 +998,21 @@ public final class AmigoNpcManager {
                   Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
                   Object model = buildPreferredSpawnModel(ownerId, componentStore, ownerRef, rec.modelId, (float)rec.modelScale);
                   if (model == null) {
-                     setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
+                     setError("ModelAsset não encontrado/ inválido: " + rec.modelId);
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
 
                   int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
                   if (roleIndex < 0) {
-                     setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
+                     setError("Missing NPC role: Amigo_Follow");
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
 
                   Object pair = invokeSpawnEntity(npcPlugin, componentStore, roleIndex, pos, rot, model, ownerRef);
                   if (pair == null) {
-                     setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
+                     setError("spawnEntity retornou null (assinatura incompatível). modelId=" + rec.modelId);
                      this.npcRefPorPlayer.remove(ownerId, rec);
                      return;
                   }
@@ -912,22 +1027,22 @@ public final class AmigoNpcManager {
                      if (doRemoveEntity(componentStore, rec.refObj)) {
                         this.finalizeRemove(ownerId, rec);
                      } else {
-                        setError(AmigoText.text("core.error.spawn.remove_after_spawn_failed"));
+                        setError("Spawn OK, mas falha ao remover imediatamente (DESPAWNING).");
                      }
 
                      return;
                   }
 
                   try {
-                     Store<EntityStore> store = (Store<EntityStore>)componentStore;
-                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                     Store<EntityStore> store = (Store)componentStore;
+                     Ref<EntityStore> npcRef = (Ref)rec.refObj;
                      this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
                      this.applyNpcScaling(store, npcRef, ownerId, rec, true);
                      armWardrobeRestoreRetry(rec, ownerId);
 
                      try {
                         if (rec.wardrobeRestorePending) {
-                           boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, (Ref<EntityStore>)ownerRef, npcRef);
+                           boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, (Ref)ownerRef, npcRef);
                            if (restored) {
                               clearWardrobeRestoreRetry(rec);
                            } else {
@@ -945,34 +1060,30 @@ public final class AmigoNpcManager {
 
                   rec.state = AmigoNpcManager.State.ACTIVE;
                } catch (Throwable t) {
-                  setError(AmigoText.format("core.error.spawn.failed", t.getClass().getSimpleName(), t.getMessage()));
+                  String var10000 = t.getClass().getSimpleName();
+                  setError("spawn() falhou: " + var10000 + " - " + t.getMessage());
                   this.npcRefPorPlayer.remove(ownerId, rec);
                   if (rec.refObj != null) {
                      this.amigoRefs.remove(rec.refObj);
                   }
                }
+
             });
             if (!queued) {
-               setError(AmigoText.format("core.error.world_execute.failed", HytaleBridge.getLastError()));
+               setError("world.execute falhou: " + HytaleBridge.getLastError());
                this.npcRefPorPlayer.remove(ownerId, rec);
                return false;
             } else {
                return true;
             }
-         } else if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
-            setError(AmigoText.text("core.error.npc.removing"));
-            return false;
-         } else {
-            setError(AmigoText.text("core.error.npc.already_exists"));
-            return false;
          }
       } else {
-         setError(AmigoText.text("core.error.spawn.invalid_world_owner_null"));
+         setError("worldObj ou ownerId null.");
          return false;
       }
    }
 
-   private void spawnIntoExistingRecord(Object worldObj, Object componentStore, UUID ownerId, Object senderObj, AmigoNpcManager.NpcRecord rec) {
+   private void spawnIntoExistingRecord(Object worldObj, Object componentStore, UUID ownerId, Object senderObj, NpcRecord rec) {
       if (worldObj != null && componentStore != null && ownerId != null && rec != null) {
          try {
             Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
@@ -981,7 +1092,7 @@ public final class AmigoNpcManager {
             }
 
             if (npcPlugin == null) {
-               setError(AmigoText.text("core.error.npcplugin.unavailable"));
+               setError("NPCPlugin.get() não disponível nesta build.");
                return;
             }
 
@@ -992,7 +1103,7 @@ public final class AmigoNpcManager {
 
             pos = coerceToVector3d(pos);
             if (pos == null) {
-               setError(AmigoText.text("core.error.player_position.unavailable"));
+               setError("Não consegui obter posição Vector3d do player.");
                return;
             }
 
@@ -1001,7 +1112,7 @@ public final class AmigoNpcManager {
                yaw = tryGetSenderYaw(senderObj);
             }
 
-            pos = offsetInFrontOfYaw(pos, yaw, 4.0);
+            pos = offsetInFrontOfYaw(pos, yaw, (double)4.0F);
             Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
             if (rot == null) {
                rot = newVector3f(0.0F, 0.0F, 0.0F);
@@ -1010,19 +1121,19 @@ public final class AmigoNpcManager {
             Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
             Object model = buildPreferredSpawnModel(ownerId, componentStore, ownerRef, rec.modelId, (float)rec.modelScale);
             if (model == null) {
-               setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
+               setError("ModelAsset não encontrado/ inválido: " + rec.modelId);
                return;
             }
 
             int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
             if (roleIndex < 0) {
-               setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
+               setError("Missing NPC role: Amigo_Follow");
                return;
             }
 
             Object pair = invokeSpawnEntity(npcPlugin, componentStore, roleIndex, pos, rot, model, ownerRef);
             if (pair == null) {
-               setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
+               setError("spawnEntity retornou null (assinatura incompatível). modelId=" + rec.modelId);
                return;
             }
 
@@ -1033,8 +1144,8 @@ public final class AmigoNpcManager {
             }
 
             try {
-               Store<EntityStore> store = (Store<EntityStore>)componentStore;
-               Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+               Store<EntityStore> store = (Store)componentStore;
+               Ref<EntityStore> npcRef = (Ref)rec.refObj;
                this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
                this.applyNpcScaling(store, npcRef, ownerId, rec, true);
                playNpcSpawnFx(store, npcRef, ownerRef);
@@ -1049,7 +1160,7 @@ public final class AmigoNpcManager {
                         try {
                            float max = stats.get(healthIdx).getMax();
                            stats.setStatValue(healthIdx, max);
-                        } catch (Throwable ignored) {
+                        } catch (Throwable var20) {
                            stats.maximizeStatValue(healthIdx);
                         }
 
@@ -1070,17 +1181,26 @@ public final class AmigoNpcManager {
             rec.state = AmigoNpcManager.State.ACTIVE;
          } catch (Throwable var23) {
          }
+
       }
    }
 
-   public boolean spawnWithStore(Object worldObj, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, UUID ownerId, Object senderObj) {
+   public boolean spawnWithStore(Object worldObj, Store store, Ref playerEntityRef, UUID ownerId, Object senderObj) {
       if (worldObj != null && store != null && playerEntityRef != null && ownerId != null) {
-         AmigoNpcManager.NpcRecord existing = this.npcRefPorPlayer.get(ownerId);
-         if (existing == null) {
-            AmigoNpcManager.NpcRecord rec = new AmigoNpcManager.NpcRecord(worldObj, ownerId, null, AmigoNpcManager.State.SPAWNING);
+         NpcRecord existing = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (existing != null) {
+            if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
+               setError("NPC está em processo de remoção. Tente novamente em instantes.");
+               return false;
+            } else {
+               setError("NPC já existe para este player (evitando duplicação).");
+               return false;
+            }
+         } else {
+            NpcRecord rec = new NpcRecord(worldObj, ownerId, (Object)null, AmigoNpcManager.State.SPAWNING);
 
             try {
-               Boolean dbg = this.debugLogByOwner.get(ownerId);
+               Boolean dbg = (Boolean)this.debugLogByOwner.get(ownerId);
                rec.debugLogEnabled = dbg != null ? dbg : false;
             } catch (Throwable var25) {
             }
@@ -1090,22 +1210,20 @@ public final class AmigoNpcManager {
             boolean hasSavedWardrobeCosmetics = hasSavedWardrobeCosmetics(ownerId);
             rec.modelId = savedModel != null && !savedModel.isBlank() ? savedModel : (hasSavedWardrobeCosmetics ? null : "PlayerTestModel_V");
             double savedScale = AmigoPersistence.loadModelScale(ownerId);
-            rec.modelScale = savedScale <= 0.0 ? 1.0 : savedScale;
-            rec.customName = normalizeCustomName(AmigoPersistence.loadCustomName(ownerId));
+            rec.modelScale = savedScale <= (double)0.0F ? (double)1.0F : savedScale;
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
             rec.equippedWeaponId = AmigoPersistence.loadEquippedWeaponId(ownerId);
-            rec.combatMode = AmigoPersistence.loadCombatMode(ownerId);
-            rec.defendeEnabled = rec.combatMode == CombatMode.PROTECT_OWNER;
-            rec.autoWeaponSwitchEnabled = AmigoPersistence.loadAutoWeaponSwitch(ownerId);
-            rec.interruptAttacksEnabled = AmigoPersistence.loadInterruptAttacks(ownerId);
+            rec.defendeEnabled = AmigoPersistence.loadDefenderEnabled(ownerId);
             rec.autoLootEnabled = AmigoPersistence.loadAutoLootEnabled(ownerId);
-            rec.godMode = false;
+            rec.godMode = AmigoPersistence.loadGodMode(ownerId);
             rec.totalXp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
             rec.npcLevelCached = XpProgression.levelFromTotalXp(rec.totalXp);
             int computedSwordLevel = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
             if (computedSwordLevel != rec.level) {
                rec.level = computedSwordLevel;
-               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+               String expectedWeapon = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(rec.level);
+               rec.equippedWeaponId = expectedWeapon;
+               AmigoPersistence.saveSwordState(ownerId, rec.level, expectedWeapon);
             }
 
             rec.baseHp = AmigoPersistence.loadBaseHp(ownerId);
@@ -1115,107 +1233,108 @@ public final class AmigoNpcManager {
             try {
                Object npcPlugin = invokeStaticNoArg("com.hypixel.hytale.server.npc.NPCPlugin", "get");
                if (npcPlugin == null) {
-                  setError(AmigoText.text("core.error.npcplugin.unavailable"));
+                  setError("NPCPlugin.get() não disponível nesta build.");
                   this.npcRefPorPlayer.remove(ownerId, rec);
-                  return false;
-               }
-
-               Object pos = tryGetPositionFromStore(store, playerEntityRef);
-               if (pos == null) {
-                  pos = tryGetSenderPosition(senderObj);
-               }
-
-               pos = coerceToVector3d(pos);
-               if (pos == null) {
-                  setError(AmigoText.text("core.error.player_position.unavailable"));
-                  this.npcRefPorPlayer.remove(ownerId, rec);
-                  return false;
-               }
-
-               Float yaw = null;
-
-               try {
-                  TransformComponent pt = (TransformComponent)store.getComponent(playerEntityRef, TransformComponent.getComponentType());
-                  if (pt != null) {
-                     yaw = extractYawFromRotation(pt.getRotation());
-                  }
-               } catch (Throwable var24) {
-               }
-
-               if (yaw == null) {
-                  yaw = tryGetSenderYaw(senderObj);
-               }
-
-               pos = offsetInFrontOfYaw(pos, yaw, 4.0);
-               Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
-               if (rot == null) {
-                  rot = newVector3f(0.0F, 0.0F, 0.0F);
-               }
-
-               Object model = buildPreferredSpawnModel(ownerId, store, playerEntityRef, rec.modelId, (float)rec.modelScale);
-               if (model == null) {
-                  setError(AmigoText.format("core.error.model_asset.invalid", rec.modelId));
-                  this.npcRefPorPlayer.remove(ownerId, rec);
-                  return false;
-               }
-
-               int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
-               if (roleIndex < 0) {
-                  setError(AmigoText.format("core.error.role.missing", "Amigo_Follow"));
-                  this.npcRefPorPlayer.remove(ownerId, rec);
-                  return false;
-               }
-
-               Object pair = invokeSpawnEntity(npcPlugin, store, roleIndex, pos, rot, model, playerEntityRef);
-               if (pair == null) {
-                  setError(AmigoText.format("core.error.spawn_entity.null", rec.modelId));
-                  this.npcRefPorPlayer.remove(ownerId, rec);
-                  return false;
-               }
-
-               Object ref = extractRefFromPair(pair);
-               rec.refObj = ref != null ? ref : pair;
-               if (rec.refObj != null) {
-                  this.amigoRefs.put(rec.refObj, ownerId);
-               }
-
-               if (rec.state == AmigoNpcManager.State.DESPAWNING) {
-                  if (doRemoveEntity(store, rec.refObj)) {
-                     this.finalizeRemove(ownerId, rec);
-                  } else {
-                     setError(AmigoText.text("core.error.spawn.remove_after_spawn_failed"));
-                  }
-
                   return false;
                } else {
-                  try {
-                     this.applySwordWeaponNow(store, (Ref<EntityStore>)rec.refObj, ownerId, rec, true);
-                     this.applyNpcScaling(store, (Ref<EntityStore>)rec.refObj, ownerId, rec, true);
-                     armWardrobeRestoreRetry(rec, ownerId);
-
-                     try {
-                        if (rec.wardrobeRestorePending) {
-                           boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, playerEntityRef, (Ref<EntityStore>)rec.refObj);
-                           if (restored) {
-                              clearWardrobeRestoreRetry(rec);
-                           } else {
-                              rec.nextWardrobeRestoreMillis = System.currentTimeMillis() + 250L;
-                           }
-                        }
-                     } catch (Throwable var22) {
-                     }
-
-                     playNpcSpawnFx(store, (Ref<EntityStore>)rec.refObj, playerEntityRef);
-                     rec.spawnFxUntilMillis = System.currentTimeMillis() + 1800L;
-                     rec.spawnFxNextMillis = 0L;
-                  } catch (Throwable var23) {
+                  Object pos = tryGetPositionFromStore(store, playerEntityRef);
+                  if (pos == null) {
+                     pos = tryGetSenderPosition(senderObj);
                   }
 
-                  rec.state = AmigoNpcManager.State.ACTIVE;
-                  return true;
+                  pos = coerceToVector3d(pos);
+                  if (pos == null) {
+                     setError("Não consegui obter posição Vector3d do player.");
+                     this.npcRefPorPlayer.remove(ownerId, rec);
+                     return false;
+                  } else {
+                     Float yaw = null;
+
+                     try {
+                        TransformComponent pt = (TransformComponent)store.getComponent(playerEntityRef, TransformComponent.getComponentType());
+                        if (pt != null) {
+                           yaw = extractYawFromRotation(pt.getRotation());
+                        }
+                     } catch (Throwable var24) {
+                     }
+
+                     if (yaw == null) {
+                        yaw = tryGetSenderYaw(senderObj);
+                     }
+
+                     pos = offsetInFrontOfYaw(pos, yaw, (double)4.0F);
+                     Object rot = getStaticFieldIfExists("com.hypixel.hytale.server.npc.NPCPlugin", "NULL_ROTATION");
+                     if (rot == null) {
+                        rot = newVector3f(0.0F, 0.0F, 0.0F);
+                     }
+
+                     Object model = buildPreferredSpawnModel(ownerId, store, playerEntityRef, rec.modelId, (float)rec.modelScale);
+                     if (model == null) {
+                        setError("ModelAsset não encontrado/ inválido: " + rec.modelId);
+                        this.npcRefPorPlayer.remove(ownerId, rec);
+                        return false;
+                     } else {
+                        int roleIndex = getNpcRoleIndexWithFallbacks(npcPlugin, "Amigo_Follow");
+                        if (roleIndex < 0) {
+                           setError("Missing NPC role: Amigo_Follow");
+                           this.npcRefPorPlayer.remove(ownerId, rec);
+                           return false;
+                        } else {
+                           Object pair = invokeSpawnEntity(npcPlugin, store, roleIndex, pos, rot, model, playerEntityRef);
+                           if (pair == null) {
+                              setError("spawnEntity retornou null (assinatura incompatível). modelId=" + rec.modelId);
+                              this.npcRefPorPlayer.remove(ownerId, rec);
+                              return false;
+                           } else {
+                              Object ref = extractRefFromPair(pair);
+                              rec.refObj = ref != null ? ref : pair;
+                              if (rec.refObj != null) {
+                                 this.amigoRefs.put(rec.refObj, ownerId);
+                              }
+
+                              if (rec.state == AmigoNpcManager.State.DESPAWNING) {
+                                 if (doRemoveEntity(store, rec.refObj)) {
+                                    this.finalizeRemove(ownerId, rec);
+                                 } else {
+                                    setError("Spawn OK, mas falha ao remover imediatamente (DESPAWNING).");
+                                 }
+
+                                 return false;
+                              } else {
+                                 try {
+                                    this.applySwordWeaponNow(store, (Ref)rec.refObj, ownerId, rec, true);
+                                    this.applyNpcScaling(store, (Ref)rec.refObj, ownerId, rec, true);
+                                    armWardrobeRestoreRetry(rec, ownerId);
+
+                                    try {
+                                       if (rec.wardrobeRestorePending) {
+                                          boolean restored = AmigoWardrobePersistence.restoreNpcWardrobe(ownerId, store, playerEntityRef, (Ref)rec.refObj);
+                                          if (restored) {
+                                             clearWardrobeRestoreRetry(rec);
+                                          } else {
+                                             rec.nextWardrobeRestoreMillis = System.currentTimeMillis() + 250L;
+                                          }
+                                       }
+                                    } catch (Throwable var22) {
+                                    }
+
+                                    playNpcSpawnFx(store, (Ref)rec.refObj, playerEntityRef);
+                                    rec.spawnFxUntilMillis = System.currentTimeMillis() + 1800L;
+                                    rec.spawnFxNextMillis = 0L;
+                                 } catch (Throwable var23) {
+                                 }
+
+                                 rec.state = AmigoNpcManager.State.ACTIVE;
+                                 return true;
+                              }
+                           }
+                        }
+                     }
+                  }
                }
             } catch (Throwable t) {
-               setError(AmigoText.format("core.error.spawn_with_store.failed", t.getClass().getSimpleName(), t.getMessage()));
+               String var10000 = t.getClass().getSimpleName();
+               setError("spawnWithStore() falhou: " + var10000 + " - " + t.getMessage());
                this.npcRefPorPlayer.remove(ownerId, rec);
                if (rec.refObj != null) {
                   this.amigoRefs.remove(rec.refObj);
@@ -1223,274 +1342,204 @@ public final class AmigoNpcManager {
 
                return false;
             }
-         } else if (existing.state != AmigoNpcManager.State.SPAWNING && existing.state != AmigoNpcManager.State.ACTIVE) {
-            setError(AmigoText.text("core.error.npc.removing"));
-            return false;
-         } else {
-            setError(AmigoText.text("core.error.npc.already_exists"));
-            return false;
          }
       } else {
-         setError(AmigoText.text("core.error.spawn_with_store.invalid_args"));
+         setError("world/store/playerEntityRef/ownerId inválidos.");
          return false;
       }
    }
 
-   public boolean despawnWithStore(Store<EntityStore> store, UUID ownerId) {
+   public boolean despawnWithStore(Store store, UUID ownerId) {
       if (store != null && ownerId != null) {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec == null) {
-            setError(AmigoText.text("core.error.npc.not_registered"));
+            setError("Nenhum NPC registrado para este player.");
             return false;
-         }
-
-         long now = System.currentTimeMillis();
-         if (rec.downed) {
-            try {
-               if (rec.refObj != null) {
-                  doRemoveEntity(store, rec.refObj);
-                  this.amigoRefs.remove(rec.refObj);
-                  rec.refObj = null;
-               }
-            } catch (Throwable var7) {
-            }
-
-            return true;
          } else {
-            clearWardrobeRestoreRetry(rec);
-            rec.state = AmigoNpcManager.State.DESPAWNING;
-
-            try {
+            long now = System.currentTimeMillis();
+            if (rec.downed) {
                try {
-                  if (rec.refObj instanceof Ref<?> rawNpcRef) {
-                     @SuppressWarnings("unchecked")
-                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
-                     AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+                  if (rec.refObj != null) {
+                     doRemoveEntity(store, rec.refObj);
+                     this.amigoRefs.remove(rec.refObj);
+                     rec.refObj = null;
                   }
-               } catch (Throwable var9) {
+               } catch (Throwable var7) {
                }
 
-               if (rec.backpack != null) {
-                  AmigoPersistence.saveBackpack(ownerId, rec.backpack);
-               }
+               return true;
+            } else {
+               clearWardrobeRestoreRetry(rec);
+               rec.state = AmigoNpcManager.State.DESPAWNING;
 
                try {
-                  AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
-               } catch (Throwable var8) {
+                  try {
+                     if (rec.refObj instanceof Ref) {
+                        Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                        AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+                     }
+                  } catch (Throwable var9) {
+                  }
+
+                  if (rec.backpack != null) {
+                     AmigoPersistence.saveBackpack(ownerId, rec.backpack);
+                  }
+
+                  try {
+                     AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+                  } catch (Throwable var8) {
+                  }
+               } catch (Throwable var10) {
                }
-            } catch (Throwable var10) {
-            }
 
-            if (rec.refObj == null) {
-               return true;
+               if (rec.refObj == null) {
+                  return true;
+               } else if (!doRemoveEntity(store, rec.refObj)) {
+                  return false;
+               } else {
+                  this.finalizeRemove(ownerId, rec);
+                  return true;
+               }
             }
-
-            if (!doRemoveEntity(store, rec.refObj)) {
-               return false;
-            }
-
-            this.finalizeRemove(ownerId, rec);
-            return true;
          }
       } else {
-         setError(AmigoText.text("core.error.despawn_with_store.invalid_args"));
+         setError("store ou ownerId inválidos.");
          return false;
       }
    }
 
    public boolean requestRespawn(Object worldObj, UUID ownerId, Object senderObj) {
-      if (worldObj == null || ownerId == null) {
-         setError(AmigoText.text("core.error.respawn.invalid_args"));
+      if (worldObj != null && ownerId != null) {
+         long now = System.currentTimeMillis();
+         long delay = 1000L + ThreadLocalRandom.current().nextLong(1001L);
+         long at = now + delay;
+         String msg = "Estou chegando.";
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            this.pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
+            return true;
+         } else {
+            rec.respawnRequested = true;
+            rec.respawnWorldObj = worldObj;
+            rec.respawnSenderObj = senderObj;
+            rec.respawnAtMillis = at;
+            rec.respawnMessage = msg;
+            return this.despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
+         }
+      } else {
+         setError("worldObj ou ownerId inválidos.");
          return false;
       }
-
-      long now = System.currentTimeMillis();
-      long delay = 1000L + ThreadLocalRandom.current().nextLong(1001L);
-      long at = now + delay;
-      String msg = AmigoText.text("core.chat.respawn.arriving");
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null) {
-         this.pendingRespawns.put(ownerId, new PendingRespawn(worldObj, senderObj, at, msg));
-         return true;
-      }
-
-      if (rec.downed) {
-         long deadline = rec.downedUntilMillis;
-         Object oldWorld = rec.worldObj != null ? rec.worldObj : worldObj;
-         Object oldRef = rec.refObj;
-         if (oldRef != null && oldWorld != null) {
-            HytaleBridge.worldExecute(oldWorld, () -> {
-               try {
-                  Object oldStore = getComponentStoreFromWorld(oldWorld);
-                  if (oldStore != null) {
-                     doRemoveEntity(oldStore, oldRef);
-                  }
-               } catch (Throwable ignored) {
-               }
-               this.amigoRefs.remove(oldRef);
-               if (rec.refObj == oldRef) {
-                  rec.refObj = null;
-               }
-            });
-         }
-
-         rec.state = AmigoNpcManager.State.SPAWNING;
-         return HytaleBridge.worldExecute(worldObj, () -> {
-            try {
-               Object storeObj = getComponentStoreFromWorld(worldObj);
-               if (storeObj == null) {
-                  rec.state = AmigoNpcManager.State.ACTIVE;
-                  return;
-               }
-
-               this.spawnIntoExistingRecord(worldObj, storeObj, ownerId, senderObj, rec);
-               if (rec.refObj != null) {
-                  rec.downed = true;
-                  rec.downedUntilMillis = deadline;
-                  rec.deathDespawnAtMillis = 0L;
-                  rec.state = AmigoNpcManager.State.ACTIVE;
-                  if (rec.refObj instanceof Ref<?> rawRef && storeObj instanceof Store<?> rawStore) {
-                     @SuppressWarnings("unchecked")
-                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
-                     @SuppressWarnings("unchecked")
-                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
-                     MovementStatesComponent movement = store.getComponent(npcRef, MovementStatesComponent.getComponentType());
-                     if (movement != null) {
-                        MovementStates states = movement.getMovementStates();
-                        if (states == null) {
-                           states = new MovementStates();
-                        }
-
-                        states.sleeping = true;
-                        states.idle = true;
-                        states.horizontalIdle = true;
-                        states.walking = false;
-                        states.running = false;
-                        states.sprinting = false;
-                        states.onGround = true;
-                        movement.setMovementStates(states);
-                        movement.setSentMovementStates(new MovementStates(states));
-                        store.putComponent(npcRef, MovementStatesComponent.getComponentType(), movement);
-                     }
-                  }
-               }
-            } catch (Throwable ignored) {
-               rec.state = AmigoNpcManager.State.ACTIVE;
-            }
-         });
-      }
-
-      rec.respawnRequested = true;
-      rec.respawnWorldObj = worldObj;
-      rec.respawnSenderObj = senderObj;
-      rec.respawnAtMillis = at;
-      rec.respawnMessage = msg;
-      return this.despawn(rec.worldObj != null ? rec.worldObj : worldObj, ownerId);
    }
 
    public boolean despawn(Object worldObj, UUID ownerId) {
       if (ownerId == null) {
-         setError(AmigoText.text("core.error.despawn.invalid_owner"));
+         setError("ownerId null.");
          return false;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null) {
-         setError(AmigoText.text("core.error.npc.not_registered"));
-         return false;
-      }
-
-      long now = System.currentTimeMillis();
-      if (rec.downed) {
-         Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
-         if (worldToUse == null) {
-            try {
-               if (rec.refObj != null) {
-                  this.amigoRefs.remove(rec.refObj);
-                  rec.refObj = null;
-               }
-            } catch (Throwable var8) {
-            }
-
-            return true;
-         } else {
-            return rec.refObj == null ? true : HytaleBridge.worldExecute(worldToUse, () -> {
-               try {
-                  Object componentStore = getComponentStoreFromWorld(worldToUse);
-                  if (componentStore == null) {
-                     return;
-                  }
-
-                  try {
-                     doRemoveEntity(componentStore, rec.refObj);
-                  } catch (Throwable var6x) {
-                  }
-
-                  try {
-                     this.amigoRefs.remove(rec.refObj);
-                  } catch (Throwable var5) {
-                  }
-
-                  rec.refObj = null;
-               } catch (Throwable var7x) {
-               }
-            });
-         }
       } else {
-         clearWardrobeRestoreRetry(rec);
-         rec.state = AmigoNpcManager.State.DESPAWNING;
-
-         try {
-            if (rec.backpack != null) {
-               AmigoPersistence.saveBackpack(ownerId, rec.backpack);
-            }
-
-            try {
-               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
-            } catch (Throwable var9) {
-            }
-         } catch (Throwable var10) {
-         }
-
-         Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
-         if (worldToUse == null) {
-            setError(AmigoText.text("core.error.despawn.world_unavailable"));
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            setError("Nenhum NPC registrado para este player.");
             return false;
-         } else if (rec.refObj == null) {
-            return true;
          } else {
-            boolean queued = HytaleBridge.worldExecute(worldToUse, () -> {
+            long now = System.currentTimeMillis();
+            if (rec.downed) {
+               Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
+               if (worldToUse == null) {
+                  try {
+                     if (rec.refObj != null) {
+                        this.amigoRefs.remove(rec.refObj);
+                        rec.refObj = null;
+                     }
+                  } catch (Throwable var8) {
+                  }
+
+                  return true;
+               } else if (rec.refObj == null) {
+                  return true;
+               } else {
+                  boolean queued = HytaleBridge.worldExecute(worldToUse, () -> {
+                     try {
+                        Object componentStore = getComponentStoreFromWorld(worldToUse);
+                        if (componentStore == null) {
+                           return;
+                        }
+
+                        try {
+                           doRemoveEntity(componentStore, rec.refObj);
+                        } catch (Throwable var6) {
+                        }
+
+                        try {
+                           this.amigoRefs.remove(rec.refObj);
+                        } catch (Throwable var5) {
+                        }
+
+                        rec.refObj = null;
+                     } catch (Throwable var7) {
+                     }
+
+                  });
+                  return queued;
+               }
+            } else {
+               clearWardrobeRestoreRetry(rec);
+               rec.state = AmigoNpcManager.State.DESPAWNING;
+
                try {
-                  Object componentStore = getComponentStoreFromWorld(worldToUse);
-                  if (componentStore == null) {
-                     setError(AmigoText.text("core.error.store.unavailable"));
-                     return;
+                  if (rec.backpack != null) {
+                     AmigoPersistence.saveBackpack(ownerId, rec.backpack);
                   }
 
                   try {
-                     if (rec.refObj instanceof Ref<?> rawNpcRef) {
-                        @SuppressWarnings("unchecked")
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
-                        Store<EntityStore> store = (Store<EntityStore>)componentStore;
-                        AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
-                     }
-                  } catch (Throwable var7x) {
+                     AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
+                  } catch (Throwable var9) {
                   }
-
-                  if (!doRemoveEntity(componentStore, rec.refObj)) {
-                     return;
-                  }
-
-                  this.finalizeRemove(ownerId, rec);
-               } catch (Throwable t) {
-                  setError(AmigoText.format("core.error.despawn.failed", t.getClass().getSimpleName(), t.getMessage()));
+               } catch (Throwable var10) {
                }
-            });
-            if (!queued) {
-               setError(AmigoText.format("core.error.world_execute.failed", HytaleBridge.getLastError()));
-               return false;
-            } else {
-               return true;
+
+               Object worldToUse = rec.worldObj != null ? rec.worldObj : worldObj;
+               if (worldToUse == null) {
+                  setError("World indisponível para despawn.");
+                  return false;
+               } else if (rec.refObj == null) {
+                  return true;
+               } else {
+                  boolean queued = HytaleBridge.worldExecute(worldToUse, () -> {
+                     try {
+                        Object componentStore = getComponentStoreFromWorld(worldToUse);
+                        if (componentStore == null) {
+                           setError("Não consegui obter Store via world.getEntityStore().getStore().");
+                           return;
+                        }
+
+                        try {
+                           if (rec.refObj instanceof Ref) {
+                              Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                              Store<EntityStore> store = (Store)componentStore;
+                              AmigoWardrobePersistence.saveNpcWardrobe(ownerId, store, npcRef);
+                           }
+                        } catch (Throwable var7) {
+                        }
+
+                        if (!doRemoveEntity(componentStore, rec.refObj)) {
+                           return;
+                        }
+
+                        this.finalizeRemove(ownerId, rec);
+                     } catch (Throwable t) {
+                        String var10000 = t.getClass().getSimpleName();
+                        setError("despawn() falhou: " + var10000 + " - " + t.getMessage());
+                     }
+
+                  });
+                  if (!queued) {
+                     setError("world.execute falhou: " + HytaleBridge.getLastError());
+                     return false;
+                  } else {
+                     return true;
+                  }
+               }
             }
          }
       }
@@ -1500,7 +1549,7 @@ public final class AmigoNpcManager {
       if (ownerId == null) {
          return false;
       } else {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
          if (rec == null) {
             return false;
          } else {
@@ -1509,7 +1558,7 @@ public final class AmigoNpcManager {
       }
    }
 
-   private void finalizeRemove(UUID ownerId, AmigoNpcManager.NpcRecord rec) {
+   private void finalizeRemove(UUID ownerId, NpcRecord rec) {
       if (ownerId != null && rec != null) {
          try {
             if (rec.refObj != null) {
@@ -1531,125 +1580,24 @@ public final class AmigoNpcManager {
             String msg = rec.respawnMessage;
             this.pendingRespawns.put(ownerId, new PendingRespawn(respawnWorld, respawnSender, at, msg));
          }
-      }
-   }
 
-   public void shutdownForReload() {
-      ArrayList<AmigoNpcManager.NpcRecord> records = new ArrayList<>(this.npcRefPorPlayer.values());
-
-      for (Entry<UUID, AmigoNpcManager.NpcRecord> entry : this.npcRefPorPlayer.entrySet()) {
-         UUID ownerId = entry.getKey();
-         AmigoNpcManager.NpcRecord rec = entry.getValue();
-         if (ownerId == null || rec == null) {
-            continue;
-         }
-
-         try {
-            this.saveNpcWardrobeNowInternal(ownerId);
-         } catch (Throwable ignored) {
-         }
-
-         try {
-            if (rec.backpack != null) {
-               AmigoPersistence.saveBackpack(ownerId, rec.backpack);
-               rec.backpackDirty = false;
-            }
-         } catch (Throwable ignored) {
-         }
-
-         try {
-            AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
-         } catch (Throwable ignored) {
-         }
-
-         rec.respawnRequested = false;
-         rec.respawnWorldObj = null;
-         rec.respawnSenderObj = null;
-      }
-
-      this.pendingRespawns.clear();
-
-      for (AmigoNpcManager.NpcRecord rec : records) {
-         this.removeNpcForReload(rec);
-      }
-
-      this.debugLogByOwner.clear();
-      this.npcRefPorPlayer.clear();
-      this.amigoRefs.clear();
-      WEAPON_ATTACK_ANIM_CACHE.clear();
-      LAST_ERROR = null;
-   }
-
-   private void removeNpcForReload(AmigoNpcManager.NpcRecord rec) {
-      if (rec == null || rec.worldObj == null || rec.refObj == null) {
-         return;
-      }
-
-      Object worldObj = rec.worldObj;
-      Object refObj = rec.refObj;
-
-      try {
-         if (worldObj instanceof World world && world.isInThread()) {
-            Object storeObj = getComponentStoreFromWorld(worldObj);
-            if (storeObj != null) {
-               doRemoveEntity(storeObj, refObj);
-            }
-            this.amigoRefs.remove(refObj);
-            rec.refObj = null;
-            return;
-         }
-      } catch (Throwable ignored) {
-      }
-
-      CountDownLatch latch = new CountDownLatch(1);
-      boolean queued = false;
-      try {
-         queued = HytaleBridge.worldExecute(worldObj, () -> {
-            try {
-               Object storeObj = getComponentStoreFromWorld(worldObj);
-               if (storeObj != null) {
-                  doRemoveEntity(storeObj, refObj);
-               }
-            } catch (Throwable ignored) {
-            } finally {
-               this.amigoRefs.remove(refObj);
-               if (rec.refObj == refObj) {
-                  rec.refObj = null;
-               }
-               latch.countDown();
-            }
-         });
-      } catch (Throwable ignored) {
-      }
-
-      if (queued) {
-         try {
-            latch.await(2000L, TimeUnit.MILLISECONDS);
-         } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-         }
-      }
-
-      this.amigoRefs.remove(refObj);
-      if (rec.refObj == refObj) {
-         rec.refObj = null;
       }
    }
 
    public SimpleItemContainer getOrLoadBackpack(UUID ownerId) {
       if (ownerId == null) {
          return new SimpleItemContainer((short)45);
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec != null) {
-         if (rec.backpack == null) {
-            rec.backpack = AmigoPersistence.loadBackpack(ownerId);
-         }
-
-         return rec.backpack;
       } else {
-         return AmigoPersistence.loadBackpack(ownerId);
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.backpack == null) {
+               rec.backpack = AmigoPersistence.loadBackpack(ownerId);
+            }
+
+            return rec.backpack;
+         } else {
+            return AmigoPersistence.loadBackpack(ownerId);
+         }
       }
    }
 
@@ -1658,152 +1606,38 @@ public final class AmigoNpcManager {
    }
 
    public UUID getOwnerFromRef(Object refObj) {
-      return refObj == null ? null : this.amigoRefs.get(refObj);
+      return refObj == null ? null : (UUID)this.amigoRefs.get(refObj);
    }
 
    public boolean isDowned(UUID ownerId) {
-      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      NpcRecord rec = ownerId == null ? null : (NpcRecord)this.npcRefPorPlayer.get(ownerId);
       return rec != null && rec.downed;
    }
 
-   public String getNpcDisplayName(UUID ownerId) {
-      if (ownerId == null) {
-         return "AmigoNPC";
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      String name = rec != null ? rec.customName : null;
-      if (name == null || name.isBlank()) {
-         try {
-            name = AmigoPersistence.loadCustomName(ownerId);
-         } catch (Throwable ignored) {
-         }
-      }
-
-      return name == null || name.isBlank() ? "AmigoNPC" : name;
-   }
-
-   public String getActivityStateName(UUID ownerId) {
-      if (ownerId == null) {
-         return "INACTIVE";
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null) {
-         return "INACTIVE";
-      }
-
-      if (rec.downed) {
-         return "DOWNED";
-      }
-
-      if (rec.refObj == null || rec.state != AmigoNpcManager.State.ACTIVE) {
-         return "INACTIVE";
-      }
-
-      return rec.activityState == null ? "IDLE" : rec.activityState.name();
-   }
-
-   public float getCachedHealth(UUID ownerId) {
-      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
-      return rec == null ? 0.0F : Math.max(0.0F, rec.cachedHealth);
-   }
-
-   public float getCachedMaxHealth(UUID ownerId) {
-      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
-      return rec == null ? 0.0F : Math.max(0.0F, rec.cachedMaxHealth);
-   }
-
-   public boolean hasRecentCombatParticipation(UUID ownerId, Object targetRefObj, long now) {
-      if (ownerId == null || targetRefObj == null) {
-         return false;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null || rec.combatTags == null) {
-         return false;
-      }
-
-      synchronized (rec.combatTags) {
-         for (CombatTag tag : rec.combatTags) {
-            if (tag != null
-               && refEq(tag.targetRefObj, targetRefObj)
-               && tag.lastSeenMillis > 0L
-               && now - tag.lastSeenMillis <= 30000L) {
-               return true;
-            }
-         }
-      }
-
-      return false;
-   }
-
-   public void recordExternalCompanionKillXp(UUID ownerId, Object targetRefObj, long gain, long now) {
-      if (ownerId == null || targetRefObj == null) {
-         return;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null) {
-         return;
-      }
-
-      synchronized (rec) {
-         rec.externalCompanionKillXpTargetRefObj = targetRefObj;
-         rec.externalCompanionKillXpAtMillis = now > 0L ? now : System.currentTimeMillis();
-         rec.externalCompanionKillXpGain = Math.max(0L, gain);
-      }
-   }
-
-   private static long consumeExternalCompanionKillXp(AmigoNpcManager.NpcRecord rec, Object targetRefObj, long now) {
-      if (rec == null || targetRefObj == null) {
-         return -1L;
-      }
-
-      synchronized (rec) {
-         if (rec.externalCompanionKillXpTargetRefObj == null
-            || !refEq(rec.externalCompanionKillXpTargetRefObj, targetRefObj)
-            || rec.externalCompanionKillXpAtMillis <= 0L
-            || now - rec.externalCompanionKillXpAtMillis > 2000L) {
-            return -1L;
-         }
-
-         long gain = Math.max(0L, rec.externalCompanionKillXpGain);
-         rec.externalCompanionKillXpTargetRefObj = null;
-         rec.externalCompanionKillXpAtMillis = 0L;
-         rec.externalCompanionKillXpGain = 0L;
-         return gain;
-      }
-   }
-
    public void markDowned(UUID ownerId) {
-      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
+      NpcRecord rec = ownerId == null ? null : (NpcRecord)this.npcRefPorPlayer.get(ownerId);
       if (rec != null) {
          if (!rec.downed) {
             rec.downed = true;
-            rec.activityState = CompanionActivityState.DOWNED;
-            rec.cachedHealth = 0.0F;
             long now = System.currentTimeMillis();
-            rec.downedUntilMillis = now + DOWNED_AUTO_REVIVE_MILLIS;
+            rec.downedUntilMillis = now + 40000L;
 
             try {
                ActionTraceService.getShared().record(ownerId, "npc_state", "downed until=" + rec.downedUntilMillis);
             } catch (Throwable var12) {
             }
 
-            rec.deathDespawnAtMillis = 0L;
-            rec.nextDownedMessageMillis = now;
+            rec.deathDespawnAtMillis = now + 1200L;
             rec.regenStartAtMillis = 0L;
             rec.regenLastApplyMillis = 0L;
             rec.combatUntilMillis = 0L;
             rec.combatTargetRefObj = null;
             rec.assistUntilMillis = 0L;
             rec.assistTargetRefObj = null;
-            rec.ownerCombatContextUntilMillis = 0L;
             rec.chaseDisengaged = false;
             rec.targetLostSinceMillis = 0L;
             rec.targetStuckSinceMillis = 0L;
-            rec.lastTargetHorizontal = -1.0;
+            rec.lastTargetHorizontal = (double)-1.0F;
             rec.lastTargetSampleMillis = 0L;
 
             try {
@@ -1816,12 +1650,12 @@ public final class AmigoNpcManager {
                            return;
                         }
 
-                        Store<EntityStore> store = (Store<EntityStore>)storeObj;
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+                        Store<EntityStore> store = (Store)storeObj;
+                        Ref<EntityStore> npcRef = (Ref)rec.refObj;
                         Object npcEntityObj = getComponentFromStore(store, npcRef, NPCEntity.getComponentType());
                         if (npcEntityObj != null) {
-                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTarget", null);
-                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", null);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTarget", (Object)null);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", (Object)null);
                            setRoleStateOnNpcEntity(npcEntityObj, npcRef, store, false);
                         }
 
@@ -1839,18 +1673,27 @@ public final class AmigoNpcManager {
                               s.walking = false;
                               s.running = false;
                               s.sprinting = false;
-                              s.sleeping = true;
                               ms.setMovementStates(s);
                               ms.setSentMovementStates(new MovementStates(s));
                               store.putComponent(npcRef, MovementStatesComponent.getComponentType(), ms);
                            }
                         } catch (Throwable var8) {
                         }
-                     } catch (Throwable var9x) {
+                     } catch (Throwable var9) {
                      }
+
                   });
                }
             } catch (Throwable var11) {
+            }
+
+            try {
+               long before = rec.totalXp;
+               long after = XpProgression.applyDeathPenalty(before);
+               rec.totalXp = after;
+               rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
+               AmigoPersistence.saveTotalXp(ownerId, after);
+            } catch (Throwable var10) {
             }
 
             try {
@@ -1863,77 +1706,266 @@ public final class AmigoNpcManager {
                            return;
                         }
 
-                        Store<EntityStore> store = (Store<EntityStore>)storeObj;
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
-                        NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
-                     } catch (Throwable var5x) {
+                        Store<EntityStore> store = (Store)storeObj;
+                        Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                        updateNpcHud(store, npcRef, rec);
+                     } catch (Throwable var5) {
                      }
+
                   });
                }
             } catch (Throwable var9) {
             }
+
          }
       }
    }
 
-   public NpcLevelProgressSnapshot getLevelProgressSnapshot(UUID ownerId) {
-      return NpcQueryService.getLevelProgressSnapshot(this.npcRefPorPlayer, ownerId);
+   public LevelProgressSnapshot getLevelProgressSnapshot(UUID ownerId) {
+      if (ownerId == null) {
+         return new LevelProgressSnapshot(1, 0L, 0L);
+      } else {
+         try {
+            XpProgression.init();
+            NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+            long totalXp = rec != null ? Math.max(0L, rec.totalXp) : Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+            int level = Math.max(1, XpProgression.levelFromTotalXp(totalXp));
+            long start = XpProgression.xpStartOfLevel(level);
+            long need = Math.max(0L, XpProgression.xpToNext(level));
+            long into = start == Long.MAX_VALUE ? 0L : Math.max(0L, totalXp - start);
+            if (need > 0L && into > need) {
+               into = need;
+            }
+
+            return new LevelProgressSnapshot(level, into, need);
+         } catch (Throwable var12) {
+            return new LevelProgressSnapshot(1, 0L, 0L);
+         }
+      }
    }
 
    public Color getZoneHudColor(UUID ownerId) {
-      return NpcQueryService.getZoneHudColor(this.npcRefPorPlayer, ownerId);
-   }
-
-   public int getZoneForHud(UUID ownerId) {
-      return NpcQueryService.getZoneForHud(this.npcRefPorPlayer, ownerId);
-   }
-
-   public String getZoneNameForHud(UUID ownerId) {
-      return NpcQueryService.getZoneNameForHud(this.npcRefPorPlayer, ownerId);
-   }
-
-   public int getNpcLevel(UUID ownerId) {
-      return NpcQueryService.getNpcLevel(this.npcRefPorPlayer, ownerId);
-   }
-
-   public long getNpcTotalXp(UUID ownerId) {
-      return NpcQueryService.getNpcTotalXp(this.npcRefPorPlayer, ownerId);
-   }
-
-   public boolean isInCombat(UUID ownerId, long nowMillis) {
-      return NpcQueryService.isInCombat(this.npcRefPorPlayer, ownerId, nowMillis);
-   }
-
-   public boolean addNpcXpViaApi(UUID ownerId, long amount, NpcXpSource source, NpcXpContext ctx) {
-      return NpcProgressionActionService.addNpcXpViaApi(
-         this.npcRefPorPlayer, ownerId, amount, source, ctx, AmigoNpcManager::getComponentStoreFromWorld, this::addNpcXp
-      );
-   }
-
-   public void requestRescale(UUID ownerId) {
-      NpcProgressionActionService.requestRescale(
-         this.npcRefPorPlayer, ownerId, AmigoNpcManager::getComponentStoreFromWorld, (store, npcRef, resolvedOwnerId, rec) -> {
-            this.applyNpcScaling(store, npcRef, resolvedOwnerId, rec, false);
-
-            try {
-               NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
-            } catch (Throwable var6) {
-            }
-         }
-      );
-   }
-
-   public float mitigateIncomingDamage(UUID ownerId, float incomingAmount) {
-      try {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         long totalXp = rec != null ? rec.totalXp : AmigoPersistence.loadTotalXp(ownerId);
-         return NpcProgressionSupport.mitigateIncomingDamage(ownerId, totalXp, incomingAmount);
-      } catch (Throwable var6) {
-         return Math.max(0.0F, incomingAmount);
+      if (ownerId == null) {
+         return new Color((byte)-1, (byte)-1, (byte)-1);
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         return rec != null && rec.zoneHudColor != null ? rec.zoneHudColor : new Color((byte)-1, (byte)-1, (byte)-1);
       }
    }
 
-   private void applyNpcScaling(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, boolean healToFull) {
+   public int getZoneForHud(UUID ownerId) {
+      if (ownerId == null) {
+         return 0;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            return 0;
+         } else {
+            int raw = rec.zoneRawId;
+            if (raw > 0) {
+               return raw;
+            } else {
+               return rec.zoneInferredId > 0 ? rec.zoneInferredId : ZoneModel.expectedZoneForLevel(Math.max(1, rec.npcLevelCached));
+            }
+         }
+      }
+   }
+
+   public String getZoneNameForHud(UUID ownerId) {
+      int zid = this.getZoneForHud(ownerId);
+      return zid <= 0 ? "" : ZoneModel.zoneName(zid);
+   }
+
+   public int getNpcLevel(UUID ownerId) {
+      if (ownerId == null) {
+         return 1;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            return Math.max(1, rec.npcLevelCached);
+         } else {
+            try {
+               long totalXp = AmigoPersistence.loadTotalXp(ownerId);
+               return XpProgression.levelFromTotalXp(totalXp);
+            } catch (Throwable var5) {
+               return 1;
+            }
+         }
+      }
+   }
+
+   public long getNpcTotalXp(UUID ownerId) {
+      if (ownerId == null) {
+         return 0L;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            return Math.max(0L, rec.totalXp);
+         } else {
+            try {
+               return Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+            } catch (Throwable var4) {
+               return 0L;
+            }
+         }
+      }
+   }
+
+   public boolean isInCombat(UUID ownerId, long nowMillis) {
+      if (ownerId == null) {
+         return false;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec == null) {
+            return false;
+         } else if (rec.wasInCombat) {
+            return true;
+         } else {
+            long last = rec.lastCombatTagMillis;
+            return last > 0L && nowMillis - last < 5000L;
+         }
+      }
+   }
+
+   public boolean addNpcXpViaApi(UUID ownerId, long amount, NpcXpSource source, NpcXpContext ctx) {
+      if (ownerId != null && amount > 0L) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj instanceof Ref && rec.worldObj != null) {
+            Object worldObj = rec.worldObj;
+            HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  Object storeObj = getComponentStoreFromWorld(worldObj);
+                  if (storeObj == null) {
+                     return;
+                  }
+
+                  Store<EntityStore> store = (Store)storeObj;
+                  Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                  this.addNpcXp(store, npcRef, ownerId, rec, amount, source, ctx);
+               } catch (Throwable var11) {
+               }
+
+            });
+            return true;
+         } else {
+            try {
+               XpProgression.init();
+               long before = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+               long after = before + amount;
+               if (after < before) {
+                  after = Long.MAX_VALUE;
+               }
+
+               AmigoPersistence.saveTotalXp(ownerId, after);
+               int oldLevel = Math.max(1, XpProgression.levelFromTotalXp(before));
+               int newLevel = Math.max(1, XpProgression.levelFromTotalXp(after));
+               NpcXpSource src = source != null ? source : NpcXpSource.COMMAND;
+               NpcXpContext c = ctx != null ? ctx : NpcXpContext.now();
+               AmigoEventBus.post(new NpcExperienceGainedEvent(ownerId, amount, before, after, oldLevel, newLevel, src, c));
+               if (newLevel > oldLevel) {
+                  AmigoEventBus.post(new NpcLevelUpEvent(ownerId, oldLevel, newLevel, after, src, c));
+               }
+
+               return true;
+            } catch (Throwable var15) {
+               return false;
+            }
+         }
+      } else {
+         return false;
+      }
+   }
+
+   public void requestRescale(UUID ownerId) {
+      if (ownerId != null) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE) {
+               if (rec.refObj instanceof Ref) {
+                  Object worldObj = rec.worldObj;
+                  if (worldObj != null) {
+                     HytaleBridge.worldExecute(worldObj, () -> {
+                        try {
+                           Object storeObj = getComponentStoreFromWorld(worldObj);
+                           if (storeObj == null) {
+                              return;
+                           }
+
+                           Store<EntityStore> store = (Store)storeObj;
+                           Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                           this.applyNpcScaling(store, npcRef, ownerId, rec, false);
+
+                           try {
+                              updateNpcHud(store, npcRef, rec);
+                           } catch (Throwable var8) {
+                           }
+                        } catch (Throwable var9) {
+                        }
+
+                     });
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public float mitigateIncomingDamage(UUID ownerId, float incomingAmount) {
+      if (ownerId == null) {
+         return incomingAmount;
+      } else {
+         float amount = Math.max(0.0F, incomingAmount);
+
+         try {
+            NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+            long totalXp = rec != null ? rec.totalXp : AmigoPersistence.loadTotalXp(ownerId);
+            int lvl = XpProgression.levelFromTotalXp(totalXp);
+            double mult = StatScaling.multiplier(lvl);
+            if (mult <= (double)0.0F) {
+               return amount;
+            } else {
+               float afterLevel = (float)((double)amount / mult);
+               return AttributeModifierService.getShared().applyIncomingDamageMods(ownerId, afterLevel, lvl);
+            }
+         } catch (Throwable var11) {
+            return amount;
+         }
+      }
+   }
+
+   private static int resolveDefenseStatIndex() {
+      Integer cached = DEF_STAT_INDEX;
+      if (cached != null) {
+         return cached;
+      } else {
+         synchronized(AmigoNpcManager.class) {
+            cached = DEF_STAT_INDEX;
+            if (cached != null) {
+               return cached;
+            } else {
+               int idx = -1;
+               String[] candidates = new String[]{"getDefense", "getDefence", "getArmor", "getArmour", "getPhysicalDefense", "getPhysicalDefence", "getProtection", "getResistance", "getPhysicalResistance"};
+
+               for(String name : candidates) {
+                  try {
+                     Method m = DefaultEntityStatTypes.class.getMethod(name);
+                     Object out = m.invoke((Object)null);
+                     if (out instanceof Integer) {
+                        idx = (Integer)out;
+                        break;
+                     }
+                  } catch (Throwable var11) {
+                  }
+               }
+
+               DEF_STAT_INDEX = idx;
+               return idx;
+            }
+         }
+      }
+   }
+
+   private void applyNpcScaling(Store store, Ref npcRef, UUID ownerId, NpcRecord rec, boolean healToFull) {
       if (store != null && npcRef != null && ownerId != null && rec != null) {
          try {
             XpProgression.init();
@@ -1957,7 +1989,7 @@ public final class AmigoNpcManager {
                } catch (Throwable var36) {
                }
 
-               long baseHp = Math.max(1L, Math.round(base));
+               long baseHp = Math.max(1L, (long)Math.round(base));
                rec.baseHp = baseHp;
                AmigoPersistence.saveBaseHp(ownerId, baseHp);
                updatedBases = true;
@@ -1965,13 +1997,13 @@ public final class AmigoNpcManager {
 
             if (rec.baseDef < 0L) {
                long baseDef = 1L;
-               int defIdx = NpcScalingSupport.resolveDefenseStatIndex();
+               int defIdx = resolveDefenseStatIndex();
                if (defIdx >= 0) {
                   try {
                      stats.maximizeStatValue(defIdx);
                      float defVal = stats.get(defIdx).get();
-                     baseDef = Math.max(0L, Math.round(defVal));
-                  } catch (Throwable ignored) {
+                     baseDef = Math.max(0L, (long)Math.round(defVal));
+                  } catch (Throwable var35) {
                      baseDef = 1L;
                   }
                }
@@ -1997,48 +2029,6 @@ public final class AmigoNpcManager {
             }
 
             long defValScaled = StatScaling.scaledDef(rec.baseDef, level);
-
-            try {
-               if (NpcStatsConfigService.getShared().get().EnableNpcStats) {
-                  NpcStatsState st = NpcStatsService.getShared().load(ownerId);
-                  long extraDef = AttributeModifierService.getShared().extraDefense(st);
-                  if (extraDef > 0L) {
-                     defValScaled = Math.max(0L, defValScaled + extraDef);
-                  }
-               }
-            } catch (Throwable ignored) {
-            }
-
-            try {
-               Object ownerRefObj = rec.worldObj == null ? null : invokeOneArg(rec.worldObj, "getEntityRef", UUID.class, ownerId);
-               if (ownerRefObj instanceof Ref<?> rawOwnerRef) {
-                  @SuppressWarnings("unchecked")
-                  Ref<EntityStore> ownerRef = (Ref<EntityStore>)rawOwnerRef;
-                  EntityStatMap ownerStats = (EntityStatMap)store.getComponent(ownerRef, EntityStatMap.getComponentType());
-                  if (ownerStats != null) {
-                     try {
-                        float ownerMaxHp = ownerStats.get(healthIdx).getMax();
-                        if (ownerMaxHp > 0.0F) {
-                           desiredMaxHp = Math.min(desiredMaxHp, Math.max(1L, (long)Math.floor(ownerMaxHp * 0.90)));
-                        }
-                     } catch (Throwable ignored) {
-                     }
-
-                     int ownerDefIdx = NpcScalingSupport.resolveDefenseStatIndex();
-                     if (ownerDefIdx >= 0) {
-                        try {
-                           float ownerDef = ownerStats.get(ownerDefIdx).get();
-                           if (ownerDef >= 0.0F) {
-                              defValScaled = Math.min(defValScaled, Math.max(0L, (long)Math.floor(ownerDef * 0.90)));
-                           }
-                        } catch (Throwable ignored) {
-                        }
-                     }
-                  }
-               }
-            } catch (Throwable ignored) {
-            }
-
             String HP_MAX_MOD_KEY = "amigonpc_hpmax";
 
             try {
@@ -2055,8 +2045,8 @@ public final class AmigoNpcManager {
 
             try {
                float baseMaxF = stats.get(healthIdx).getMax();
-               baseMaxHp = Math.max(1L, Math.round(baseMaxF));
-            } catch (Throwable ignored) {
+               baseMaxHp = Math.max(1L, (long)Math.round(baseMaxF));
+            } catch (Throwable var31) {
                baseMaxHp = 1L;
             }
 
@@ -2107,7 +2097,7 @@ public final class AmigoNpcManager {
             } catch (Throwable var27) {
             }
 
-            int defIdx = NpcScalingSupport.resolveDefenseStatIndex();
+            int defIdx = resolveDefenseStatIndex();
             if (defIdx >= 0) {
                try {
                   stats.setStatValue(defIdx, (float)defValScaled);
@@ -2124,17 +2114,16 @@ public final class AmigoNpcManager {
             }
 
             try {
-               NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+               updateNpcHud(store, npcRef, rec);
             } catch (Throwable var24) {
             }
          } catch (Throwable var38) {
          }
+
       }
    }
 
-   private void addNpcXp(
-      Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, long gain, NpcXpSource source, NpcXpContext ctx
-   ) {
+   private void addNpcXp(Store store, Ref npcRef, UUID ownerId, NpcRecord rec, long gain, NpcXpSource source, NpcXpContext ctx) {
       if (gain > 0L && ownerId != null && rec != null && store != null && npcRef != null) {
          long before = rec.totalXp;
          long after = before + gain;
@@ -2159,15 +2148,11 @@ public final class AmigoNpcManager {
 
          if (newLevel != rec.level) {
             rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(newLevel);
-
-            try {
-               AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
-            } catch (Throwable var21) {
-            }
+            this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
          }
 
          try {
-            NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
+            updateNpcHud(store, npcRef, rec);
          } catch (Throwable var20) {
          }
 
@@ -2190,27 +2175,159 @@ public final class AmigoNpcManager {
             }
          } catch (Throwable var17) {
          }
+
+      }
+   }
+
+   private static void updateNpcHud(Store store, Ref npcRef, NpcRecord rec) {
+      if (store != null && npcRef != null && rec != null) {
+         XpProgression.init();
+         long totalXp = Math.max(0L, rec.totalXp);
+         int computedLevel = Math.max(1, XpProgression.levelFromTotalXp(totalXp));
+         int level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         if (level != computedLevel) {
+            level = computedLevel;
+            rec.level = computedLevel;
+         }
+
+         if (rec.npcLevelCached != computedLevel) {
+            rec.npcLevelCached = computedLevel;
+         }
+
+         long start = XpProgression.xpStartOfLevel(level);
+         long need = Math.max(1L, XpProgression.xpToNext(level));
+         long into = start == Long.MAX_VALUE ? 0L : Math.max(0L, totalXp - start);
+         if (into > need) {
+            into = need;
+         }
+
+         int segments = 12;
+         double p = Math.max((double)0.0F, Math.min((double)1.0F, (double)into / (double)need));
+         int filled = (int)Math.round(p * (double)segments);
+         if (filled < 0) {
+            filled = 0;
+         }
+
+         if (filled > segments) {
+            filled = segments;
+         }
+
+         String var10000 = repeatChar('=', filled);
+         String bar = "[" + var10000 + repeatChar('-', segments - filled) + "]";
+         String text = "Lv " + level + " " + bar + " " + into + "/" + need;
+
+         try {
+            Nameplate np = (Nameplate)store.ensureAndGetComponent(npcRef, Nameplate.getComponentType());
+            np.setText(text);
+         } catch (Throwable var20) {
+         }
+
+      }
+   }
+
+   private static String repeatChar(char c, int n) {
+      if (n <= 0) {
+         return "";
+      } else {
+         StringBuilder sb = new StringBuilder(n);
+
+         for(int i = 0; i < n; ++i) {
+            sb.append(c);
+         }
+
+         return sb.toString();
       }
    }
 
    public int getSwordLevel(UUID ownerId) {
-      return NpcSwordService.getSwordLevel(this.npcRefPorPlayer, ownerId);
+      if (ownerId == null) {
+         return 1;
+      } else {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            return br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         } else {
+            long xp = Math.max(0L, AmigoPersistence.loadTotalXp(ownerId));
+            return br.tones.amigonpc.core.swords.SwordProgression.clampLevel(XpProgression.levelFromTotalXp(xp));
+         }
+      }
    }
 
    public int changeSwordLevel(UUID ownerId, int delta, boolean announce) {
-      return NpcSwordService.changeSwordLevel(
-         this.npcRefPorPlayer,
-         ownerId,
-         delta,
-         announce,
-         AmigoNpcManager::getComponentStoreFromWorld,
-         this::applySwordWeaponNow,
-         (store, npcRef, resolvedOwnerId, rec) -> {
-            this.applyNpcScaling(store, npcRef, resolvedOwnerId, rec, false);
-            NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
-         },
-         this::sendToOwner
-      );
+      if (ownerId != null && delta != 0) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         int oldLvl = rec != null ? br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level) : br.tones.amigonpc.core.swords.SwordProgression.clampLevel(AmigoPersistence.loadSwordLevel(ownerId));
+         int newLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(oldLvl + delta);
+         if (newLvl == oldLvl) {
+            return newLvl;
+         } else {
+            if (rec != null) {
+               rec.level = newLvl;
+            }
+
+            String weaponId = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(newLvl);
+            if (rec != null) {
+               rec.equippedWeaponId = weaponId;
+            }
+
+            AmigoPersistence.saveSwordState(ownerId, newLvl, weaponId);
+            XpProgression.init();
+            long newTotalXp = XpProgression.xpStartOfLevel(newLvl);
+            if (newTotalXp < 0L) {
+               newTotalXp = 0L;
+            }
+
+            if (rec != null) {
+               rec.totalXp = newTotalXp;
+               rec.npcLevelCached = newLvl;
+            }
+
+            AmigoPersistence.saveTotalXp(ownerId, newTotalXp);
+            if (rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.worldObj != null && rec.refObj != null) {
+               Object worldObj = rec.worldObj;
+               HytaleBridge.worldExecute(worldObj, () -> {
+                  try {
+                     Object storeObj = getComponentStoreFromWorld(worldObj);
+                     if (storeObj == null) {
+                        return;
+                     }
+
+                     Store<EntityStore> store = (Store)storeObj;
+                     Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                     this.applySwordWeaponNow(store, npcRef, ownerId, rec, true);
+
+                     try {
+                        this.applyNpcScaling(store, npcRef, ownerId, rec, false);
+                     } catch (Throwable var9) {
+                     }
+
+                     try {
+                        updateNpcHud(store, npcRef, rec);
+                     } catch (Throwable var8) {
+                     }
+                  } catch (Throwable var10) {
+                  }
+
+               });
+               if (announce) {
+                  String line;
+                  if (delta > 0 && br.tones.amigonpc.core.swords.SwordProgression.crossedAnyMilestone(oldLvl, newLvl)) {
+                     line = br.tones.amigonpc.core.swords.SwordMessages.pickEpic(newLvl);
+                  } else if (delta > 0) {
+                     line = br.tones.amigonpc.core.swords.SwordMessages.pickUp(newLvl);
+                  } else {
+                     line = br.tones.amigonpc.core.swords.SwordMessages.pickDown(newLvl);
+                  }
+
+                  this.sendToOwner(worldObj, ownerId, line);
+               }
+            }
+
+            return newLvl;
+         }
+      } else {
+         return this.getSwordLevel(ownerId);
+      }
    }
 
    private void sendToOwner(Object worldObj, UUID ownerId, String text) {
@@ -2222,106 +2339,263 @@ public final class AmigoNpcManager {
                   return;
                }
 
-               Store<EntityStore> store = (Store<EntityStore>)storeObj;
-               Ref<EntityStore> ownerRef = (Ref<EntityStore>)invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
+               Store<EntityStore> store = (Store)storeObj;
+               Ref<EntityStore> ownerRef = (Ref)invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
                if (ownerRef == null) {
                   return;
                }
 
-               PlayerRef playerRef = (PlayerRef)store.getComponent(ownerRef, PlayerRef.getComponentType());
-               if (playerRef == null) {
+               Player player = (Player)store.getComponent(ownerRef, Player.getComponentType());
+               if (player == null) {
                   return;
                }
 
-               playerRef.sendMessage(Message.raw(AmigoText.format("core.chat.prefix", text)));
+               player.sendMessage(Message.raw("§7[AmigoNPC] " + text));
             } catch (Throwable var7) {
             }
+
          });
       }
    }
 
-   private static String resolveConfiguredOrLegacyMeleeWeaponId(AmigoNpcManager.NpcRecord rec) {
-      return rec == null ? null : rec.equippedWeaponId;
+   private void applySwordWeaponNow(Store store, Ref npcRef, UUID ownerId, NpcRecord rec, boolean saveNow) {
+      if (store != null && npcRef != null && rec != null && ownerId != null) {
+         int lvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
+         String expected = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(lvl);
+         if (expected != null && !expected.isBlank()) {
+            boolean slotOk = this.isHotbar0Item(store, npcRef, expected);
+            if (expected.equals(rec.equippedWeaponId) && slotOk) {
+               if (saveNow) {
+                  AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+               }
+
+            } else {
+               boolean equipped = this.equipWeaponInHotbar0(store, npcRef, expected);
+               if (equipped) {
+                  rec.equippedWeaponId = expected;
+                  if (saveNow) {
+                     AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+                  }
+
+                  this.debugEquip(rec, ownerId, "Equipado: " + expected + " (lvl " + lvl + ")");
+               } else {
+                  this.debugEquip(rec, ownerId, "FALHA ao equipar '" + expected + "' (lvl " + lvl + "). Hotbar0=" + this.getHotbar0ItemId(store, npcRef));
+               }
+
+            }
+         }
+      }
    }
 
-   private void applySwordWeaponNow(Store<EntityStore> store, Ref<EntityStore> npcRef, UUID ownerId, AmigoNpcManager.NpcRecord rec, boolean saveNow) {
-      if (store == null || npcRef == null || rec == null || ownerId == null) {
-         return;
+   private String getHotbar0ItemId(Store store, Ref npcRef) {
+      try {
+         NPCEntity npc = (NPCEntity)store.getComponent(npcRef, NPCEntity.getComponentType());
+         if (npc == null) {
+            return null;
+         } else {
+            Inventory inv = npc.getInventory();
+            if (inv == null) {
+               return null;
+            } else {
+               ItemContainer hotbar = inv.getHotbar();
+               if (hotbar == null) {
+                  return null;
+               } else {
+                  ItemStack st = hotbar.getItemStack((short)0);
+                  return st != null && !st.isEmpty() ? st.getItemId() : null;
+               }
+            }
+         }
+      } catch (Throwable var7) {
+         return null;
       }
+   }
 
-      if (rec.backpack == null) {
-         rec.backpack = this.getOrLoadBackpack(ownerId);
-      }
-
-      String expected;
-      if (rec.autoWeaponSwitchEnabled) {
-         expected = NpcWeaponSupport.selectBestBackpackWeapon(rec.backpack, false);
+   private boolean isHotbar0Item(Store store, Ref npcRef, String itemId) {
+      if (itemId != null && !itemId.isBlank()) {
+         String cur = this.getHotbar0ItemId(store, npcRef);
+         return itemId.equals(cur);
       } else {
-         expected = NpcWeaponSupport.backpackContainsWeapon(rec.backpack, rec.equippedWeaponId) ? rec.equippedWeaponId : null;
+         return false;
       }
+   }
 
-      int lvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
-      if (expected == null || expected.isBlank()) {
-         NpcWeaponSupport.clearHotbar0(store, npcRef);
-         rec.equippedWeaponId = null;
-         if (saveNow) {
-            AmigoPersistence.saveSwordState(ownerId, lvl, null);
+   private boolean equipWeaponInHotbar0(Store store, Ref npcRef, String itemId) {
+      try {
+         NPCEntity npc = (NPCEntity)store.getComponent(npcRef, NPCEntity.getComponentType());
+         if (npc == null) {
+            return false;
+         } else {
+            Inventory inv = npc.getInventory();
+            if (inv == null) {
+               inv = new Inventory();
+            }
+
+            try {
+               inv.setEntity(npc);
+            } catch (Throwable var11) {
+            }
+
+            try {
+               inv.setUsingToolsItem(false);
+            } catch (Throwable var10) {
+            }
+
+            ItemContainer hotbar = inv.getHotbar();
+            if (hotbar == null) {
+               inv = new Inventory();
+
+               try {
+                  inv.setEntity(npc);
+               } catch (Throwable var9) {
+               }
+
+               try {
+                  inv.setUsingToolsItem(false);
+               } catch (Throwable var8) {
+               }
+
+               hotbar = inv.getHotbar();
+               if (hotbar == null) {
+                  return false;
+               }
+            }
+
+            hotbar.setItemStackForSlot((short)0, new ItemStack(itemId, 1));
+
+            try {
+               ItemStack st = hotbar.getItemStack((short)0);
+               if (st == null || st.isEmpty()) {
+                  return false;
+               }
+            } catch (Throwable var12) {
+            }
+
+            inv.setActiveHotbarSlot((byte)0);
+            inv.markChanged();
+            npc.setInventory(inv);
+            npc.invalidateEquipmentNetwork();
+            return true;
          }
-         return;
+      } catch (Throwable var13) {
+         return false;
       }
+   }
 
-      if (NpcWeaponSupport.isHotbar0Item(store, npcRef, expected)) {
-         rec.equippedWeaponId = expected;
-         if (saveNow) {
-            AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+   private void debugEquip(NpcRecord rec, UUID ownerId, String msg) {
+      if (rec != null && ownerId != null) {
+         if (rec.debugLogEnabled) {
+            long now = System.currentTimeMillis();
+            if (now >= rec.debugNextEquipMillis) {
+               rec.debugNextEquipMillis = now + 1200L;
+               this.sendToOwner(rec.worldObj, ownerId, "DEBUG-EQUIP: " + msg);
+            }
          }
-         return;
       }
+   }
 
-      if (NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, expected)) {
-         rec.equippedWeaponId = expected;
-         if (saveNow) {
-            AmigoPersistence.saveSwordState(ownerId, lvl, expected);
+   private void debugCombat(NpcRecord rec, UUID ownerId, String msg) {
+      if (rec != null && ownerId != null) {
+         if (rec.debugLogEnabled) {
+            long now = System.currentTimeMillis();
+            if (now >= rec.debugNextCombatMillis) {
+               rec.debugNextCombatMillis = now + 900L;
+               this.sendToOwner(rec.worldObj, ownerId, "DEBUG-COMBAT: " + msg);
+            }
          }
-         this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.success", expected, lvl));
-      } else {
-         this.debugEquip(rec, ownerId, AmigoText.format("core.debug.equip.failed", expected, lvl, NpcWeaponSupport.getHotbar0ItemId(store, npcRef)));
       }
    }
 
-   private void debugEquip(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugEquip(rec, ownerId, msg, this::sendToOwner);
+   private void debugAttack(NpcRecord rec, UUID ownerId, String msg) {
+      if (rec != null && ownerId != null) {
+         if (rec.debugLogEnabled) {
+            long now = System.currentTimeMillis();
+            if (now >= rec.debugNextAttackMillis) {
+               rec.debugNextAttackMillis = now + 900L;
+               this.sendToOwner(rec.worldObj, ownerId, "DEBUG-ATTACK: " + msg);
+            }
+         }
+      }
    }
 
-   private void debugCombat(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugCombat(rec, ownerId, msg, this::sendToOwner);
+   private void debugZones(NpcRecord rec, UUID ownerId, String msg) {
+      if (rec != null && ownerId != null) {
+         boolean cfgEnabled = false;
+
+         try {
+            cfgEnabled = AmigoZonesConfigService.get().debugLog;
+         } catch (Throwable var7) {
+         }
+
+         if (cfgEnabled || rec.debugLogEnabled) {
+            long now = System.currentTimeMillis();
+            if (now >= rec.debugNextZonesMillis) {
+               rec.debugNextZonesMillis = now + 1000L;
+               this.sendToOwner(rec.worldObj, ownerId, "DEBUG-ZONES: " + msg);
+            }
+         }
+      }
    }
 
-   private void debugAttack(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugAttack(rec, ownerId, msg, this::sendToOwner);
-   }
+   private void debugMobLevel(NpcRecord rec, UUID ownerId, String msg) {
+      if (rec != null && ownerId != null) {
+         boolean cfgEnabled = false;
 
-   private void debugZones(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugZones(rec, ownerId, msg, this::sendToOwner);
-   }
+         try {
+            cfgEnabled = AmigoZonesConfigService.get().debugLog;
+         } catch (Throwable var7) {
+         }
 
-   private void debugMobLevel(AmigoNpcManager.NpcRecord rec, UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugMobLevel(rec, ownerId, msg, this::sendToOwner);
+         if (cfgEnabled || rec.debugLogEnabled) {
+            long now = System.currentTimeMillis();
+            if (now >= rec.debugNextMobLevelMillis) {
+               rec.debugNextMobLevelMillis = now + 1000L;
+               this.sendToOwner(rec.worldObj, ownerId, "DEBUG-MOBLEVEL: " + msg);
+            }
+         }
+      }
    }
 
    public void debugDamage(UUID ownerId, String msg) {
-      NpcDebugLogSupport.debugDamage(this.npcRefPorPlayer, ownerId, msg, this::sendToOwner);
+      if (ownerId != null && msg != null && !msg.isBlank()) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.debugLogEnabled) {
+               long now = System.currentTimeMillis();
+               if (now >= rec.debugNextDamageMillis) {
+                  rec.debugNextDamageMillis = now + 1200L;
+                  this.sendToOwner(rec.worldObj, ownerId, "DEBUG-DAMAGE: " + msg);
+               }
+            }
+         }
+      }
+   }
+
+   private static double getWeaponBaseDamage(String itemId) {
+      if (itemId != null && !itemId.isBlank()) {
+         try {
+            Item it = (Item)Item.getAssetMap().getAsset(itemId);
+            if (it == null) {
+               return (double)4.0F;
+            } else {
+               int lvl = it.getItemLevel();
+               return (double)4.0F + (double)Math.max(0, lvl) * 0.9;
+            }
+         } catch (Throwable var3) {
+            return (double)4.0F;
+         }
+      } else {
+         return (double)4.0F;
+      }
    }
 
    private static boolean refEq(Object a, Object b) {
       if (a == b) {
          return true;
-      }
-
-      if (a != null && b != null) {
+      } else if (a != null && b != null) {
          try {
             return a.equals(b);
-         } catch (Throwable ignored) {
+         } catch (Throwable var3) {
             return false;
          }
       } else {
@@ -2330,188 +2604,73 @@ public final class AmigoNpcManager {
    }
 
    public void startCombat(UUID ownerId, Object attackerRefObj) {
-      NpcCombatStateSupport.startCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
-   }
-
-   public void tryInterruptOwnerAttacker(Store<EntityStore> store, UUID ownerId, Object attackerRefObj) {
-      if (store == null || ownerId == null || attackerRefObj == null) {
-         return;
-      }
-
-      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-      if (rec == null || rec.downed || !rec.interruptAttacksEnabled || rec.refObj == null) {
-         return;
-      }
-
-      long now = System.currentTimeMillis();
-      if (now - rec.lastInterruptMillis < 1500L) {
-         return;
-      }
-
-      try {
-         Object attackerNpc = getComponentFromStore(store, attackerRefObj, NPCEntity.getComponentType());
-         if (attackerNpc == null) {
-            return;
+      if (ownerId != null && attackerRefObj != null) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (!rec.downed) {
+               if (rec.refObj != null) {
+                  if (attackerRefObj != rec.refObj) {
+                     rec.combatTargetRefObj = attackerRefObj;
+                     rec.combatUntilMillis = System.currentTimeMillis() + 3000L;
+                     rec.npcCombatTargetRefObj = null;
+                     rec.npcCombatUntilMillis = 0L;
+                     rec.assistTargetRefObj = null;
+                     rec.assistUntilMillis = 0L;
+                     String var10003 = String.valueOf(attackerRefObj);
+                     this.debugCombat(rec, ownerId, "startCombat: agressorRef=" + var10003 + " (defender=" + (rec.defendeEnabled ? "ON" : "OFF") + ")");
+                  }
+               }
+            }
          }
-
-         setMarkedTargetOnNpcEntity(attackerNpc, "CombatTarget", rec.refObj);
-         setLockedTargetOnNpcEntity(attackerNpc, rec.refObj);
-         rec.lastInterruptMillis = now;
-         this.debugCombat(rec, ownerId, "interrupt: attacker redirected to companion");
-      } catch (Throwable ignored) {
       }
    }
 
    public void startNpcCombat(UUID ownerId, Object attackerRefObj) {
-      NpcCombatStateSupport.startNpcCombat(this.npcRefPorPlayer.get(ownerId), ownerId, attackerRefObj, 3000L, this::debugCombat);
-   }
+      if (ownerId != null && attackerRefObj != null) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (!rec.downed) {
+               if (rec.refObj != null) {
+                  if (attackerRefObj != rec.refObj) {
+                     long now = System.currentTimeMillis();
+                     if (this.getActiveCombatTarget(rec, now) == null) {
+                        rec.npcCombatTargetRefObj = attackerRefObj;
+                        rec.npcCombatUntilMillis = now + 3000L;
 
-   public void startAssist(UUID ownerId, Object targetRefObj) {
-      NpcCombatStateSupport.startAssist(this.npcRefPorPlayer.get(ownerId), ownerId, targetRefObj, this::debugCombat);
-   }
+                        try {
+                           ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=npc_attacked");
+                        } catch (Throwable var7) {
+                        }
 
-   public void recordCombatTag(UUID ownerId, Object targetRefObj, Store<EntityStore> store) {
-      if (ownerId != null && targetRefObj != null && store != null) {
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         NpcLootStateSupport.recordCombatTag(rec, targetRefObj, store, 16);
+                        this.debugCombat(rec, ownerId, "startNpcCombat: agressorRef=" + String.valueOf(attackerRefObj));
+                     }
+                  }
+               }
+            }
+         }
       }
    }
 
-   private Object getActiveAssistTarget(AmigoNpcManager.NpcRecord rec, long now) {
-      return NpcCombatStateSupport.getActiveAssistTarget(rec, now);
-   }
+   public void startAssist(UUID ownerId, Object targetRefObj) {
+      if (ownerId != null && targetRefObj != null) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.defendeEnabled) {
+               if (!rec.downed) {
+                  if (rec.refObj != null) {
+                     if (targetRefObj != rec.refObj) {
+                        long now = System.currentTimeMillis();
+                        if (this.getActiveCombatTarget(rec, now) == null) {
+                           if (rec.assistTargetRefObj == null) {
+                              rec.assistTargetRefObj = targetRefObj;
+                              rec.assistUntilMillis = 0L;
 
-   private void clearAssist(AmigoNpcManager.NpcRecord rec) {
-      NpcCombatStateSupport.clearAssist(rec);
-   }
+                              try {
+                                 ActionTraceService.getShared().record(ownerId, "npc_state", "combat_start source=assist");
+                              } catch (Throwable var7) {
+                              }
 
-   private static boolean isValidEntityRef(Object store, Object refObj) {
-      return NpcEntityQuerySupport.isValidEntityRef(store, refObj, AmigoNpcManager::getComponentFromStore);
-   }
-
-   private static boolean isAliveEntityRef(Object store, Object refObj) {
-      return NpcEntityQuerySupport.isAliveEntityRef(store, refObj, AmigoNpcManager::getComponentFromStore);
-   }
-
-   private static double getEntityHeight(Object store, Object refObj) {
-      return NpcEntityQuerySupport.getEntityHeight(store, refObj, AmigoNpcManager::getComponentFromStore);
-   }
-
-   private static double getEntityRadiusXZ(Object store, Object refObj) {
-      return NpcEntityQuerySupport.getEntityRadiusXZ(store, refObj, AmigoNpcManager::getComponentFromStore);
-   }
-
-   private static void tickAssistHousekeeping(AmigoNpcManager.NpcRecord rec, Object store, long now) {
-      NpcEntityQuerySupport.tickAssistHousekeeping(rec, store, now, 3000L, AmigoNpcManager::getComponentFromStore);
-   }
-
-   private Object findNearestDefenderTarget(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d ownerPos) {
-      return NpcTargetAcquisitionSupport.findWeakestCombatTarget(
-         store, rec, ownerRefObj, ownerPos, this.pvpEnabled, 12.0, 2.5, 35.0, this::isAmigoRef
-      );
-   }
-
-   private Object findNearestTargetNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Object excludeRefObj) {
-      return NpcTargetAcquisitionSupport.findWeakestCombatTarget(
-         store, rec, ownerRefObj, npcPos, this.pvpEnabled, 12.0, 2.5, 35.0, this::isAmigoRef
-      );
-   }
-
-   private static boolean isAnyEnemyNearNpc(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Vector3d npcPos, double radius) {
-      return NpcTargetAcquisitionSupport.isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, radius, 2.5, 35.0);
-   }
-
-   private void clearCombatTagsAndLoot(AmigoNpcManager.NpcRecord rec) {
-      NpcLootStateSupport.clearCombatTagsAndLoot(rec);
-   }
-
-   private static boolean isItemRefValid(Store<EntityStore> store, Object refObj) {
-      return NpcLootStateSupport.isItemRefValid(store, refObj);
-   }
-
-   private static void lootChatAccAdd(AmigoNpcManager.NpcRecord rec, String itemId, int qty, long now) {
-      NpcLootStateSupport.lootChatAccAdd(rec, itemId, qty, now, 500L);
-   }
-
-   private void lootChatAccFlushIfDue(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object worldObj, long now) {
-      NpcLootStateSupport.lootChatAccFlushIfDue(rec, ownerId, worldObj, now, this::sendToOwner);
-   }
-
-   private boolean tryPickupGroundItemIntoBackpack(
-      Store<EntityStore> store, UUID ownerId, AmigoNpcManager.NpcRecord rec, SimpleItemContainer bag, Object itemRefObj
-   ) {
-      return NpcBackpackLootSupport.tryPickupGroundItemIntoBackpack(
-         store, ownerId, rec, bag, itemRefObj, this::maybeNotifyBackpackFull, AmigoNpcManager::lootChatAccAdd
-      );
-   }
-
-   private void refreshPendingLootFromCombatTags(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now) {
-      NpcLootStateSupport.refreshPendingLootFromCombatTags(store, rec, npcPos, ownerPos, now, 6.0, 512, AUTOLOOT_QUERY);
-   }
-
-   private static boolean containsRef(ArrayList<Object> list, Ref<EntityStore> ref) {
-      return NpcLootStateSupport.containsRef(list, ref);
-   }
-
-   private Object chooseNearestPendingLoot(AmigoNpcManager.NpcRecord rec, Store<EntityStore> store, Vector3d npcPos) {
-      return NpcLootStateSupport.chooseNearestPendingLoot(rec, store, npcPos);
-   }
-
-   private void tickCombatTaggedLooting(
-      Store<EntityStore> store,
-      UUID ownerId,
-      AmigoNpcManager.NpcRecord rec,
-      Object ownerRefObj,
-      Vector3d npcPos,
-      Vector3d ownerPos,
-      long now,
-      Object worldObj,
-      boolean inCombatOrAssistNow
-   ) {
-      if (store != null && ownerId != null && rec != null && npcPos != null) {
-         if (!rec.downed) {
-            if (rec.state == AmigoNpcManager.State.ACTIVE) {
-               NpcCombatLootFlowSupport.PreLootAction preLootAction = NpcCombatLootFlowSupport.prepareCombatTaggedLooting(
-                  rec,
-                  ownerId,
-                  now,
-                  ownerPos,
-                  inCombatOrAssistNow,
-                  500L,
-                  25000L,
-                  25.0,
-                  () -> ownerRefObj != null && isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, 4.0)
-               );
-               if (preLootAction != NpcCombatLootFlowSupport.PreLootAction.RETURN) {
-                  if (preLootAction == NpcCombatLootFlowSupport.PreLootAction.CLEAR_AND_RETURN) {
-                     this.clearCombatTagsAndLoot(rec);
-                  } else {
-                     if (rec.backpack == null) {
-                        try {
-                           rec.backpack = this.getOrLoadBackpack(ownerId);
-                        } catch (Throwable var13) {
-                        }
-                     }
-
-                     SimpleItemContainer bag = rec.backpack;
-                     if (bag != null) {
-                        rec.lootPausedInventoryFull = false;
-                        if (NpcCombatLootTargetSupport.ensureLootTarget(
-                           store, rec, npcPos, ownerPos, now, this::refreshPendingLootFromCombatTags, this::chooseNearestPendingLoot
-                        )) {
-                           if (NpcCombatLootTargetSupport.validateLootTarget(store, rec, now, 12000L, 4000L, AmigoNpcManager::isItemRefValid)) {
-                              NpcCombatLootTargetSupport.steerNpcToLootTarget(
-                                 store,
-                                 rec,
-                                 NPCEntity.getComponentType(),
-                                 AmigoNpcManager::getComponentFromStore,
-                                 AmigoNpcManager::setLockedTargetOnNpcEntity,
-                                 AmigoNpcManager::setMarkedTargetOnNpcEntity,
-                                 AmigoNpcManager::setFlockState
-                              );
-                              NpcCombatLootTargetSupport.tryPickupLootTarget(
-                                 store, ownerId, rec, bag, npcPos, now, 5.0, 4000L, this::tryPickupGroundItemIntoBackpack
-                              );
+                              this.debugCombat(rec, ownerId, "startAssist: targetRef=" + String.valueOf(targetRefObj));
                            }
                         }
                      }
@@ -2522,66 +2681,1419 @@ public final class AmigoNpcManager {
       }
    }
 
-   private void tryAutoLoot(
-      Store<EntityStore> store, UUID ownerId, AmigoNpcManager.NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now, Object worldObj
-   ) {
+   public void recordCombatTag(UUID ownerId, Object targetRefObj, Store store) {
+      if (ownerId != null && targetRefObj != null && store != null) {
+         NpcRecord rec = (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+         if (rec != null) {
+            if (rec.refObj != null) {
+               if (!rec.downed) {
+                  if (targetRefObj instanceof Ref) {
+                     long now = System.currentTimeMillis();
+                     rec.lastCombatTagMillis = now;
+                     rec.wasInCombat = true;
+
+                     try {
+                        Ref<EntityStore> targetRef = (Ref)targetRefObj;
+                        TransformComponent tc = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
+                        if (tc == null || tc.getPosition() == null) {
+                           return;
+                        }
+
+                        Vector3d pos = tc.getPosition();
+                        rec.lastBattleCenter = pos;
+                        synchronized(rec.combatTags) {
+                           CombatTag existing = null;
+
+                           for(CombatTag t : rec.combatTags) {
+                              if (t != null && refEq(t.targetRefObj, targetRefObj)) {
+                                 existing = t;
+                                 break;
+                              }
+                           }
+
+                           if (existing != null) {
+                              existing.pos = pos;
+                              existing.lastSeenMillis = now;
+                           } else {
+                              if (rec.combatTags.size() >= 16) {
+                                 rec.combatTags.remove(0);
+                              }
+
+                              rec.combatTags.add(new CombatTag(targetRefObj, pos, now));
+                           }
+                        }
+                     } catch (Throwable var16) {
+                     }
+
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   private Object getActiveAssistTarget(NpcRecord rec, long now) {
+      return rec == null ? null : rec.assistTargetRefObj;
+   }
+
+   private void clearAssist(NpcRecord rec) {
+      if (rec != null) {
+         rec.assistTargetRefObj = null;
+         rec.assistUntilMillis = 0L;
+      }
+   }
+
+   private static boolean isValidEntityRef(Object store, Object refObj) {
+      if (store != null && refObj != null) {
+         try {
+            Object tc = getComponentFromStore(store, refObj, TransformComponent.getComponentType());
+            return tc != null;
+         } catch (Throwable var3) {
+            return false;
+         }
+      } else {
+         return false;
+      }
+   }
+
+   private static boolean isAliveEntityRef(Object store, Object refObj) {
+      if (!isValidEntityRef(store, refObj)) {
+         return false;
+      } else {
+         try {
+            try {
+               Object dc = getComponentFromStore(store, refObj, DeathComponent.getComponentType());
+               if (dc != null) {
+                  return false;
+               }
+            } catch (Throwable var6) {
+            }
+
+            Object statsObj = getComponentFromStore(store, refObj, EntityStatMap.getComponentType());
+            if (statsObj instanceof EntityStatMap) {
+               EntityStatMap stats = (EntityStatMap)statsObj;
+
+               try {
+                  float hp = stats.get(DefaultEntityStatTypes.getHealth()).get();
+                  return hp > 0.0F;
+               } catch (Throwable var5) {
+                  return true;
+               }
+            } else {
+               return true;
+            }
+         } catch (Throwable var7) {
+            return true;
+         }
+      }
+   }
+
+   private static double getEntityHeight(Object store, Object refObj) {
+      if (store != null && refObj != null) {
+         try {
+            Object bbObj = getComponentFromStore(store, refObj, BoundingBox.getComponentType());
+            if (bbObj instanceof BoundingBox) {
+               BoundingBox bb = (BoundingBox)bbObj;
+
+               try {
+                  Box box = bb.getBoundingBox();
+                  if (box != null) {
+                     double h = box.height();
+                     if (h > 0.05) {
+                        return h;
+                     }
+                  }
+               } catch (Throwable var7) {
+               }
+            }
+         } catch (Throwable var8) {
+         }
+
+         return 1.8;
+      } else {
+         return 1.8;
+      }
+   }
+
+   private static double getEntityRadiusXZ(Object store, Object refObj) {
+      if (store != null && refObj != null) {
+         try {
+            Object bbObj = getComponentFromStore(store, refObj, BoundingBox.getComponentType());
+            if (bbObj instanceof BoundingBox) {
+               BoundingBox bb = (BoundingBox)bbObj;
+               Object box = null;
+
+               try {
+                  box = bb.getBoundingBox();
+               } catch (Throwable var11) {
+               }
+
+               if (box != null) {
+                  double w = readBoxDim(box, "width", "getWidth", "xSize", "getXSize");
+                  double d = readBoxDim(box, "depth", "getDepth", "zSize", "getZSize");
+                  if (w > 0.05 && d > 0.05) {
+                     double r = (double)0.5F * Math.max(w, d);
+                     return clamp(r, 0.2, (double)2.0F);
+                  }
+               }
+            }
+         } catch (Throwable var12) {
+         }
+
+         return 0.45;
+      } else {
+         return 0.45;
+      }
+   }
+
+   private static double readBoxDim(Object box, String... methodNames) {
+      if (box != null && methodNames != null) {
+         for(String name : methodNames) {
+            if (name != null && !name.isBlank()) {
+               try {
+                  Method m = box.getClass().getMethod(name);
+                  Object v = m.invoke(box);
+                  if (v instanceof Number) {
+                     Number n = (Number)v;
+                     double d = n.doubleValue();
+                     if (d > (double)0.0F) {
+                        return d;
+                     }
+                  }
+               } catch (Throwable var11) {
+               }
+            }
+         }
+
+         return (double)-1.0F;
+      } else {
+         return (double)-1.0F;
+      }
+   }
+
+   private static double clamp(double v, double min, double max) {
+      return Math.max(min, Math.min(max, v));
+   }
+
+   private static void tickAssistHousekeeping(NpcRecord rec, Object store, long now) {
+      if (rec != null) {
+         if (!rec.defendeEnabled) {
+            rec.assistTargetRefObj = null;
+            rec.assistUntilMillis = 0L;
+         } else if (rec.assistTargetRefObj != null) {
+            if (!isAliveEntityRef(store, rec.assistTargetRefObj)) {
+               rec.assistTargetRefObj = null;
+               rec.assistUntilMillis = now + 3000L;
+            }
+
+         } else {
+            if (rec.assistUntilMillis > 0L && now > rec.assistUntilMillis) {
+               rec.assistUntilMillis = 0L;
+            }
+
+         }
+      }
+   }
+
+   private Object findNearestDefenderTarget(Store store, NpcRecord rec, Object ownerRefObj, Vector3d ownerPos) {
+      if (store != null && rec != null && ownerRefObj != null && ownerPos != null) {
+         if (ownerRefObj instanceof Ref && rec.refObj instanceof Ref) {
+            Ref<EntityStore> ownerRef = (Ref)ownerRefObj;
+            Ref<EntityStore> npcRef = (Ref)rec.refObj;
+            double r = (double)12.0F;
+            double r2 = (double)144.0F;
+            double maxDy = (double)2.5F;
+            Object[] bestGroundRef = new Object[1];
+            double[] bestGroundD2 = new double[]{Double.POSITIVE_INFINITY};
+            Object[] bestAirRef = new Object[1];
+            double[] bestAirD2 = new double[]{Double.POSITIVE_INFINITY};
+
+            try {
+               store.forEachChunk((chunk, cb) -> {
+                  int sz;
+                  try {
+                     sz = chunk.size();
+                  } catch (Throwable var27) {
+                     return;
+                  }
+
+                  for(int i = 0; i < sz; ++i) {
+                     Ref<EntityStore> ref;
+                     try {
+                        ref = chunk.getReferenceTo(i);
+                     } catch (Throwable var34) {
+                        continue;
+                     }
+
+                     if (ref != null && !refEq(ref, ownerRef) && !refEq(ref, npcRef)) {
+                        try {
+                           Player maybePlayer = (Player)chunk.getComponent(i, Player.getComponentType());
+                           if (maybePlayer != null && !this.pvpEnabled) {
+                              continue;
+                           }
+                        } catch (Throwable var33) {
+                        }
+
+                        try {
+                           DeathComponent dc = (DeathComponent)chunk.getComponent(i, DeathComponent.getComponentType());
+                           if (dc != null) {
+                              continue;
+                           }
+                        } catch (Throwable var32) {
+                        }
+
+                        try {
+                           DeathComponent dc = (DeathComponent)chunk.getComponent(i, DeathComponent.getComponentType());
+                           if (dc != null) {
+                              continue;
+                           }
+                        } catch (Throwable var31) {
+                        }
+
+                        TransformComponent tc;
+                        try {
+                           tc = (TransformComponent)chunk.getComponent(i, TransformComponent.getComponentType());
+                        } catch (Throwable var30) {
+                           continue;
+                        }
+
+                        if (tc != null && tc.getPosition() != null) {
+                           Vector3d p = tc.getPosition();
+                           double dy = Math.abs(p.getY() - ownerPos.getY());
+                           if (dy > (double)2.5F) {
+                              if (dy > (double)35.0F) {
+                                 continue;
+                              }
+
+                              try {
+                                 MovementStatesComponent ms = (MovementStatesComponent)chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                                 MovementStates s = ms != null ? ms.getMovementStates() : null;
+                                 if (s == null || s.onGround) {
+                                    continue;
+                                 }
+                              } catch (Throwable var29) {
+                                 continue;
+                              }
+                           }
+
+                           double dx = p.getX() - ownerPos.getX();
+                           double dz = p.getZ() - ownerPos.getZ();
+                           double d2 = dx * dx + dz * dz;
+                           if (!(d2 > (double)144.0F)) {
+                              try {
+                                 EntityStatMap stats = (EntityStatMap)chunk.getComponent(i, EntityStatMap.getComponentType());
+                                 if (stats == null) {
+                                    continue;
+                                 }
+
+                                 EntityStatValue hp = stats.get(DefaultEntityStatTypes.getHealth());
+                                 if (hp != null && hp.get() <= 0.0F) {
+                                    continue;
+                                 }
+                              } catch (Throwable var28) {
+                                 continue;
+                              }
+
+                              boolean isAir = false;
+
+                              try {
+                                 MovementStatesComponent ms = (MovementStatesComponent)chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                                 MovementStates s = ms != null ? ms.getMovementStates() : null;
+                                 if (s != null) {
+                                    isAir = !s.onGround;
+                                 }
+                              } catch (Throwable var26) {
+                              }
+
+                              if (!isAir) {
+                                 if (d2 < bestGroundD2[0]) {
+                                    bestGroundD2[0] = d2;
+                                    bestGroundRef[0] = ref;
+                                 }
+                              } else if (d2 < bestAirD2[0]) {
+                                 bestAirD2[0] = d2;
+                                 bestAirRef[0] = ref;
+                              }
+                           }
+                        }
+                     }
+                  }
+
+               });
+            } catch (Throwable var18) {
+            }
+
+            return bestGroundRef[0] != null ? bestGroundRef[0] : bestAirRef[0];
+         } else {
+            return null;
+         }
+      } else {
+         return null;
+      }
+   }
+
+   private Object findNearestTargetNearNpc(Store store, NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Object excludeRefObj) {
+      if (store != null && rec != null && ownerRefObj != null && npcPos != null) {
+         if (ownerRefObj instanceof Ref && rec.refObj instanceof Ref) {
+            Ref<EntityStore> ownerRef = (Ref)ownerRefObj;
+            Ref<EntityStore> npcRef = (Ref)rec.refObj;
+            double r = (double)12.0F;
+            double r2 = (double)144.0F;
+            double maxDy = (double)2.5F;
+            Object[] bestGroundRef = new Object[1];
+            double[] bestGroundD2 = new double[]{Double.POSITIVE_INFINITY};
+            Object[] bestAirRef = new Object[1];
+            double[] bestAirD2 = new double[]{Double.POSITIVE_INFINITY};
+
+            try {
+               store.forEachChunk((chunk, cb) -> {
+                  int sz;
+                  try {
+                     sz = chunk.size();
+                  } catch (Throwable var28) {
+                     return;
+                  }
+
+                  for(int i = 0; i < sz; ++i) {
+                     Ref<EntityStore> ref;
+                     try {
+                        ref = chunk.getReferenceTo(i);
+                     } catch (Throwable var34) {
+                        continue;
+                     }
+
+                     if (ref != null && !refEq(ref, ownerRef) && !refEq(ref, npcRef) && (!(excludeRefObj instanceof Ref) || !refEq(ref, (Ref)excludeRefObj))) {
+                        try {
+                           Player maybePlayer = (Player)chunk.getComponent(i, Player.getComponentType());
+                           if (maybePlayer != null && !this.pvpEnabled) {
+                              continue;
+                           }
+                        } catch (Throwable var33) {
+                        }
+
+                        try {
+                           DeathComponent dc = (DeathComponent)chunk.getComponent(i, DeathComponent.getComponentType());
+                           if (dc != null) {
+                              continue;
+                           }
+                        } catch (Throwable var32) {
+                        }
+
+                        TransformComponent tc;
+                        try {
+                           tc = (TransformComponent)chunk.getComponent(i, TransformComponent.getComponentType());
+                        } catch (Throwable var31) {
+                           continue;
+                        }
+
+                        if (tc != null && tc.getPosition() != null) {
+                           Vector3d p = tc.getPosition();
+                           double dy = Math.abs(p.getY() - npcPos.getY());
+                           if (dy > (double)2.5F) {
+                              if (dy > (double)35.0F) {
+                                 continue;
+                              }
+
+                              try {
+                                 MovementStatesComponent ms = (MovementStatesComponent)chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                                 MovementStates s = ms != null ? ms.getMovementStates() : null;
+                                 if (s == null || s.onGround) {
+                                    continue;
+                                 }
+                              } catch (Throwable var30) {
+                                 continue;
+                              }
+                           }
+
+                           double dx = p.getX() - npcPos.getX();
+                           double dz = p.getZ() - npcPos.getZ();
+                           double d2 = dx * dx + dz * dz;
+                           if (!(d2 > (double)144.0F)) {
+                              try {
+                                 EntityStatMap stats = (EntityStatMap)chunk.getComponent(i, EntityStatMap.getComponentType());
+                                 if (stats == null) {
+                                    continue;
+                                 }
+
+                                 EntityStatValue hp = stats.get(DefaultEntityStatTypes.getHealth());
+                                 if (hp != null && hp.get() <= 0.0F) {
+                                    continue;
+                                 }
+                              } catch (Throwable var29) {
+                                 continue;
+                              }
+
+                              boolean isAir = false;
+
+                              try {
+                                 MovementStatesComponent ms = (MovementStatesComponent)chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                                 MovementStates s = ms != null ? ms.getMovementStates() : null;
+                                 if (s != null) {
+                                    isAir = !s.onGround;
+                                 }
+                              } catch (Throwable var27) {
+                              }
+
+                              if (!isAir) {
+                                 if (d2 < bestGroundD2[0]) {
+                                    bestGroundD2[0] = d2;
+                                    bestGroundRef[0] = ref;
+                                 }
+                              } else if (d2 < bestAirD2[0]) {
+                                 bestAirD2[0] = d2;
+                                 bestAirRef[0] = ref;
+                              }
+                           }
+                        }
+                     }
+                  }
+
+               });
+            } catch (Throwable var19) {
+            }
+
+            return bestGroundRef[0] != null ? bestGroundRef[0] : bestAirRef[0];
+         } else {
+            return null;
+         }
+      } else {
+         return null;
+      }
+   }
+
+   private static boolean isAnyEnemyNearNpc(Store store, NpcRecord rec, Object ownerRefObj, Vector3d npcPos, double radius) {
+      if (store != null && rec != null && ownerRefObj != null && npcPos != null) {
+         if (ownerRefObj instanceof Ref && rec.refObj instanceof Ref) {
+            Ref<EntityStore> ownerRef = (Ref)ownerRefObj;
+            Ref<EntityStore> npcRef = (Ref)rec.refObj;
+            double r2 = radius * radius;
+            double maxDy = (double)2.5F;
+            boolean[] found = new boolean[]{false};
+
+            try {
+               store.forEachChunk((chunk, cb) -> {
+                  if (!found[0]) {
+                     int sz;
+                     try {
+                        sz = chunk.size();
+                     } catch (Throwable var23) {
+                        return;
+                     }
+
+                     int i = 0;
+
+                     while(true) {
+                        if (i < sz) {
+                           label109: {
+                              label116: {
+                                 Ref<EntityStore> ref;
+                                 try {
+                                    ref = chunk.getReferenceTo(i);
+                                 } catch (Throwable var29) {
+                                    break label116;
+                                 }
+
+                                 if (ref != null && !refEq(ref, ownerRef) && !refEq(ref, npcRef)) {
+                                    label121: {
+                                       try {
+                                          Player maybePlayer = (Player)chunk.getComponent(i, Player.getComponentType());
+                                          if (maybePlayer != null) {
+                                             break label121;
+                                          }
+                                       } catch (Throwable var28) {
+                                       }
+
+                                       try {
+                                          DeathComponent dc = (DeathComponent)chunk.getComponent(i, DeathComponent.getComponentType());
+                                          if (dc != null) {
+                                             break label121;
+                                          }
+                                       } catch (Throwable var27) {
+                                       }
+
+                                       TransformComponent tc;
+                                       try {
+                                          tc = (TransformComponent)chunk.getComponent(i, TransformComponent.getComponentType());
+                                       } catch (Throwable var26) {
+                                          break label121;
+                                       }
+
+                                       if (tc != null && tc.getPosition() != null) {
+                                          label123: {
+                                             Vector3d p = tc.getPosition();
+                                             double dy = Math.abs(p.getY() - npcPos.getY());
+                                             if (dy > (double)2.5F) {
+                                                if (dy > (double)35.0F) {
+                                                   break label123;
+                                                }
+
+                                                try {
+                                                   MovementStatesComponent ms = (MovementStatesComponent)chunk.getComponent(i, MovementStatesComponent.getComponentType());
+                                                   MovementStates s = ms != null ? ms.getMovementStates() : null;
+                                                   if (s == null || s.onGround) {
+                                                      break label123;
+                                                   }
+                                                } catch (Throwable var25) {
+                                                   break label123;
+                                                }
+                                             }
+
+                                             double dx = p.getX() - npcPos.getX();
+                                             double dz = p.getZ() - npcPos.getZ();
+                                             double d2 = dx * dx + dz * dz;
+                                             if (!(d2 > r2)) {
+                                                try {
+                                                   EntityStatMap stats = (EntityStatMap)chunk.getComponent(i, EntityStatMap.getComponentType());
+                                                   if (stats != null) {
+                                                      EntityStatValue hp = stats.get(DefaultEntityStatTypes.getHealth());
+                                                      if (hp == null || !(hp.get() <= 0.0F)) {
+                                                         break label109;
+                                                      }
+                                                   }
+                                                } catch (Throwable var24) {
+                                                }
+                                             }
+                                          }
+                                       }
+                                    }
+                                 }
+                              }
+
+                              ++i;
+                              continue;
+                           }
+
+                           found[0] = true;
+                           return;
+                        }
+
+                        return;
+                     }
+                  }
+               });
+            } catch (Throwable var14) {
+            }
+
+            return found[0];
+         } else {
+            return false;
+         }
+      } else {
+         return false;
+      }
+   }
+
+   private static double dist2(Vector3d a, Vector3d b) {
+      if (a != null && b != null) {
+         double dx = a.getX() - b.getX();
+         double dy = a.getY() - b.getY();
+         double dz = a.getZ() - b.getZ();
+         return dx * dx + dy * dy + dz * dz;
+      } else {
+         return Double.POSITIVE_INFINITY;
+      }
+   }
+
+   private void clearCombatTagsAndLoot(NpcRecord rec) {
+      if (rec != null) {
+         synchronized(rec.combatTags) {
+            rec.combatTags.clear();
+         }
+
+         rec.pendingLootRefObjs.clear();
+         rec.lootTargetRefObj = null;
+         rec.lootTargetSinceMillis = 0L;
+         rec.lootingActive = false;
+         rec.lastCombatEndMillis = 0L;
+         rec.lootStickUntilMillis = 0L;
+         rec.lastBattleCenter = null;
+      }
+   }
+
+   private static boolean isItemRefValid(Store store, Object refObj) {
+      if (store != null && refObj != null) {
+         if (!(refObj instanceof Ref)) {
+            return false;
+         } else {
+            try {
+               Ref<EntityStore> r = (Ref)refObj;
+               TransformComponent tc = (TransformComponent)store.getComponent(r, TransformComponent.getComponentType());
+               ItemComponent ic = (ItemComponent)store.getComponent(r, ItemComponent.getComponentType());
+               return tc != null && tc.getPosition() != null && ic != null;
+            } catch (Throwable var5) {
+               return false;
+            }
+         }
+      } else {
+         return false;
+      }
+   }
+
+   private static void lootChatAccAdd(NpcRecord rec, String itemId, int qty, long now) {
+      if (rec != null && itemId != null && !itemId.isBlank() && qty > 0) {
+         try {
+            Integer cur = (Integer)rec.lootChatAcc.get(itemId);
+            rec.lootChatAcc.put(itemId, (cur == null ? 0 : cur) + qty);
+            rec.lootChatSendAtMillis = now + 500L;
+         } catch (Throwable var6) {
+         }
+
+      }
+   }
+
+   private void lootChatAccFlushIfDue(NpcRecord rec, UUID ownerId, Object worldObj, long now) {
+      if (rec != null && ownerId != null && worldObj != null) {
+         long at = rec.lootChatSendAtMillis;
+         if (at > 0L && now >= at) {
+            if (rec.lootChatAcc.isEmpty()) {
+               rec.lootChatSendAtMillis = 0L;
+            } else {
+               try {
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("AmigoNPC: Coletado ");
+                  boolean first = true;
+
+                  for(Map.Entry en : rec.lootChatAcc.entrySet()) {
+                     if (en != null) {
+                        String id = (String)en.getKey();
+                        Integer q = (Integer)en.getValue();
+                        if (id != null && !id.isBlank() && q != null && q > 0) {
+                           if (!first) {
+                              sb.append(", ");
+                           }
+
+                           first = false;
+                           sb.append(q).append(" ").append(id);
+                           if (sb.length() > 180) {
+                              break;
+                           }
+                        }
+                     }
+                  }
+
+                  sb.append(".");
+                  this.sendToOwner(worldObj, ownerId, sb.toString());
+               } catch (Throwable var17) {
+               } finally {
+                  rec.lootChatAcc.clear();
+                  rec.lootChatSendAtMillis = 0L;
+               }
+
+            }
+         }
+      }
+   }
+
+   private boolean tryPickupGroundItemIntoBackpack(Store store, UUID ownerId, NpcRecord rec, SimpleItemContainer bag, Object itemRefObj) {
+      if (store != null && ownerId != null && rec != null && bag != null && itemRefObj != null) {
+         if (!(itemRefObj instanceof Ref)) {
+            return false;
+         } else {
+            Ref<EntityStore> itemRef = (Ref)itemRefObj;
+
+            ItemComponent ic;
+            try {
+               ic = (ItemComponent)store.getComponent(itemRef, ItemComponent.getComponentType());
+            } catch (Throwable var22) {
+               return false;
+            }
+
+            if (ic == null) {
+               return false;
+            } else {
+               try {
+                  ic.setPickupDelay(0.0F);
+               } catch (Throwable var21) {
+               }
+
+               ItemStack before;
+               try {
+                  before = ic.getItemStack();
+               } catch (Throwable var20) {
+                  return false;
+               }
+
+               if (before == null) {
+                  return false;
+               } else {
+                  int beforeQty;
+                  try {
+                     beforeQty = before.getQuantity();
+                  } catch (Throwable var19) {
+                     return false;
+                  }
+
+                  if (beforeQty <= 0) {
+                     return false;
+                  } else {
+                     String itemId;
+                     try {
+                        itemId = before.getItemId();
+                     } catch (Throwable var18) {
+                        itemId = null;
+                     }
+
+                     if (itemId == null || itemId.isBlank()) {
+                        itemId = "item";
+                     }
+
+                     try {
+                        if (!AutoLootConfigService.isItemAllowed(itemId)) {
+                           return false;
+                        }
+                     } catch (Throwable var17) {
+                     }
+
+                     try {
+                        ItemStack rem;
+                        try {
+                           rem = ItemComponent.addToItemContainer(store, itemRef, bag);
+                        } catch (Throwable var23) {
+                           ItemStackTransaction tx = bag.addItemStack(before);
+                           rem = tx != null ? tx.getRemainder() : null;
+                        }
+
+                        int remQty = 0;
+
+                        try {
+                           if (rem != null) {
+                              remQty = rem.getQuantity();
+                           }
+                        } catch (Throwable var16) {
+                        }
+
+                        int inserted = beforeQty - remQty;
+                        if (inserted <= 0) {
+                           if (isBackpackCompletelyFull(bag)) {
+                              rec.lootPausedInventoryFull = true;
+                              rec.lootingActive = false;
+                              this.maybeNotifyBackpackFull(rec, ownerId, rec.worldObj, System.currentTimeMillis());
+                           }
+
+                           return false;
+                        } else {
+                           rec.backpackDirty = true;
+                           long now = System.currentTimeMillis();
+                           if (rec.nextBackpackSaveMillis == 0L) {
+                              rec.nextBackpackSaveMillis = now + 5000L;
+                           }
+
+                           if (rem != null && remQty > 0) {
+                              ic.setItemStack(rem);
+                              store.putComponent(itemRef, ItemComponent.getComponentType(), ic);
+                           } else {
+                              store.removeEntity(itemRef, RemoveReason.REMOVE);
+                           }
+
+                           lootChatAccAdd(rec, itemId, inserted, now);
+                           return true;
+                        }
+                     } catch (Throwable var24) {
+                        return false;
+                     }
+                  }
+               }
+            }
+         }
+      } else {
+         return false;
+      }
+   }
+
+   private void refreshPendingLootFromCombatTags(Store store, NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now) {
+      if (store != null && rec != null) {
+         try {
+            rec.lootProcessedUntil.entrySet().removeIf((e) -> e == null || e.getValue() == null || (Long)e.getValue() <= now);
+         } catch (Throwable var13) {
+         }
+
+         ArrayList<CombatTag> tags = new ArrayList();
+         synchronized(rec.combatTags) {
+            tags.addAll(rec.combatTags);
+         }
+
+         if (!tags.isEmpty()) {
+            double tagR2 = (double)36.0F;
+
+            try {
+               store.forEachChunk(AUTOLOOT_QUERY, (chunkObj, cb) -> {
+                  if (!(chunkObj instanceof ArchetypeChunk)) {
+                     return true;
+                  } else {
+                     ArchetypeChunk<?> rawChunk = chunkObj;
+
+                     ArchetypeChunk<EntityStore> chunk;
+                     try {
+                        chunk = rawChunk;
+                     } catch (Throwable var18) {
+                        return true;
+                     }
+
+                     int sz;
+                     try {
+                        sz = chunk.size();
+                     } catch (Throwable var17) {
+                        return true;
+                     }
+
+                     for(int i = 0; i < sz; ++i) {
+                        if (rec.pendingLootRefObjs.size() >= 512) {
+                           return true;
+                        }
+
+                        Ref<EntityStore> ref;
+                        try {
+                           ref = chunk.getReferenceTo(i);
+                        } catch (Throwable var20) {
+                           continue;
+                        }
+
+                        if (ref != null && !containsRef(rec.pendingLootRefObjs, ref)) {
+                           Long until = (Long)rec.lootProcessedUntil.get(ref);
+                           if (until == null || until <= now) {
+                              TransformComponent tc;
+                              try {
+                                 tc = (TransformComponent)chunk.getComponent(i, TransformComponent.getComponentType());
+                              } catch (Throwable var19) {
+                                 continue;
+                              }
+
+                              if (tc != null && tc.getPosition() != null) {
+                                 Vector3d p = tc.getPosition();
+                                 boolean nearAnyTag = false;
+
+                                 for(CombatTag t : tags) {
+                                    if (t != null && t.pos != null && dist2(p, t.pos) <= (double)36.0F) {
+                                       nearAnyTag = true;
+                                       break;
+                                    }
+                                 }
+
+                                 if (nearAnyTag) {
+                                    rec.pendingLootRefObjs.add(ref);
+                                 }
+                              }
+                           }
+                        }
+                     }
+
+                     return true;
+                  }
+               });
+            } catch (Throwable var11) {
+            }
+
+         }
+      }
+   }
+
+   private static boolean containsRef(ArrayList list, Ref ref) {
+      if (list != null && ref != null) {
+         for(Object o : list) {
+            if (o instanceof Ref && refEq((Ref)o, ref)) {
+               return true;
+            }
+         }
+
+         return false;
+      } else {
+         return false;
+      }
+   }
+
+   private Object chooseNearestPendingLoot(NpcRecord rec, Store store, Vector3d npcPos) {
+      if (rec != null && store != null && npcPos != null) {
+         Object best = null;
+         double bestD2 = Double.POSITIVE_INFINITY;
+
+         for(int i = rec.pendingLootRefObjs.size() - 1; i >= 0; --i) {
+            Object r = rec.pendingLootRefObjs.get(i);
+            if (!isItemRefValid(store, r)) {
+               rec.pendingLootRefObjs.remove(i);
+            } else if (r instanceof Ref) {
+               try {
+                  TransformComponent tc = (TransformComponent)store.getComponent((Ref)r, TransformComponent.getComponentType());
+                  if (tc != null && tc.getPosition() != null) {
+                     double d2 = dist2(tc.getPosition(), npcPos);
+                     if (d2 < bestD2) {
+                        bestD2 = d2;
+                        best = r;
+                     }
+                  }
+               } catch (Throwable var12) {
+               }
+            }
+         }
+
+         return best;
+      } else {
+         return null;
+      }
+   }
+
+   private void tickCombatTaggedLooting(Store store, UUID ownerId, NpcRecord rec, Object ownerRefObj, Vector3d npcPos, Vector3d ownerPos, long now, Object worldObj, boolean inCombatOrAssistNow) {
+      if (store != null && ownerId != null && rec != null && npcPos != null) {
+         if (!rec.downed) {
+            if (rec.state == AmigoNpcManager.State.ACTIVE) {
+               if (inCombatOrAssistNow) {
+                  if (!rec.wasInCombat) {
+                     try {
+                        ActionTraceService.getShared().record(ownerId, "npc_state", "combat_active");
+                     } catch (Throwable var26) {
+                     }
+                  }
+
+                  rec.wasInCombat = true;
+                  rec.lootingActive = false;
+                  rec.lootTargetRefObj = null;
+                  rec.lootTargetSinceMillis = 0L;
+                  rec.lootStickUntilMillis = 0L;
+                  rec.pendingLootRefObjs.clear();
+               } else {
+                  if (rec.wasInCombat) {
+                     rec.wasInCombat = false;
+                     rec.lastCombatEndMillis = now;
+
+                     try {
+                        ActionTraceService.getShared().record(ownerId, "npc_state", "combat_end");
+                     } catch (Throwable var33) {
+                     }
+
+                     boolean hasTags;
+                     synchronized(rec.combatTags) {
+                        hasTags = !rec.combatTags.isEmpty();
+                     }
+
+                     rec.lootingActive = hasTags;
+                     rec.lootStickUntilMillis = hasTags ? now + 500L : 0L;
+                     if (hasTags) {
+                        try {
+                           ActionTraceService.getShared().record(ownerId, "npc_state", "looting_start");
+                        } catch (Throwable var31) {
+                        }
+                     }
+
+                     rec.lootTargetRefObj = null;
+                     rec.lootTargetSinceMillis = 0L;
+                     rec.pendingLootRefObjs.clear();
+                  }
+
+                  if (rec.lootingActive) {
+                     if (rec.lastCombatEndMillis > 0L) {
+                        boolean timeUp = now - rec.lastCombatEndMillis >= 25000L;
+                        boolean distUp = false;
+                        if (rec.lastBattleCenter != null && ownerPos != null) {
+                           distUp = dist2(rec.lastBattleCenter, ownerPos) >= (double)625.0F;
+                        }
+
+                        if (timeUp || distUp) {
+                           this.clearCombatTagsAndLoot(rec);
+                           return;
+                        }
+                     }
+
+                     if (ownerRefObj != null && isAnyEnemyNearNpc(store, rec, ownerRefObj, npcPos, (double)4.0F)) {
+                        rec.lootingActive = false;
+                        rec.lootTargetRefObj = null;
+                        rec.lootTargetSinceMillis = 0L;
+                        rec.pendingLootRefObjs.clear();
+
+                        try {
+                           ActionTraceService.getShared().record(ownerId, "npc_state", "looting_stop reason=enemy_near");
+                        } catch (Throwable var27) {
+                        }
+
+                     } else {
+                        if (rec.backpack == null) {
+                           try {
+                              rec.backpack = this.getOrLoadBackpack(ownerId);
+                           } catch (Throwable var30) {
+                           }
+                        }
+
+                        SimpleItemContainer bag = rec.backpack;
+                        if (bag != null) {
+                           rec.lootPausedInventoryFull = false;
+                           if (rec.lootTargetRefObj == null) {
+                              if (rec.pendingLootRefObjs.isEmpty()) {
+                                 this.refreshPendingLootFromCombatTags(store, rec, npcPos, ownerPos, now);
+                              }
+
+                              Object chosen = this.chooseNearestPendingLoot(rec, store, npcPos);
+                              if (chosen == null) {
+                                 if (rec.lootStickUntilMillis > 0L && now < rec.lootStickUntilMillis) {
+                                    return;
+                                 }
+
+                                 rec.lootingActive = false;
+                                 return;
+                              }
+
+                              rec.lootTargetRefObj = chosen;
+                              rec.lootTargetSinceMillis = now;
+                           }
+
+                           if (!isItemRefValid(store, rec.lootTargetRefObj)) {
+                              rec.lootTargetRefObj = null;
+                              rec.lootTargetSinceMillis = 0L;
+                           } else if (rec.lootTargetSinceMillis > 0L && now - rec.lootTargetSinceMillis > 12000L) {
+                              rec.lootProcessedUntil.put(rec.lootTargetRefObj, now + 4000L);
+                              rec.lootTargetRefObj = null;
+                              rec.lootTargetSinceMillis = 0L;
+                           } else {
+                              try {
+                                 Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
+                                 if (npcEntityObj != null) {
+                                    setLockedTargetOnNpcEntity(npcEntityObj, rec.lootTargetRefObj);
+                                    setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", (Object)null);
+                                    setFlockState(store, rec.refObj, "Run", "");
+                                 }
+                              } catch (Throwable var29) {
+                              }
+
+                              try {
+                                 Ref<EntityStore> itemRef = (Ref)rec.lootTargetRefObj;
+                                 TransformComponent itc = (TransformComponent)store.getComponent(itemRef, TransformComponent.getComponentType());
+                                 if (itc == null || itc.getPosition() == null) {
+                                    return;
+                                 }
+
+                                 Vector3d ip = itc.getPosition();
+                                 double dx = ip.getX() - npcPos.getX();
+                                 double dz = ip.getZ() - npcPos.getZ();
+                                 double h2 = dx * dx + dz * dz;
+                                 double dy = Math.abs(ip.getY() - npcPos.getY());
+                                 double lootMaxDy = (double)10.0F;
+
+                                 try {
+                                    AutoLootConfig cfg = AutoLootConfigService.get();
+                                    if (cfg != null && cfg.VerticalScanBlocks > 0) {
+                                       lootMaxDy = (double)cfg.VerticalScanBlocks;
+                                    }
+                                 } catch (Throwable var28) {
+                                 }
+
+                                 if (h2 <= (double)25.0F && dy <= lootMaxDy) {
+                                    boolean inserted = this.tryPickupGroundItemIntoBackpack(store, ownerId, rec, bag, itemRef);
+                                    if (!inserted) {
+                                       rec.lootProcessedUntil.put(itemRef, now + 4000L);
+                                    }
+
+                                    removeRefFromList(rec.pendingLootRefObjs, itemRef);
+                                    rec.lootTargetRefObj = null;
+                                    rec.lootTargetSinceMillis = 0L;
+                                 }
+                              } catch (Throwable var34) {
+                              }
+
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   private static void removeRefFromList(ArrayList list, Ref ref) {
+      if (list != null && ref != null) {
+         for(int i = list.size() - 1; i >= 0; --i) {
+            Object o = list.get(i);
+            if (o instanceof Ref && refEq((Ref)o, ref)) {
+               list.remove(i);
+            }
+         }
+
+      }
+   }
+
+   private void tryAutoLoot(Store store, UUID ownerId, NpcRecord rec, Vector3d npcPos, Vector3d ownerPos, long now, Object worldObj) {
       if (rec != null && store != null && ownerId != null && npcPos != null) {
          if (!rec.autoLootEnabled) {
             endCombatTaggedLooting(rec);
          } else if (!rec.downed) {
             if (rec.state == AmigoNpcManager.State.ACTIVE) {
-               NpcAutoLootSupport.ScanSetup scanSetup = NpcAutoLootSupport.prepareScan(rec, npcPos, now, 250L, 5.0, 8);
-               if (scanSetup != null) {
-                  double r2 = scanSetup.radiusSq;
-                  int maxPerScan = scanSetup.maxPerScan;
-                  double maxDyFinal = scanSetup.maxDy;
-                  Vector3d lootCenterPos = scanSetup.lootCenterPos;
-                  SimpleItemContainer bag = NpcAutoLootSupport.prepareBackpack(
-                     rec,
-                     ownerId,
-                     worldObj,
-                     now,
-                     this::getOrLoadBackpack,
-                     this::debugCombat,
-                     this::maybeNotifyBackpackFull,
-                     AmigoNpcManager::isBackpackCompletelyFull
-                  );
-                  if (bag != null) {
-                     NpcAutoLootSupport.ScanResult scanResult = NpcAutoLootSupport.scanNearbyDrops(
-                        store,
-                        ownerId,
-                        rec,
-                        bag,
-                        worldObj,
-                        now,
-                        lootCenterPos,
-                        ownerPos,
-                        r2,
-                        400.0,
-                        maxDyFinal,
-                        maxPerScan,
-                        400L,
-                        AUTOLOOT_QUERY,
-                        this::debugCombat,
-                        this::maybeNotifyBackpackFull,
-                        AmigoNpcManager::isBackpackCompletelyFull,
-                        AmigoNpcManager::lootChatAccAdd
-                     );
-                     NpcAutoLootSupport.finalizeScan(
-                        store,
-                        ownerId,
-                        rec,
-                        bag,
-                        now,
-                        worldObj,
-                        scanResult.removeLater,
-                        scanResult.updateLaterRef,
-                        scanResult.updateLaterComp,
-                        scanResult.pickedCount,
-                        this::debugCombat,
-                        this::lootChatAccFlushIfDue,
-                        AmigoNpcManager::doRemoveEntity
-                     );
+               boolean forceDelayedScan = false;
+               Vector3d forcedLootCenter = null;
+
+               try {
+                  if (rec.autoLootStickUntilMillis > 0L) {
+                     if (now < rec.autoLootStickUntilMillis) {
+                        rec.nextAutoLootMillis = Math.max(rec.nextAutoLootMillis, rec.autoLootStickUntilMillis);
+                        return;
+                     }
+
+                     forceDelayedScan = true;
+                     forcedLootCenter = rec.autoLootStickAnchorPos != null ? rec.autoLootStickAnchorPos : npcPos;
+                     rec.autoLootStickUntilMillis = 0L;
+                     rec.autoLootStickDeadRefObj = null;
+                     rec.autoLootStickAnchorPos = null;
+                     rec.nextAutoLootMillis = now;
+                  }
+               } catch (Throwable var38) {
+               }
+
+               if (forceDelayedScan || now >= rec.nextAutoLootMillis) {
+                  rec.nextAutoLootMillis = now + 250L;
+                  double radius = (double)5.0F;
+                  double r2 = (double)25.0F;
+                  int maxPerScan = 8;
+                  double maxDy = (double)5.0F;
+
+                  try {
+                     AutoLootConfig cfg = AutoLootConfigService.get();
+                     if (cfg != null && cfg.VerticalScanBlocks > 0) {
+                        maxDy = (double)cfg.VerticalScanBlocks;
+                     }
+                  } catch (Throwable var37) {
+                  }
+
+                  double maxDyFinal = maxDy;
+                  Vector3d lootCenterPos = forceDelayedScan && forcedLootCenter != null ? forcedLootCenter : npcPos;
+                  if (rec.backpack == null) {
+                     try {
+                        rec.backpack = this.getOrLoadBackpack(ownerId);
+                     } catch (Throwable t) {
+                        String var10003 = t.getClass().getSimpleName();
+                        this.debugCombat(rec, ownerId, "AutoLoot: falha ao carregar mochila: " + var10003 + ": " + t.getMessage());
+                     }
+                  }
+
+                  SimpleItemContainer bag = rec.backpack;
+                  if (bag == null) {
+                     this.debugCombat(rec, ownerId, "AutoLoot: mochila null (sem container)");
+                  } else {
+                     if (rec.lootPausedInventoryFull) {
+                        if (now < rec.nextLootFullRecheckMillis) {
+                           return;
+                        }
+
+                        rec.nextLootFullRecheckMillis = now + 1000L;
+                        if (isBackpackCompletelyFull(bag)) {
+                           this.maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
+                           return;
+                        }
+
+                        rec.lootPausedInventoryFull = false;
+                     }
+
+                     if (isBackpackCompletelyFull(bag)) {
+                        rec.lootPausedInventoryFull = true;
+                        rec.nextLootFullRecheckMillis = now + 1000L;
+                        this.maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
+                     } else {
+                        int[] picked = new int[]{0};
+                        ArrayList<Ref<EntityStore>> removeLater = new ArrayList();
+                        ArrayList<Ref<EntityStore>> updateLaterRef = new ArrayList();
+                        ArrayList<ItemComponent> updateLaterComp = new ArrayList();
+
+                        try {
+                           store.forEachChunk(AUTOLOOT_QUERY, (chunkObj, cb) -> {
+                              ArchetypeChunk<EntityStore> chunk = null;
+                              if (chunkObj instanceof ArchetypeChunk) {
+                                 ArchetypeChunk<?> rawChunk = chunkObj;
+
+                                 try {
+                                    chunk = rawChunk;
+                                 } catch (Throwable var45) {
+                                    chunk = null;
+                                 }
+                              }
+
+                              int size;
+                              try {
+                                 size = chunk != null ? chunk.size() : chunkGetSize(chunkObj);
+                              } catch (Throwable var44) {
+                                 return true;
+                              }
+
+                              for(int i = 0; i < size && picked[0] < 8; ++i) {
+                                 Ref<EntityStore> itemRef;
+                                 try {
+                                    itemRef = chunk != null ? chunk.getReferenceTo(i) : chunkGetEntity(chunkObj, i);
+                                 } catch (Throwable var49) {
+                                    continue;
+                                 }
+
+                                 if (itemRef != null && itemRef.isValid()) {
+                                    TransformComponent tc;
+                                    ItemComponent ic;
+                                    try {
+                                       tc = chunk != null ? (TransformComponent)chunk.getComponent(i, TransformComponent.getComponentType()) : (TransformComponent)chunkGetComponent(chunkObj, i, TransformComponent.getComponentType());
+                                       ic = chunk != null ? (ItemComponent)chunk.getComponent(i, ItemComponent.getComponentType()) : (ItemComponent)chunkGetComponent(chunkObj, i, ItemComponent.getComponentType());
+                                    } catch (Throwable var48) {
+                                       continue;
+                                    }
+
+                                    if (tc != null && ic != null) {
+                                       try {
+                                          ic.setPickupDelay(0.0F);
+                                       } catch (Throwable var43) {
+                                       }
+
+                                       Vector3d pos = tc.getPosition();
+                                       if (pos != null) {
+                                          double ldx = pos.getX() - lootCenterPos.getX();
+                                          double ldz = pos.getZ() - lootCenterPos.getZ();
+                                          double ldy = Math.abs(pos.getY() - lootCenterPos.getY());
+                                          if (!(ldx * ldx + ldz * ldz > (double)25.0F) && !(ldy > maxDyFinal)) {
+                                             ItemStack before = ic.getItemStack();
+                                             if (before != null) {
+                                                int beforeQty;
+                                                try {
+                                                   beforeQty = before.getQuantity();
+                                                } catch (Throwable var47) {
+                                                   continue;
+                                                }
+
+                                                if (beforeQty > 0) {
+                                                   String itemIdStr = null;
+
+                                                   try {
+                                                      Object idObj = before.getItemId();
+                                                      if (idObj != null) {
+                                                         itemIdStr = idObj.toString();
+                                                      }
+                                                   } catch (Throwable var42) {
+                                                   }
+
+                                                   if (itemIdStr == null || itemIdStr.isBlank()) {
+                                                      itemIdStr = "item";
+                                                   }
+
+                                                   try {
+                                                      if (!AutoLootConfigService.isItemAllowed(itemIdStr)) {
+                                                         continue;
+                                                      }
+                                                   } catch (Throwable var46) {
+                                                   }
+
+                                                   ItemStack remainder = null;
+
+                                                   try {
+                                                      remainder = ItemComponent.addToItemContainer(store, itemRef, bag);
+                                                   } catch (Throwable var41) {
+                                                      remainder = null;
+                                                   }
+
+                                                   if (remainder == null) {
+                                                      ItemStackTransaction tx;
+                                                      try {
+                                                         tx = bag.addItemStack(before);
+                                                      } catch (Throwable var40) {
+                                                         tx = null;
+                                                      }
+
+                                                      try {
+                                                         remainder = tx != null ? tx.getRemainder() : null;
+                                                      } catch (Throwable var39) {
+                                                      }
+                                                   }
+
+                                                   int remQty = 0;
+                                                   if (remainder != null) {
+                                                      try {
+                                                         remQty = remainder.getQuantity();
+                                                      } catch (Throwable var38) {
+                                                         remQty = beforeQty;
+                                                      }
+                                                   }
+
+                                                   if (remainder != null && remQty >= beforeQty) {
+                                                      if (isBackpackCompletelyFull(bag)) {
+                                                         rec.lootPausedInventoryFull = true;
+                                                         rec.nextLootFullRecheckMillis = now + 1000L;
+                                                         this.maybeNotifyBackpackFull(rec, ownerId, worldObj, now);
+                                                         return false;
+                                                      }
+                                                   } else {
+                                                      int inserted = beforeQty - (remainder != null ? remQty : 0);
+                                                      if (inserted > 0) {
+                                                         lootChatAccAdd(rec, itemIdStr, inserted, now);
+                                                      }
+
+                                                      int var10002 = picked[0]++;
+                                                      rec.backpackDirty = true;
+                                                      rec.nextBackpackSaveMillis = Math.min(rec.nextBackpackSaveMillis, now + 400L);
+                                                      if (remainder != null && remQty > 0) {
+                                                         try {
+                                                            ic.setItemStack(remainder);
+                                                            updateLaterRef.add(itemRef);
+                                                            updateLaterComp.add(ic);
+                                                         } catch (Throwable var37) {
+                                                         }
+                                                      } else {
+                                                         removeLater.add(itemRef);
+                                                      }
+                                                   }
+                                                }
+                                             }
+                                          }
+                                       }
+                                    }
+                                 }
+                              }
+
+                              return true;
+                           });
+                        } catch (Throwable t) {
+                           String var45 = t.getClass().getSimpleName();
+                           this.debugCombat(rec, ownerId, "AutoLoot forEachChunk falhou: " + var45 + ": " + t.getMessage());
+                        }
+
+                        for(int i = 0; i < updateLaterRef.size(); ++i) {
+                           Ref<EntityStore> ref = (Ref)updateLaterRef.get(i);
+                           ItemComponent comp = (ItemComponent)updateLaterComp.get(i);
+                           if (ref != null && ref.isValid() && comp != null) {
+                              try {
+                                 store.putComponent(ref, ItemComponent.getComponentType(), comp);
+                              } catch (Throwable var34) {
+                              }
+                           }
+                        }
+
+                        for(Ref r : removeLater) {
+                           if (r != null && r.isValid()) {
+                              try {
+                                 store.removeEntity(r, RemoveReason.REMOVE);
+                              } catch (Throwable var33) {
+                                 doRemoveEntity(store, r);
+                              }
+                           }
+                        }
+
+                        if (rec.backpackDirty && now >= rec.nextBackpackSaveMillis) {
+                           try {
+                              AmigoPersistence.saveBackpack(ownerId, bag);
+                              rec.backpackDirty = false;
+                           } catch (Throwable t) {
+                              this.debugCombat(rec, ownerId, "Falha ao salvar mochila: " + t.getMessage());
+                           }
+                        }
+
+                        this.lootChatAccFlushIfDue(rec, ownerId, worldObj, now);
+                        if (picked[0] > 0) {
+                           String wn = null;
+
+                           try {
+                              Object n = invokeNoArg(worldObj, "getName");
+                              if (n instanceof String) {
+                                 String s = (String)n;
+                                 if (!s.isBlank()) {
+                                    wn = s;
+                                 }
+                              }
+                           } catch (Throwable var31) {
+                           }
+
+                           try {
+                              NpcCollectXpSource.onPickup(ownerId, picked[0], wn);
+                           } catch (Throwable var30) {
+                           }
+                        }
+
+                     }
                   }
                }
             }
@@ -2590,362 +4102,933 @@ public final class AmigoNpcManager {
    }
 
    private static boolean isBackpackCompletelyFull(SimpleItemContainer bag) {
-      return NpcBackpackLootSupport.isBackpackCompletelyFull(bag);
+      if (bag == null) {
+         return true;
+      } else {
+         short cap;
+         try {
+            cap = bag.getCapacity();
+         } catch (Throwable var7) {
+            return true;
+         }
+
+         for(short slot = 0; slot < cap; ++slot) {
+            ItemStack st;
+            try {
+               st = bag.getItemStack(slot);
+            } catch (Throwable var8) {
+               continue;
+            }
+
+            if (st == null || st.isEmpty()) {
+               return false;
+            }
+
+            try {
+               Item item = st.getItem();
+               int max = item != null ? item.getMaxStack() : 1;
+               if (st.getQuantity() < max) {
+                  return false;
+               }
+            } catch (Throwable var6) {
+               return false;
+            }
+         }
+
+         return true;
+      }
    }
 
    private static double distSq(Vector3d a, Vector3d b) {
-      double dx = a.x() - b.x();
-      double dy = a.y() - b.y();
-      double dz = a.z() - b.z();
+      double dx = a.getX() - b.getX();
+      double dy = a.getY() - b.getY();
+      double dz = a.getZ() - b.getZ();
       return dx * dx + dy * dy + dz * dz;
    }
 
-   private void maybeNotifyBackpackFull(AmigoNpcManager.NpcRecord rec, UUID ownerId, Object worldObj, long now) {
-      NpcBackpackLootSupport.maybeNotifyBackpackFull(rec, ownerId, worldObj, now, 30000L, this::sendToOwner);
+   private static int chunkGetSize(Object chunk) {
+      Object v = invokeNoArg(chunk, "size");
+      if (v == null) {
+         v = invokeNoArg(chunk, "getSize");
+      }
+
+      if (v instanceof Integer i) {
+         return i;
+      } else if (v instanceof Short s) {
+         return s;
+      } else if (v instanceof Long l) {
+         return (int)l;
+      } else {
+         return 0;
+      }
    }
 
-   private Object getActiveCombatTarget(AmigoNpcManager.NpcRecord rec, long now) {
-      return NpcCombatStateSupport.getActiveCombatTarget(rec, now);
+   private static Ref chunkGetEntity(Object chunk, int index) {
+      if (chunk == null) {
+         return null;
+      } else {
+         try {
+            Method m = chunk.getClass().getMethod("getReferenceTo", Integer.TYPE);
+            return (Ref)m.invoke(chunk, index);
+         } catch (Throwable var10) {
+            try {
+               for(Method m : chunk.getClass().getMethods()) {
+                  String name = m.getName();
+                  if ((name.equals("getReferenceTo") || name.equals("getEntity") || name.equals("getReference")) && m.getParameterCount() == 1) {
+                     Class<?> p0 = m.getParameterTypes()[0];
+                     if (p0 == Integer.TYPE || p0 == Integer.class || p0 == Short.TYPE || p0 == Short.class) {
+                        Object idx = p0 != Short.TYPE && p0 != Short.class ? index : (short)index;
+                        return (Ref)m.invoke(chunk, idx);
+                     }
+                  }
+               }
+            } catch (Throwable var9) {
+            }
+
+            return null;
+         }
+      }
    }
 
-   private Object getActiveNpcCombatTarget(AmigoNpcManager.NpcRecord rec, long now) {
-      return NpcCombatStateSupport.getActiveNpcCombatTarget(rec, now);
+   private static Object chunkGetComponent(Object chunk, int index, Object componentType) {
+      if (chunk != null && componentType != null) {
+         try {
+            for(Method m : chunk.getClass().getMethods()) {
+               if (m.getName().equals("getComponent") && m.getParameterCount() == 2) {
+                  Class<?>[] p = m.getParameterTypes();
+                  boolean firstIsIndex = p[0] == Integer.TYPE || p[0] == Integer.class || p[0] == Short.TYPE || p[0] == Short.class;
+                  if (firstIsIndex) {
+                     Object idx = p[0] != Short.TYPE && p[0] != Short.class ? index : (short)index;
+
+                     try {
+                        return m.invoke(chunk, idx, componentType);
+                     } catch (Throwable var11) {
+                     }
+                  }
+               }
+            }
+         } catch (Throwable var12) {
+         }
+
+         return null;
+      } else {
+         return null;
+      }
+   }
+
+   private void maybeNotifyBackpackFull(NpcRecord rec, UUID ownerId, Object worldObj, long now) {
+      if (rec != null && ownerId != null && worldObj != null) {
+         if (now >= rec.nextLootFullMsgMillis) {
+            rec.nextLootFullMsgMillis = now + 30000L;
+
+            try {
+               this.sendToOwner(worldObj, ownerId, "Estou com o inventário cheio.");
+            } catch (Throwable var7) {
+            }
+
+         }
+      }
+   }
+
+   private Object getActiveCombatTarget(NpcRecord rec, long now) {
+      if (rec == null) {
+         return null;
+      } else if (rec.combatTargetRefObj == null) {
+         return null;
+      } else if (rec.combatUntilMillis <= 0L) {
+         return null;
+      } else {
+         return now > rec.combatUntilMillis ? null : rec.combatTargetRefObj;
+      }
+   }
+
+   private Object getActiveNpcCombatTarget(NpcRecord rec, long now) {
+      if (rec == null) {
+         return null;
+      } else if (rec.npcCombatTargetRefObj == null) {
+         return null;
+      } else if (rec.npcCombatUntilMillis <= 0L) {
+         return null;
+      } else {
+         return now > rec.npcCombatUntilMillis ? null : rec.npcCombatTargetRefObj;
+      }
    }
 
    public void tickDowned() {
       long now = System.currentTimeMillis();
 
-      for (Entry<UUID, AmigoNpcManager.NpcRecord> e : this.npcRefPorPlayer.entrySet()) {
-         UUID owner = e.getKey();
-         AmigoNpcManager.NpcRecord rec = e.getValue();
-         if (rec == null || !rec.downed || rec.downedUntilMillis <= 0L) {
-            continue;
-         }
-
-         if (rec.worldObj != null && now >= rec.nextDownedMessageMillis) {
-            String msg = DOWNED_CHAT_MESSAGES[ThreadLocalRandom.current().nextInt(DOWNED_CHAT_MESSAGES.length)];
-            this.sendToOwner(rec.worldObj, owner, msg);
-            rec.nextDownedMessageMillis = now + ThreadLocalRandom.current().nextLong(
-               DOWNED_CHAT_MIN_INTERVAL_MILLIS, DOWNED_CHAT_MAX_INTERVAL_MILLIS + 1L
-            );
-         }
-
-         if (rec.worldObj != null && rec.refObj != null) {
-            Object worldObj = rec.worldObj;
-            Object refAtSchedule = rec.refObj;
-            HytaleBridge.worldExecute(worldObj, () -> {
-               try {
-                  if (rec.refObj != refAtSchedule || !rec.downed) {
-                     return;
-                  }
-
-                  Object storeObj = getComponentStoreFromWorld(worldObj);
-                  if (!(storeObj instanceof Store<?> rawStore)) {
-                     return;
-                  }
-
-                  Store<EntityStore> store = (Store<EntityStore>)rawStore;
-                  Object ownerRefObj = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
-                  if (!(ownerRefObj instanceof Ref<?> ownerRefRaw) || !(refAtSchedule instanceof Ref<?> npcRefRaw)) {
-                     return;
-                  }
-
-                  @SuppressWarnings("unchecked")
-                  Ref<EntityStore> ownerRef = (Ref<EntityStore>)ownerRefRaw;
-                  @SuppressWarnings("unchecked")
-                  Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefRaw;
-                  TransformComponent ownerTransform = store.getComponent(ownerRef, TransformComponent.getComponentType());
-                  TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
-                  if (ownerTransform == null || npcTransform == null || ownerTransform.getPosition() == null || npcTransform.getPosition() == null) {
-                     return;
-                  }
-
-                  if (distSq(ownerTransform.getPosition(), npcTransform.getPosition()) <= DOWNED_BODY_HIDE_DISTANCE * DOWNED_BODY_HIDE_DISTANCE) {
-                     return;
-                  }
-
-                  doRemoveEntity(store, refAtSchedule);
-                  this.amigoRefs.remove(refAtSchedule);
-                  if (rec.refObj == refAtSchedule) {
-                     rec.refObj = null;
-                  }
-               } catch (Throwable ignored) {
-               }
-            });
-         }
-
-         if (now >= rec.downedUntilMillis && rec.state != AmigoNpcManager.State.SPAWNING && rec.worldObj != null) {
-            Object worldObj = rec.worldObj;
-            rec.state = AmigoNpcManager.State.SPAWNING;
-            boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
-               try {
-                  Object storeObj = getComponentStoreFromWorld(worldObj);
-                  if (storeObj == null) {
-                     rec.state = AmigoNpcManager.State.ACTIVE;
-                     return;
-                  }
-
-                  Object ownerPos = tryGetOwnerPositionFromWorldStore(worldObj, storeObj, owner);
-                  if (ownerPos == null) {
-                     rec.state = AmigoNpcManager.State.ACTIVE;
-                     return;
-                  }
-
-                  if (rec.refObj != null) {
-                     Object oldRef = rec.refObj;
+      for(Map.Entry e : this.npcRefPorPlayer.entrySet()) {
+         UUID owner = (UUID)e.getKey();
+         NpcRecord rec = (NpcRecord)e.getValue();
+         if (rec != null && rec.downed && rec.downedUntilMillis > 0L) {
+            if (rec.deathDespawnAtMillis > 0L && now >= rec.deathDespawnAtMillis) {
+               rec.deathDespawnAtMillis = 0L;
+               if (rec.worldObj != null && rec.refObj != null) {
+                  Object worldObj = rec.worldObj;
+                  Object refToRemove = rec.refObj;
+                  HytaleBridge.worldExecute(worldObj, () -> {
                      try {
-                        doRemoveEntity(storeObj, oldRef);
-                     } catch (Throwable ignored) {
+                        Object storeObj = getComponentStoreFromWorld(worldObj);
+                        if (storeObj == null) {
+                           return;
+                        }
+
+                        if (rec.refObj != refToRemove) {
+                           return;
+                        }
+
+                        try {
+                           doRemoveEntity(storeObj, refToRemove);
+                        } catch (Throwable var7) {
+                        }
+
+                        try {
+                           this.amigoRefs.remove(refToRemove);
+                        } catch (Throwable var6) {
+                        }
+
+                        rec.refObj = null;
+                     } catch (Throwable var8) {
                      }
-                     this.amigoRefs.remove(oldRef);
-                     rec.refObj = null;
-                  }
 
-                  this.spawnIntoExistingRecord(worldObj, storeObj, owner, null, rec);
-                  if (rec.refObj == null) {
+                  });
+               }
+            }
+
+            if (now >= rec.downedUntilMillis && rec.state != AmigoNpcManager.State.SPAWNING && rec.worldObj != null) {
+               Object worldObj = rec.worldObj;
+               rec.state = AmigoNpcManager.State.SPAWNING;
+               boolean queued = HytaleBridge.worldExecute(worldObj, () -> {
+                  try {
+                     Object storeObj = getComponentStoreFromWorld(worldObj);
+                     if (storeObj == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                        return;
+                     }
+
+                     Object ownerPos = tryGetOwnerPositionFromWorldStore(worldObj, storeObj, owner);
+                     if (ownerPos == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                        return;
+                     }
+
+                     if (rec.refObj != null) {
+                        Object oldRef = rec.refObj;
+
+                        try {
+                           doRemoveEntity(storeObj, oldRef);
+                        } catch (Throwable var9) {
+                        }
+
+                        try {
+                           this.amigoRefs.remove(oldRef);
+                        } catch (Throwable var8) {
+                        }
+
+                        rec.refObj = null;
+                     }
+
+                     this.spawnIntoExistingRecord(worldObj, storeObj, owner, (Object)null, rec);
+                     if (rec.refObj == null) {
+                        rec.state = AmigoNpcManager.State.ACTIVE;
+                     }
+                  } catch (Throwable var10) {
                      rec.state = AmigoNpcManager.State.ACTIVE;
-                     rec.downed = true;
-                     return;
                   }
 
-                  this.applyRevivePenalty(rec, owner, false);
-                  rec.downed = false;
-                  rec.downedUntilMillis = 0L;
-                  rec.nextDownedMessageMillis = 0L;
-                  if (rec.refObj instanceof Ref<?> rawRef && storeObj instanceof Store<?> rawStore) {
-                     @SuppressWarnings("unchecked")
-                     Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
-                     @SuppressWarnings("unchecked")
-                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
-                     this.applyNpcScaling(store, npcRef, owner, rec, true);
-                     NpcHudSyncSupport.updateNpcHud(store, npcRef, rec);
-                  }
-               } catch (Throwable ignored) {
+               });
+               if (!queued) {
                   rec.state = AmigoNpcManager.State.ACTIVE;
                }
-            });
-            if (!queued) {
-               rec.state = AmigoNpcManager.State.ACTIVE;
             }
          }
       }
+
    }
 
    public void tickFollow() {
       if (!this.pendingRespawns.isEmpty()) {
          long now = System.currentTimeMillis();
-         Iterator<Entry<UUID, PendingRespawn>> it = this.pendingRespawns.entrySet().iterator();
+         Iterator<Map.Entry<UUID, PendingRespawn>> it = this.pendingRespawns.entrySet().iterator();
 
-         while (it.hasNext()) {
-            Entry<UUID, PendingRespawn> en = it.next();
-            UUID ownerId = en.getKey();
-            PendingRespawn pr = en.getValue();
-            if (pr == null || pr.worldObj == null) {
-               it.remove();
-            } else if (now >= pr.atMillis) {
-               if (this.npcRefPorPlayer.containsKey(ownerId)) {
-                  it.remove();
-               } else {
-                  if (pr.message != null && !pr.message.isBlank()) {
-                     this.sendToOwner(pr.worldObj, ownerId, pr.message);
+         while(it.hasNext()) {
+            Map.Entry<UUID, PendingRespawn> en = (Map.Entry)it.next();
+            UUID ownerId = (UUID)en.getKey();
+            PendingRespawn pr = (PendingRespawn)en.getValue();
+            if (pr != null && pr.worldObj != null) {
+               if (now >= pr.atMillis) {
+                  if (this.npcRefPorPlayer.containsKey(ownerId)) {
+                     it.remove();
+                  } else {
+                     if (pr.message != null && !pr.message.isBlank()) {
+                        this.sendToOwner(pr.worldObj, ownerId, pr.message);
+                     }
+
+                     this.spawn(pr.worldObj, ownerId, pr.senderObj);
+                     it.remove();
                   }
-
-                  this.spawn(pr.worldObj, ownerId, pr.senderObj);
-                  it.remove();
                }
+            } else {
+               it.remove();
             }
          }
       }
 
-      for (Entry<UUID, AmigoNpcManager.NpcRecord> e : this.npcRefPorPlayer.entrySet()) {
-         UUID owner = e.getKey();
-         AmigoNpcManager.NpcRecord rec = e.getValue();
+      for(Map.Entry e : this.npcRefPorPlayer.entrySet()) {
+         UUID owner = (UUID)e.getKey();
+         NpcRecord rec = (NpcRecord)e.getValue();
          if (rec != null && rec.state == AmigoNpcManager.State.ACTIVE && rec.refObj != null && rec.worldObj != null && !rec.downed) {
             Object worldObj = rec.worldObj;
-            HytaleBridge.worldExecute(
-               worldObj,
-               () -> {
+            HytaleBridge.worldExecute(worldObj, () -> {
+               try {
+                  Object storeObj = getComponentStoreFromWorld(worldObj);
+                  if (!(storeObj instanceof Store)) {
+                     return;
+                  }
+
+                  Store<?> rawStore = (Store)storeObj;
+                  Store<EntityStore> store = rawStore;
+                  Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
+                  if (ownerRef == null) {
+                     return;
+                  }
+
+                  Object ownerTransform = getComponentFromStore(rawStore, ownerRef, TransformComponent.getComponentType());
+                  Object npcTransform = getComponentFromStore(rawStore, rec.refObj, TransformComponent.getComponentType());
+                  if (!(npcTransform instanceof TransformComponent)) {
+                     this.amigoRefs.remove(rec.refObj);
+                     this.npcRefPorPlayer.remove(owner, rec);
+                     return;
+                  }
+
                   try {
-                     if (!(getComponentStoreFromWorld(worldObj) instanceof Store<?> rawStore)) {
-                        return;
+                     Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                     EntityStatMap st = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+                     if (st != null) {
+                        try {
+                           EntityStatValue hp = st.get(DefaultEntityStatTypes.getHealth());
+                           if (hp != null && hp.get() <= 0.0F) {
+                              this.markDowned(owner);
+                              return;
+                           }
+                        } catch (Throwable var77) {
+                        }
+                     }
+                  } catch (Throwable var78) {
+                  }
+
+                  if (!(ownerTransform instanceof TransformComponent)) {
+                     return;
+                  }
+
+                  TransformComponent ot = (TransformComponent)ownerTransform;
+                  TransformComponent nt = (TransformComponent)npcTransform;
+                  Vector3d op = ot.getPosition();
+                  Vector3d np = nt.getPosition();
+                  if (op == null || np == null) {
+                     return;
+                  }
+
+                  try {
+                     int ownerLevel = Math.max(1, rec.npcLevelCached);
+                     ZoneMobService.ZoneSnapshot zs = ZoneMobService.getShared().computeZoneSnapshot(worldObj, store, ownerRef, ownerLevel);
+                     rec.zoneRawId = zs.rawZoneId();
+                     rec.zoneExpected = zs.expectedZone();
+                     rec.zoneCurrent = zs.currentZone();
+                     rec.zoneHudColor = zs.color();
+                  } catch (Throwable var76) {
+                     rec.zoneRawId = 0;
+                     rec.zoneExpected = 0;
+                     rec.zoneCurrent = 0;
+                     rec.zoneHudColor = ZoneModel.WHITE;
+                  }
+
+                  double dx = op.getX() - np.getX();
+                  double dz = op.getZ() - np.getZ();
+                  double dy = op.getY() - np.getY();
+                  double horizontal = Math.sqrt(dx * dx + dz * dz);
+                  if (rec.chaseDisengaged && horizontal <= (double)10.0F) {
+                     rec.chaseDisengaged = false;
+                  }
+
+                  if (horizontal > (double)25.0F) {
+                     if (rec.farSinceMillis == 0L) {
+                        rec.farSinceMillis = System.currentTimeMillis();
+                     }
+                  } else {
+                     rec.farSinceMillis = 0L;
+                  }
+
+                  long now = System.currentTimeMillis();
+                  if (rec.nextUndergroundCheckMillis <= 0L || now >= rec.nextUndergroundCheckMillis) {
+                     rec.nextUndergroundCheckMillis = now + 500L;
+                     rec.ownerUnderground = hasCeilingAboveBestEffort(rawStore, op);
+                  }
+
+                  boolean ownerUnderground = rec.ownerUnderground;
+                  if (rec.lastNpcMovedMillis == 0L) {
+                     rec.lastNpcMovedMillis = now;
+                  }
+
+                  if (rec.lastSampleMillis == 0L) {
+                     rec.lastSampleMillis = now;
+                  }
+
+                  if (rec.lastNpcPos == null) {
+                     rec.lastNpcPos = np;
+                  }
+
+                  if (now - rec.lastSampleMillis >= 400L) {
+                     double mdx = np.getX() - rec.lastNpcPos.getX();
+                     double mdy = np.getY() - rec.lastNpcPos.getY();
+                     double mdz = np.getZ() - rec.lastNpcPos.getZ();
+                     double moved = Math.sqrt(mdx * mdx + mdy * mdy + mdz * mdz);
+                     if (moved > (double)0.25F) {
+                        rec.lastNpcMovedMillis = now;
                      }
 
-                     Store<EntityStore> store = (Store<EntityStore>)rawStore;
-                     Object ownerRef = invokeOneArg(worldObj, "getEntityRef", UUID.class, owner);
-                     if (ownerRef == null) {
-                        return;
-                     }
+                     rec.lastNpcPos = np;
+                     rec.lastSampleMillis = now;
+                  }
 
-                     Object ownerTransform = getComponentFromStore(store, ownerRef, TransformComponent.getComponentType());
-                     Object npcTransform = getComponentFromStore(store, rec.refObj, TransformComponent.getComponentType());
-                     if (!(npcTransform instanceof TransformComponent)) {
-                        this.amigoRefs.remove(rec.refObj);
-                        this.npcRefPorPlayer.remove(owner, rec);
-                        return;
-                     }
+                  clearExpiredAttackAnimation(rawStore, rec.refObj, rec, now);
 
-                     try {
-                        Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
-                        EntityStatMap st = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
-                        if (st != null) {
+                  try {
+                     tickLevelUpFx(store, ownerRef, rec.refObj, rec, now);
+                  } catch (Throwable var75) {
+                  }
+
+                  try {
+                     tickWardrobeRestore(store, rec, ownerRef, now);
+                  } catch (Throwable var74) {
+                  }
+
+                  boolean lootStickActiveNow = false;
+
+                  try {
+                     if (lootStickActiveNow) {
+                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
+                        if (npcEntityObj != null) {
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTargetClose", (Object)null);
+                           setLockedTargetOnNpcEntity(npcEntityObj, rec.refObj);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", (Object)null);
+                        }
+                     } else if (!rec.defendeEnabled) {
+                        if (rec.combatUntilMillis > 0L && now > rec.combatUntilMillis) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                        }
+
+                        if (rec.npcCombatUntilMillis > 0L && now > rec.npcCombatUntilMillis) {
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                        }
+
+                        Object combatTarget = this.getActiveCombatTarget(rec, now);
+                        if (combatTarget != null && !isAliveEntityRef(store, combatTarget)) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                           combatTarget = null;
+                        }
+
+                        Object npcCombatTarget = this.getActiveNpcCombatTarget(rec, now);
+                        if (npcCombatTarget != null && !isAliveEntityRef(store, npcCombatTarget)) {
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                           npcCombatTarget = null;
+                        }
+
+                        rec.assistUntilMillis = 0L;
+                        rec.assistTargetRefObj = null;
+                        Object desiredTarget = combatTarget != null ? combatTarget : (npcCombatTarget != null ? npcCombatTarget : ownerRef);
+                        if (desiredTarget != null && !refEq(desiredTarget, ownerRef) && horizontal > (double)30.0F) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                           combatTarget = null;
+                           npcCombatTarget = null;
+                           desiredTarget = ownerRef;
+                        }
+
+                        boolean inCombat = desiredTarget != null && !refEq(desiredTarget, ownerRef);
+                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
+                        if (npcEntityObj != null) {
+                           boolean closeFollow = ownerUnderground && !inCombat;
+                           boolean lootStickHold = rec.autoLootEnabled && rec.autoLootStickUntilMillis > now && !inCombat;
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTargetClose", closeFollow ? ownerRef : null);
+                           Object lockedTarget = lootStickHold ? rec.refObj : (inCombat ? desiredTarget : ownerRef);
+                           setLockedTargetOnNpcEntity(npcEntityObj, lockedTarget);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", inCombat ? desiredTarget : null);
+                        }
+
+                        if (inCombat) {
+                           this.updateCurrentTargetMobLevel(store, rec, desiredTarget);
+                           boolean wantsRanged = false;
+
                            try {
-                              EntityStatValue hp = st.get(DefaultEntityStatTypes.getHealth());
-                              if (hp != null) {
-                                 rec.cachedHealth = Math.max(0.0F, hp.get());
-                                 rec.cachedMaxHealth = Math.max(0.0F, hp.getMax());
-                                 if (hp.get() <= 0.0F) {
-                                    this.markDowned(owner);
-                                    return;
+                              if (desiredTarget instanceof Ref && rec.refObj instanceof Ref) {
+                                 Ref<EntityStore> tgtRef = (Ref)desiredTarget;
+                                 TransformComponent npcT2 = (TransformComponent)store.getComponent((Ref)rec.refObj, TransformComponent.getComponentType());
+                                 if (npcT2 != null && npcT2.getPosition() != null) {
+                                    wantsRanged = isAirborneTarget(store, tgtRef, npcT2.getPosition());
                                  }
                               }
-                           } catch (Throwable var26) {
+                           } catch (Throwable var73) {
+                           }
+
+                           if (wantsRanged) {
+                              this.tryEquipDefaultBow(store, rec, now);
+                              this.tryRangedAttack(store, rec, ownerRef, desiredTarget, now);
+                           } else {
+                              rec.rangedBowReadyAtMillis = 0L;
+                              rec.rangedBowItemId = null;
+
+                              try {
+                                 if (rec.refObj instanceof Ref) {
+                                    Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                    this.applySwordWeaponNow(store, npcRef, rec.ownerId, rec, false);
+                                 }
+                              } catch (Throwable var72) {
+                              }
+
+                              this.tryMeleeAttack(store, rec, ownerRef, desiredTarget, now);
+                           }
+                        } else {
+                           rec.rangedBowReadyAtMillis = 0L;
+                           rec.rangedBowItemId = null;
+
+                           try {
+                              if (rec.refObj instanceof Ref) {
+                                 Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                 this.applySwordWeaponNow(store, npcRef, rec.ownerId, rec, false);
+                              }
+                           } catch (Throwable var71) {
+                           }
+
+                           rec.chaseDisengaged = false;
+                           rec.targetLostSinceMillis = 0L;
+                           rec.targetStuckSinceMillis = 0L;
+                           rec.lastTargetHorizontal = (double)-1.0F;
+                           rec.lastTargetSampleMillis = 0L;
+                           rec.currentTargetMobLevel = 0;
+                           rec.currentTargetMobUuid = null;
+                        }
+                     } else {
+                        if (rec.combatUntilMillis > 0L && now > rec.combatUntilMillis) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                        }
+
+                        if (rec.npcCombatUntilMillis > 0L && now > rec.npcCombatUntilMillis) {
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                        }
+
+                        Object combatTarget = this.getActiveCombatTarget(rec, now);
+                        if (combatTarget != null && !isAliveEntityRef(store, combatTarget)) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                           combatTarget = null;
+                        }
+
+                        Object npcCombatTarget = this.getActiveNpcCombatTarget(rec, now);
+                        if (npcCombatTarget != null && !isAliveEntityRef(store, npcCombatTarget)) {
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                           npcCombatTarget = null;
+                        }
+
+                        tickAssistHousekeeping(rec, store, now);
+                        if (!rec.chaseDisengaged && !rec.lootingActive && combatTarget == null && npcCombatTarget == null && rec.assistTargetRefObj == null && rec.assistUntilMillis == 0L) {
+                           Object autoTarget = this.findNearestDefenderTarget(store, rec, ownerRef, op);
+                           if (autoTarget != null) {
+                              rec.assistTargetRefObj = autoTarget;
+                              rec.assistUntilMillis = 0L;
+                              this.debugCombat(rec, owner, "autoAssist: targetRef=" + String.valueOf(autoTarget));
                            }
                         }
-                     } catch (Throwable var27) {
+
+                        Object desiredTarget = combatTarget;
+                        if (combatTarget == null) {
+                           desiredTarget = npcCombatTarget != null ? npcCombatTarget : null;
+                        }
+
+                        if (desiredTarget == null) {
+                           Object assistTarget = this.getActiveAssistTarget(rec, now);
+                           desiredTarget = assistTarget != null ? assistTarget : ownerRef;
+                        }
+
+                        boolean inCombatOrAssist = desiredTarget != null && !refEq(desiredTarget, ownerRef);
+                        boolean lootStickHold = false;
+                        if (inCombatOrAssist && horizontal > (double)30.0F) {
+                           rec.combatUntilMillis = 0L;
+                           rec.combatTargetRefObj = null;
+                           rec.npcCombatUntilMillis = 0L;
+                           rec.npcCombatTargetRefObj = null;
+                           rec.assistTargetRefObj = null;
+                           rec.chaseDisengaged = true;
+                           rec.assistUntilMillis = now + 3000L;
+                           desiredTarget = ownerRef;
+                           inCombatOrAssist = false;
+                           rec.targetLostSinceMillis = 0L;
+                           rec.targetStuckSinceMillis = 0L;
+                           rec.lastTargetHorizontal = (double)-1.0F;
+                           rec.lastTargetSampleMillis = 0L;
+                        }
+
+                        if (inCombatOrAssist && !isAliveEntityRef(store, desiredTarget)) {
+                           if (rec.autoLootEnabled) {
+                              boolean refresh = rec.autoLootStickUntilMillis <= 0L || now >= rec.autoLootStickUntilMillis || rec.autoLootStickDeadRefObj == null || !refEq(rec.autoLootStickDeadRefObj, desiredTarget);
+                              if (refresh) {
+                                 rec.autoLootStickUntilMillis = now + 900L;
+                                 rec.autoLootStickDeadRefObj = desiredTarget;
+
+                                 try {
+                                    if (desiredTarget instanceof Ref) {
+                                       Ref<EntityStore> deadRef = (Ref)desiredTarget;
+                                       TransformComponent deadT = (TransformComponent)store.getComponent(deadRef, TransformComponent.getComponentType());
+                                       if (deadT != null && deadT.getPosition() != null) {
+                                          rec.autoLootStickAnchorPos = deadT.getPosition();
+                                       }
+                                    }
+
+                                    if (rec.autoLootStickAnchorPos == null) {
+                                       rec.autoLootStickAnchorPos = np;
+                                    }
+                                 } catch (Throwable var70) {
+                                 }
+                              }
+                           }
+
+                           if (rec.autoLootStickUntilMillis > 0L && now >= rec.autoLootStickUntilMillis) {
+                           }
+
+                           if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
+                              rec.combatUntilMillis = 0L;
+                              rec.combatTargetRefObj = null;
+                              combatTarget = null;
+                           }
+
+                           if (npcCombatTarget != null && refEq(desiredTarget, npcCombatTarget)) {
+                              rec.npcCombatUntilMillis = 0L;
+                              rec.npcCombatTargetRefObj = null;
+                              npcCombatTarget = null;
+                           }
+
+                           if (rec.assistTargetRefObj != null && refEq(desiredTarget, rec.assistTargetRefObj)) {
+                              rec.assistTargetRefObj = null;
+                              rec.assistUntilMillis = now + 3000L;
+                           }
+
+                           Object rt = this.findNearestTargetNearNpc(store, rec, ownerRef, np, desiredTarget);
+                           if (rt != null) {
+                              rec.assistTargetRefObj = rt;
+                              rec.assistUntilMillis = 0L;
+                              desiredTarget = rt;
+                              inCombatOrAssist = true;
+                              rec.targetLostSinceMillis = 0L;
+                              rec.targetStuckSinceMillis = 0L;
+                              rec.lastTargetHorizontal = (double)-1.0F;
+                              rec.lastTargetSampleMillis = 0L;
+                              this.debugCombat(rec, owner, "retargetOnDeath: targetRef=" + String.valueOf(rt));
+                           } else {
+                              desiredTarget = ownerRef;
+                              inCombatOrAssist = false;
+                           }
+                        }
+
+                        if (inCombatOrAssist) {
+                           try {
+                              if (desiredTarget instanceof Ref && rec.refObj instanceof Ref) {
+                                 Ref<EntityStore> tgtRef = (Ref)desiredTarget;
+                                 Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                 TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+                                 TransformComponent tgtT = (TransformComponent)store.getComponent(tgtRef, TransformComponent.getComponentType());
+                                 if (npcT != null && tgtT != null && npcT.getPosition() != null && tgtT.getPosition() != null) {
+                                    Vector3d np2 = npcT.getPosition();
+                                    Vector3d tp2 = tgtT.getPosition();
+                                    double dx2 = tp2.getX() - np2.getX();
+                                    double dz2 = tp2.getZ() - np2.getZ();
+                                    double dy2 = tp2.getY() - np2.getY();
+                                    double h2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
+                                    double ady2 = Math.abs(dy2);
+                                    boolean airborne = false;
+
+                                    try {
+                                       airborne = isAirborneTarget(store, tgtRef, np2);
+                                    } catch (Throwable var69) {
+                                    }
+
+                                    double targetHeight = getEntityHeight(store, tgtRef);
+                                    boolean tallTarget = targetHeight >= 1.9;
+                                    double allowedDy = airborne ? (double)35.0F : (tallTarget ? (double)3.0F : (double)2.0F);
+                                    if (!airborne && tallTarget && h2 < 0.9 && now - rec.lastCombatNudgeMillis > 900L) {
+                                       try {
+                                          double len = Math.sqrt(dx2 * dx2 + dz2 * dz2);
+                                          double nx = len > 0.001 ? -dx2 / len : (double)1.0F;
+                                          double nz = len > 0.001 ? -dz2 / len : (double)0.0F;
+                                          Vector3d npos = new Vector3d(np2.getX() + nx * 0.8, np2.getY(), np2.getZ() + nz * 0.8);
+                                          npcT.teleportPosition(npos);
+                                          rec.lastCombatNudgeMillis = now;
+                                       } catch (Throwable var68) {
+                                       }
+                                    }
+
+                                    boolean tooFar = h2 > (double)30.0F;
+                                    boolean tooHigh = ady2 > allowedDy;
+                                    boolean stuckTooLong = false;
+                                    if (airborne) {
+                                       rec.targetStuckSinceMillis = 0L;
+                                       rec.lastTargetHorizontal = h2;
+                                       rec.lastTargetSampleMillis = now;
+                                    } else {
+                                       if (now - rec.lastTargetSampleMillis >= 350L) {
+                                          boolean npcNotMoving = now - rec.lastNpcMovedMillis > 900L;
+                                          boolean farFromTarget = h2 > 3.2;
+                                          if (npcNotMoving && farFromTarget && rec.lastTargetHorizontal >= (double)0.0F && h2 >= rec.lastTargetHorizontal - 0.2) {
+                                             if (rec.targetStuckSinceMillis == 0L) {
+                                                rec.targetStuckSinceMillis = now;
+                                             }
+                                          } else {
+                                             rec.targetStuckSinceMillis = 0L;
+                                          }
+
+                                          rec.lastTargetHorizontal = h2;
+                                          rec.lastTargetSampleMillis = now;
+                                       }
+
+                                       stuckTooLong = rec.targetStuckSinceMillis > 0L && now - rec.targetStuckSinceMillis > 2000L;
+                                    }
+
+                                    boolean lostCond = tooFar || tooHigh || stuckTooLong;
+                                    if (lostCond) {
+                                       if (rec.targetLostSinceMillis == 0L) {
+                                          rec.targetLostSinceMillis = now;
+                                       }
+                                    } else {
+                                       rec.targetLostSinceMillis = 0L;
+                                    }
+
+                                    if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
+                                       boolean okToRenew = !lostCond && h2 <= (double)30.0F;
+                                       if (okToRenew) {
+                                          rec.combatUntilMillis = now + 3000L;
+                                       }
+                                    }
+
+                                    if (rec.targetLostSinceMillis > 0L && now - rec.targetLostSinceMillis > 2000L) {
+                                       if (combatTarget != null && refEq(desiredTarget, combatTarget)) {
+                                          rec.combatUntilMillis = 0L;
+                                          rec.combatTargetRefObj = null;
+                                          combatTarget = null;
+                                       } else if (npcCombatTarget != null && refEq(desiredTarget, npcCombatTarget)) {
+                                          rec.npcCombatUntilMillis = 0L;
+                                          rec.npcCombatTargetRefObj = null;
+                                          npcCombatTarget = null;
+                                       } else {
+                                          rec.assistTargetRefObj = null;
+                                          rec.assistUntilMillis = now + 3000L;
+                                       }
+
+                                       rec.targetLostSinceMillis = 0L;
+                                       rec.targetStuckSinceMillis = 0L;
+                                       rec.lastTargetHorizontal = (double)-1.0F;
+                                       rec.lastTargetSampleMillis = 0L;
+                                       desiredTarget = ownerRef;
+                                       inCombatOrAssist = false;
+                                    }
+                                 }
+                              }
+                           } catch (Throwable var79) {
+                           }
+                        } else {
+                           rec.targetLostSinceMillis = 0L;
+                           rec.targetStuckSinceMillis = 0L;
+                           rec.lastTargetHorizontal = (double)-1.0F;
+                           rec.lastTargetSampleMillis = 0L;
+                        }
+
+                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
+                        if (npcEntityObj != null) {
+                           boolean closeFollow = ownerUnderground && !inCombatOrAssist;
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "LockedTargetClose", closeFollow ? ownerRef : null);
+                           Object lockedTarget = lootStickHold ? rec.refObj : (inCombatOrAssist ? desiredTarget : ownerRef);
+                           setLockedTargetOnNpcEntity(npcEntityObj, lockedTarget);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", inCombatOrAssist ? desiredTarget : null);
+                           setFlockState(store, rec.refObj, inCombatOrAssist ? "Run" : "Walk", "");
+                           if (inCombatOrAssist) {
+                              this.updateCurrentTargetMobLevel(store, rec, desiredTarget);
+                              boolean wantsRanged = false;
+
+                              try {
+                                 if (desiredTarget instanceof Ref && rec.refObj instanceof Ref) {
+                                    Ref<EntityStore> tgtRef = (Ref)desiredTarget;
+                                    Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                    TransformComponent npcT2 = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
+                                    if (npcT2 != null && npcT2.getPosition() != null) {
+                                       wantsRanged = isAirborneTarget(store, tgtRef, npcT2.getPosition());
+                                    }
+                                 }
+                              } catch (Throwable var67) {
+                              }
+
+                              if (wantsRanged) {
+                                 this.tryEquipDefaultBow(store, rec, now);
+                                 this.tryRangedAttack(store, rec, ownerRef, desiredTarget, now);
+                              } else {
+                                 rec.rangedBowReadyAtMillis = 0L;
+                                 rec.rangedBowItemId = null;
+
+                                 try {
+                                    if (rec.refObj instanceof Ref) {
+                                       Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                       this.applySwordWeaponNow(store, npcRef, rec.ownerId, rec, false);
+                                    }
+                                 } catch (Throwable var66) {
+                                 }
+
+                                 this.tryMeleeAttack(store, rec, ownerRef, desiredTarget, now);
+                              }
+                           } else {
+                              rec.rangedBowReadyAtMillis = 0L;
+                              rec.rangedBowItemId = null;
+
+                              try {
+                                 if (rec.refObj instanceof Ref) {
+                                    Ref<EntityStore> npcRef = (Ref)rec.refObj;
+                                    this.applySwordWeaponNow(store, npcRef, rec.ownerId, rec, false);
+                                 }
+                              } catch (Throwable var65) {
+                              }
+
+                              rec.currentTargetMobLevel = 0;
+                              rec.currentTargetMobUuid = null;
+                           }
+                        }
+                     }
+                  } catch (Throwable var80) {
+                  }
+
+                  boolean inCombatOrAssistNow = now < rec.combatUntilMillis || now < rec.assistUntilMillis || now < rec.npcCombatUntilMillis || rec.combatTargetRefObj != null || rec.assistTargetRefObj != null || rec.npcCombatTargetRefObj != null;
+
+                  try {
+                     if (inCombatOrAssistNow) {
+                        rec.regenWasInCombat = true;
+                        rec.regenStartAtMillis = 0L;
+                        rec.regenLastApplyMillis = 0L;
+                     } else if (rec.regenWasInCombat) {
+                        rec.regenWasInCombat = false;
+                        if (!rec.godMode && !rec.downed) {
+                           rec.regenStartAtMillis = now + 3000L;
+                           rec.regenLastApplyMillis = 0L;
+                        }
+
+                        try {
+                           if (rec.autoLootEnabled && rec.state == AmigoNpcManager.State.ACTIVE && !rec.downed) {
+                              Vector3d anchorPos = op != null ? op : np;
+                              if (rec.autoLootStickAnchorPos == null && anchorPos != null) {
+                                 rec.autoLootStickAnchorPos = anchorPos;
+                              }
+
+                              rec.autoLootStickUntilMillis = Math.max(rec.autoLootStickUntilMillis, now + 900L);
+                              rec.autoLootStickDeadRefObj = null;
+                           }
+                        } catch (Throwable var63) {
+                        }
                      }
 
-                     if (!(ownerTransform instanceof TransformComponent ot)) {
-                        return;
-                     }
+                     this.tickSpawnFollowFx(store, rec, ownerRef, now);
+                     this.tickAutoRegen(store, rec, ownerRef, now);
+                  } catch (Throwable var64) {
+                  }
 
-                     TransformComponent nt = (TransformComponent)npcTransform;
-                     Vector3d op = ot.getPosition();
-                     Vector3d np = nt.getPosition();
-                     if (op == null || np == null) {
-                        return;
-                     }
+                  if (!rec.autoLootEnabled) {
+                     endCombatTaggedLooting(rec);
+                  } else {
+                     boolean pauseTaggedLootNow = now < rec.combatUntilMillis || now < rec.assistUntilMillis;
+                     this.tickCombatTaggedLooting(rawStore, owner, rec, ownerRef, np, op, now, worldObj, pauseTaggedLootNow);
+                     this.tryAutoLoot(rawStore, owner, rec, np, op, now, worldObj);
+                  }
 
-                     NpcFollowContextSupport.Context followContext = NpcFollowContextSupport.prepare(
-                        store,
-                        worldObj,
-                        ownerRef,
-                        rec,
-                        op,
-                        np,
-                        10.0,
-                        500L,
-                        AmigoNpcManager::hasCeilingAboveBestEffort,
-                        AmigoNpcManager::clearExpiredAttackAnimation,
-                        AmigoNpcManager::tickLevelUpFx,
-                        AmigoNpcManager::tickWardrobeRestore
-                     );
-                     long nowx = followContext.now;
-                     double horizontal = followContext.horizontal;
-                     double dy = followContext.dy;
-                     boolean ownerUnderground = followContext.ownerUnderground;
-                     boolean lootStickActiveNow = false;
+                  boolean stalled = now - rec.lastNpcMovedMillis > 6000L;
+                  boolean stalledShort = now - rec.lastNpcMovedMillis > 3500L;
+                  boolean followSoft = horizontal > (double)25.0F || Math.abs(dy) > (double)12.0F;
+                  boolean followHard = horizontal > (double)35.0F || Math.abs(dy) > (double)18.0F;
+                  boolean farHard = horizontal > (double)120.0F || Math.abs(dy) > (double)30.0F;
+                  boolean farSoft = horizontal > (double)70.0F || Math.abs(dy) > (double)20.0F;
+                  boolean shouldRescue = false;
+                  if (rec.farSinceMillis > 0L) {
+                     long limit = inCombatOrAssistNow ? 1500L : 2500L;
+                     if (now - rec.farSinceMillis > limit) {
+                        shouldRescue = true;
+                     }
+                  }
+
+                  if (!inCombatOrAssistNow) {
+                     shouldRescue = shouldRescue || followHard || followSoft && stalledShort;
+                  }
+
+                  if (!shouldRescue) {
+                     shouldRescue = farHard || farSoft && stalled;
+                  }
+
+                  double forcedTeleportDist = ownerUnderground ? (double)10.0F : (double)35.0F;
+                  shouldRescue = shouldRescue || horizontal > forcedTeleportDist;
+                  if (shouldRescue && now - rec.lastTeleportMillis > 1000L) {
+                     rec.lastTeleportMillis = now;
+                     rec.combatUntilMillis = 0L;
+                     rec.combatTargetRefObj = null;
+                     rec.npcCombatUntilMillis = 0L;
+                     rec.npcCombatTargetRefObj = null;
+                     rec.assistUntilMillis = now + 3000L;
+                     rec.assistTargetRefObj = null;
+                     rec.chaseDisengaged = true;
+                     rec.targetLostSinceMillis = 0L;
+                     rec.targetStuckSinceMillis = 0L;
+                     rec.lastTargetHorizontal = (double)-1.0F;
+                     rec.lastTargetSampleMillis = 0L;
+                     rec.currentTargetMobLevel = 0;
+                     rec.currentTargetMobUuid = null;
 
                      try {
-                        NpcFollowCombatSupport.tick(
-                           store,
-                           owner,
-                           rec,
-                           ownerRef,
-                           op,
-                           np,
-                           nowx,
-                           horizontal,
-                           ownerUnderground,
-                           lootStickActiveNow,
-                           "LockedTargetClose",
-                           30.0,
-                           3000L,
-                           3000L,
-                           35.0,
-                           AmigoNpcManager::getComponentFromStore,
-                           AmigoNpcManager::setMarkedTargetOnNpcEntity,
-                           AmigoNpcManager::setLockedTargetOnNpcEntity,
-                           AmigoNpcManager::setFlockState,
-                           AmigoNpcManager::isAliveEntityRef,
-                           AmigoNpcManager::tickAssistHousekeeping,
-                           this::findNearestDefenderTarget,
-                           this::findNearestTargetNearNpc,
-                           this::debugCombat,
-                           AmigoNpcManager::isAirborneTarget,
-                           AmigoNpcManager::getEntityHeight,
-                           this::updateCurrentTargetMobLevel,
-                           this::tryEquipDefaultBow,
-                           this::tryRangedAttack,
-                           this::applySwordWeaponNow,
-                           this::tryMeleeAttack
-                        );
-                     } catch (Throwable var25) {
+                        Float yaw = null;
+
+                        try {
+                           yaw = extractYawFromRotation(ot.getRotation());
+                        } catch (Throwable var61) {
+                        }
+
+                        Object tposObj = offsetInFrontOfYaw(op, yaw, (double)4.0F);
+                        Vector3d tpos = tposObj instanceof Vector3d ? (Vector3d)tposObj : (Vector3d)coerceToVector3d(tposObj);
+                        if (tpos != null) {
+                           nt.teleportPosition(tpos);
+                        }
+                     } catch (Throwable var62) {
                      }
 
-                     boolean inCombatOrAssistNow = NpcFollowRecoveryLootSupport.tick(
-                        store,
-                        owner,
-                        rec,
-                        ownerRef,
-                        op,
-                        np,
-                        nowx,
-                        worldObj,
-                        3000L,
-                        this::tickSpawnFollowFx,
-                        this::tickAutoRegen,
-                        this::tickCombatTaggedLooting,
-                        this::tryAutoLoot,
-                        AmigoNpcManager::endCombatTaggedLooting
-                     );
-                     boolean inCombatOrAssist = inCombatOrAssistNow;
-
-                     if (rec.downed) {
-                        rec.activityState = CompanionActivityState.DOWNED;
-                     } else if (inCombatOrAssist) {
-                        rec.activityState = CompanionActivityState.COMBAT;
-                        rec.gatherTargetX = Integer.MIN_VALUE;
-                        rec.gatherTargetY = Integer.MIN_VALUE;
-                        rec.gatherTargetZ = Integer.MIN_VALUE;
-                     } else if (worldObj instanceof World world) {
-                        NpcGatheringSupport.Result gatheringResult = NpcGatheringSupport.tick(
-                           world, owner, rec, np, nowx, false, this::maybeNotifyBackpackFull
-                        );
-                        rec.activityState = switch (gatheringResult) {
-                           case GATHERED -> CompanionActivityState.GATHERING;
-                           case FULL, FOLLOWING -> CompanionActivityState.FOLLOWING;
-                           case COMBAT -> CompanionActivityState.COMBAT;
-                           case IDLE -> CompanionActivityState.IDLE;
-                        };
-                     } else {
-                        rec.activityState = CompanionActivityState.FOLLOWING;
+                     try {
+                        Object npcEntityObj = getComponentFromStore(store, rec.refObj, NPCEntity.getComponentType());
+                        if (npcEntityObj != null) {
+                           setLockedTargetOnNpcEntity(npcEntityObj, ownerRef);
+                           setMarkedTargetOnNpcEntity(npcEntityObj, "CombatTarget", (Object)null);
+                        }
+                     } catch (Throwable var60) {
                      }
 
-                     NpcFollowRescueSupport.tryRescue(
-                        store,
-                        owner,
-                        rec,
-                        ownerRef,
-                        op,
-                        ot,
-                        nt,
-                        nowx,
-                        horizontal,
-                        dy,
-                        inCombatOrAssist,
-                        ownerUnderground,
-                        10.0,
-                        3000L,
-                        NPCEntity.getComponentType(),
-                        AmigoNpcManager::getComponentFromStore,
-                        AmigoNpcManager::setLockedTargetOnNpcEntity,
-                        AmigoNpcManager::setMarkedTargetOnNpcEntity,
-                        AmigoNpcManager::extractYawFromRotation,
-                        AmigoNpcManager::offsetInFrontOfYaw,
-                        AmigoNpcManager::coerceToVector3d,
-                        this::debugCombat
-                     );
-                  } catch (Throwable var28) {
+                     String var10003 = String.format(Locale.US, "%.2f", horizontal);
+                     this.debugCombat(rec, owner, "hardTeleport: h=" + var10003 + " dy=" + String.format(Locale.US, "%.2f", dy));
                   }
+               } catch (Throwable var81) {
                }
-            );
+
+            });
          }
       }
+
    }
 
-   private static void applyMovementAnimation(
-      Store<EntityStore> store, Ref<EntityStore> npcRef, MovementStates ownerStates, double ownerSpeed, double npcSpeed, boolean moving, double distance
-   ) {
+   private static void applyMovementAnimation(Store store, Ref npcRef, MovementStates ownerStates, double ownerSpeed, double npcSpeed, boolean moving, double distance) {
       try {
          MovementStatesComponent msComp = (MovementStatesComponent)store.ensureAndGetComponent(npcRef, MovementStatesComponent.getComponentType());
          MovementStates s = ownerStates != null ? new MovementStates(ownerStates) : new MovementStates();
@@ -2953,8 +5036,8 @@ public final class AmigoNpcManager {
          if (moving && !(npcSpeed < 0.2)) {
             boolean ownerSprint = ownerStates != null && ownerStates.sprinting;
             boolean ownerRun = ownerStates != null && (ownerStates.running || ownerStates.sprinting);
-            boolean wantSprint = ownerSprint || ownerSpeed > 6.0 || distance > 35.0;
-            boolean wantRun = ownerRun || ownerSpeed > 4.2 || distance > 25.0;
+            boolean wantSprint = ownerSprint || ownerSpeed > (double)6.0F || distance > (double)35.0F;
+            boolean wantRun = ownerRun || ownerSpeed > 4.2 || distance > (double)25.0F;
             if (npcSpeed < 1.2) {
                wantSprint = false;
                wantRun = false;
@@ -2977,80 +5060,37 @@ public final class AmigoNpcManager {
          msComp.setSentMovementStates(new MovementStates(s));
       } catch (Throwable var16) {
       }
+
    }
 
    public void revive(UUID ownerId, boolean manual) {
-      AmigoNpcManager.NpcRecord rec = ownerId == null ? null : this.npcRefPorPlayer.get(ownerId);
-      if (rec == null || !rec.downed || rec.refObj == null || rec.worldObj == null) {
-         return;
-      }
+      NpcRecord rec = ownerId == null ? null : (NpcRecord)this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         if (rec.refObj != null) {
+            if (rec.worldObj != null) {
+               rec.downed = false;
+               rec.downedUntilMillis = 0L;
+               HytaleBridge.worldExecute(rec.worldObj, () -> {
+                  try {
+                     Object componentStore = getComponentStoreFromWorld(rec.worldObj);
+                     if (!(componentStore instanceof Store)) {
+                        return;
+                     }
 
-      this.applyRevivePenalty(rec, ownerId, manual);
-      rec.downed = false;
-      rec.downedUntilMillis = 0L;
-      rec.deathDespawnAtMillis = 0L;
-      rec.nextDownedMessageMillis = 0L;
-      rec.activityState = CompanionActivityState.FOLLOWING;
-      HytaleBridge.worldExecute(rec.worldObj, () -> {
-         try {
-            if (!(getComponentStoreFromWorld(rec.worldObj) instanceof Store<?> rawStore) || !(rec.refObj instanceof Ref<?> rawRef)) {
-               return;
+                     Store<?> rawStore = (Store)componentStore;
+                     Ref<EntityStore> ref = (Ref)rec.refObj;
+                     EntityStatMap stats = (EntityStatMap)rawStore.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
+                     stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+                     this.applyNpcScaling(rawStore, ref, ownerId, rec, true);
+                     rawStore.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
+                     rawStore.ensureComponent(ref, MovementStatesComponent.getComponentType());
+                     rawStore.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
+                  } catch (Throwable var8) {
+                  }
+
+               });
             }
-
-            @SuppressWarnings("unchecked")
-            Store<EntityStore> store = (Store<EntityStore>)rawStore;
-            @SuppressWarnings("unchecked")
-            Ref<EntityStore> ref = (Ref<EntityStore>)rawRef;
-            EntityStatMap stats = store.ensureAndGetComponent(ref, EntityStatMap.getComponentType());
-            this.applyNpcScaling(store, ref, ownerId, rec, true);
-            stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
-            try {
-               EntityStatValue hp = stats.get(DefaultEntityStatTypes.getHealth());
-               if (hp != null) {
-                  rec.cachedHealth = Math.max(0.0F, hp.get());
-                  rec.cachedMaxHealth = Math.max(0.0F, hp.getMax());
-               }
-            } catch (Throwable ignored) {
-            }
-            store.putComponent(ref, EntityStatMap.getComponentType(), stats);
-            store.ensureComponent(ref, ActiveAnimationComponent.getComponentType());
-            MovementStatesComponent movement = store.ensureAndGetComponent(ref, MovementStatesComponent.getComponentType());
-            if (movement != null) {
-               MovementStates states = movement.getMovementStates();
-               if (states == null) {
-                  states = new MovementStates();
-               }
-
-               states.sleeping = false;
-               states.idle = true;
-               states.horizontalIdle = true;
-               states.onGround = true;
-               movement.setMovementStates(states);
-               movement.setSentMovementStates(new MovementStates(states));
-               store.putComponent(ref, MovementStatesComponent.getComponentType(), movement);
-            }
-
-            store.putComponent(ref, RespondToHit.getComponentType(), RespondToHit.INSTANCE);
-            NpcHudSyncSupport.updateNpcHud(store, ref, rec);
-         } catch (Throwable ignored) {
          }
-      });
-   }
-
-   private void applyRevivePenalty(AmigoNpcManager.NpcRecord rec, UUID ownerId, boolean manual) {
-      if (rec == null || ownerId == null) {
-         return;
-      }
-
-      try {
-         double rate = manual ? 0.10 : 0.40;
-         long after = XpProgression.applyCurrentLevelPenalty(rec.totalXp, rate);
-         rec.totalXp = after;
-         rec.npcLevelCached = XpProgression.levelFromTotalXp(after);
-         rec.level = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.npcLevelCached);
-         AmigoPersistence.saveTotalXp(ownerId, after);
-         AmigoPersistence.saveSwordState(ownerId, rec.level, rec.equippedWeaponId);
-      } catch (Throwable ignored) {
       }
    }
 
@@ -3063,14 +5103,14 @@ public final class AmigoNpcManager {
       try {
          Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
          Method getCt = tcClass.getMethod("getComponentType");
-         Object componentType = getCt.invoke(null);
+         Object componentType = getCt.invoke((Object)null);
          if (componentType == null) {
             return null;
+         } else {
+            Object tc = invokeStoreGetComponent(componentStore, playerEntityRef, componentType);
+            return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
          }
-
-         Object tc = invokeStoreGetComponent(componentStore, playerEntityRef, componentType);
-         return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
-      } catch (Throwable ignored) {
+      } catch (Throwable var6) {
          return null;
       }
    }
@@ -3080,25 +5120,25 @@ public final class AmigoNpcManager {
          Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
          if (ref == null) {
             return null;
+         } else {
+            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+            Method getCt = tcClass.getMethod("getComponentType");
+            Object componentType = getCt.invoke((Object)null);
+            if (componentType == null) {
+               return null;
+            } else {
+               Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
+               return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
+            }
          }
-
-         Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
-         Method getCt = tcClass.getMethod("getComponentType");
-         Object componentType = getCt.invoke(null);
-         if (componentType == null) {
-            return null;
-         }
-
-         Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
-         return tc == null ? null : invokeNoArg(tc, "getPosition", "position");
-      } catch (Throwable ignored) {
+      } catch (Throwable var8) {
          return null;
       }
    }
 
    private static Object invokeStoreGetComponent(Object store, Object ref, Object componentType) {
       try {
-         for (Method m : store.getClass().getMethods()) {
+         for(Method m : store.getClass().getMethods()) {
             if (m.getName().equals("getComponent") && m.getParameterCount() == 2) {
                return m.invoke(store, ref, componentType);
             }
@@ -3115,7 +5155,7 @@ public final class AmigoNpcManager {
 
    private static Object invokeSpawnNPC(Object npcPlugin, Object store, String npcType, String groupType, Object pos, Object rot) {
       try {
-         for (Method m : npcPlugin.getClass().getMethods()) {
+         for(Method m : npcPlugin.getClass().getMethods()) {
             if (m.getName().equals("spawnNPC") && m.getParameterCount() == 5) {
                try {
                   return m.invoke(npcPlugin, store, npcType, groupType, pos, rot);
@@ -3134,25 +5174,16 @@ public final class AmigoNpcManager {
          Method m = npcPlugin.getClass().getMethod("getIndex", String.class);
          Object r = m.invoke(npcPlugin, roleName);
          return r instanceof Integer ? (Integer)r : ((Number)r).intValue();
-      } catch (Throwable ignored) {
+      } catch (Throwable var4) {
          return -1;
       }
    }
 
    private static int getNpcRoleIndexWithFallbacks(Object npcPlugin, String roleName) {
       if (roleName != null && !roleName.isBlank()) {
-         String rn = roleName;
-         String[] candidates = new String[]{
-            rn,
-            rn.endsWith(".json") ? rn.substring(0, rn.length() - 5) : rn,
-            "_Core/" + rn,
-            "_Core/AmigoNPC/" + rn,
-            "Server/NPC/Roles/" + rn,
-            "Server/NPC/Roles/_Core/" + rn,
-            "Server/NPC/Roles/_Core/AmigoNPC/" + rn
-         };
+         String[] candidates = new String[]{roleName, roleName.endsWith(".json") ? roleName.substring(0, roleName.length() - 5) : roleName, "_Core/" + roleName, "_Core/AmigoNPC/" + roleName, "Server/NPC/Roles/" + roleName, "Server/NPC/Roles/_Core/" + roleName, "Server/NPC/Roles/_Core/AmigoNPC/" + roleName};
 
-         for (String c : candidates) {
+         for(String c : candidates) {
             if (c != null && !c.isBlank()) {
                String key = c.endsWith(".json") ? c.substring(0, c.length() - 5) : c;
                int idx = getNpcRoleIndex(npcPlugin, key);
@@ -3170,7 +5201,7 @@ public final class AmigoNpcManager {
 
    private static Object invokeSpawnEntity(Object npcPlugin, Object store, int roleIndex, Object pos, Object rot, Object model, Object ownerRef) {
       try {
-         for (Method m : npcPlugin.getClass().getMethods()) {
+         for(Method m : npcPlugin.getClass().getMethods()) {
             if (m.getName().equals("spawnEntity") && m.getParameterCount() == 7) {
                try {
                   Object pre = buildPreAddToWorldTriConsumer();
@@ -3189,23 +5220,23 @@ public final class AmigoNpcManager {
    private static Object buildPostSpawnTriConsumer(Object ownerRef) {
       if (ownerRef == null) {
          return buildNoopTriConsumer();
-      }
-
-      try {
-         Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
-         return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> {
-            try {
-               if (args != null && args.length >= 1 && args[0] != null) {
-                  Object npcEntity = args[0];
-                  setLockedTargetOnNpcEntity(npcEntity, ownerRef);
+      } else {
+         try {
+            Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
+            return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> {
+               try {
+                  if (args != null && args.length >= 1 && args[0] != null) {
+                     Object npcEntity = args[0];
+                     setLockedTargetOnNpcEntity(npcEntity, ownerRef);
+                  }
+               } catch (Throwable var5) {
                }
-            } catch (Throwable var5) {
-            }
 
-            return null;
-         });
-      } catch (Throwable ignored) {
-         return buildNoopTriConsumer();
+               return null;
+            });
+         } catch (Throwable var2) {
+            return buildNoopTriConsumer();
+         }
       }
    }
 
@@ -3252,19 +5283,24 @@ public final class AmigoNpcManager {
             }
          } catch (Throwable var4) {
          }
+
       }
    }
 
-   private void updateCurrentTargetMobLevel(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object desiredTargetRefObj) {
+   private void updateCurrentTargetMobLevel(Store store, NpcRecord rec, Object desiredTargetRefObj) {
       if (store != null && rec != null) {
          if (desiredTargetRefObj instanceof Ref && rec.refObj instanceof Ref) {
             try {
-               Ref<EntityStore> tgtRef = (Ref<EntityStore>)desiredTargetRefObj;
+               Ref<EntityStore> tgtRef = (Ref)desiredTargetRefObj;
                String instanceId = null;
 
                try {
-                  if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
-                     instanceId = s;
+                  Object n = invokeNoArg(rec.worldObj, "getName");
+                  if (n instanceof String) {
+                     String s = (String)n;
+                     if (!s.isBlank()) {
+                        instanceId = s;
+                     }
                   }
                } catch (Throwable var8) {
                }
@@ -3279,25 +5315,13 @@ public final class AmigoNpcManager {
                   rec.zoneInferredAtMillis = System.currentTimeMillis();
                }
 
-               this.debugMobLevel(
-                  rec,
-                  rec.ownerId,
-                  AmigoText.format(
-                     "core.debug.moblevel.zone_result",
-                     rec.zoneRawId,
-                     rec.zoneInferredId,
-                     rec.currentTargetMobLevel,
-                     r.baseLevel(),
-                     r.offset(),
-                     r.finalLevel(),
-                     r.maxLevelCap(),
-                     r.cacheHit()
-                  )
-               );
-            } catch (Throwable ignored) {
+               int var10003 = rec.zoneRawId;
+               this.debugMobLevel(rec, rec.ownerId, "rawZoneId=" + var10003 + " inferredZone=" + rec.zoneInferredId + " mobLevelFinal=" + rec.currentTargetMobLevel + " | base=" + r.baseLevel() + " offset=" + r.offset() + " final=" + r.finalLevel() + " cap=" + r.maxLevelCap() + " cacheHit=" + r.cacheHit());
+            } catch (Throwable var9) {
                rec.currentTargetMobLevel = 0;
                rec.currentTargetMobUuid = null;
             }
+
          } else {
             rec.currentTargetMobLevel = 0;
             rec.currentTargetMobUuid = null;
@@ -3327,7 +5351,7 @@ public final class AmigoNpcManager {
                return;
             }
 
-            for (Method m : stateSupport.getClass().getMethods()) {
+            for(Method m : stateSupport.getClass().getMethods()) {
                if (m.getName().equals("setState") && m.getParameterCount() == 4) {
                   Class<?>[] p = m.getParameterTypes();
                   if (p.length == 4 && p[1] == String.class && p[2] == String.class) {
@@ -3340,7 +5364,7 @@ public final class AmigoNpcManager {
                }
             }
 
-            for (Method m : stateSupport.getClass().getMethods()) {
+            for(Method m : stateSupport.getClass().getMethods()) {
                if (m.getName().equals("flockSetState") && m.getParameterCount() == 4) {
                   try {
                      m.invoke(stateSupport, npcRefObj, state, "Default", storeObj);
@@ -3351,19 +5375,49 @@ public final class AmigoNpcManager {
             }
          } catch (Throwable var16) {
          }
+
       }
    }
 
-   private static void setFlockState(Store<EntityStore> store, Object npcRefObj, String state, String subState) {
+   private static void setFlockState(Store store, Object npcRefObj, String state, String subState) {
    }
 
-   private static boolean isAirborneTarget(Store<EntityStore> store, Ref<EntityStore> targetRef, Vector3d npcPos) {
+   private static String resolveDefaultBowId() {
+      String cached = RESOLVED_BOW_ID;
+      if (cached != null) {
+         return cached.isBlank() ? null : cached;
+      } else {
+         String found = null;
+         String[] candidates = new String[]{"Weapon_Shortbow_Onyxium", "Weapon_Shortbow", "Weapon_Bow_Crude", "Weapon_Bow_Wood", "Weapon_Bow_Iron", "Weapon_Bow_Steel", "Weapon_Bow_Mithril", "Weapon_Bow_Thorium", "Weapon_Bow_Onyxium", "Weapon_Bow", "Weapon_Ranged_Bow"};
+
+         try {
+            for(String id : candidates) {
+               try {
+                  if (id != null && !id.isBlank()) {
+                     Item it = (Item)Item.getAssetMap().getAsset(id);
+                     if (it != null) {
+                        found = id;
+                        break;
+                     }
+                  }
+               } catch (Throwable var8) {
+               }
+            }
+         } catch (Throwable var9) {
+         }
+
+         RESOLVED_BOW_ID = found == null ? "" : found;
+         return found;
+      }
+   }
+
+   private static boolean isAirborneTarget(Store store, Ref targetRef, Vector3d npcPos) {
       try {
          if (store != null && targetRef != null && npcPos != null) {
             TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
             if (tgtT != null && tgtT.getPosition() != null) {
                Vector3d tp = tgtT.getPosition();
-               double dy = tp.y() - npcPos.y();
+               double dy = tp.getY() - npcPos.getY();
                double dyAbs = Math.abs(dy);
                MovementStatesComponent ms = (MovementStatesComponent)store.getComponent(targetRef, MovementStatesComponent.getComponentType());
                if (ms != null) {
@@ -3387,19 +5441,19 @@ public final class AmigoNpcManager {
                   }
                }
 
-               return dyAbs >= 2.0;
+               return dyAbs >= (double)2.0F;
             } else {
                return false;
             }
          } else {
             return false;
          }
-      } catch (Throwable ignored) {
+      } catch (Throwable var11) {
          return false;
       }
    }
 
-   private void aimNpcAtTarget(Store<EntityStore> store, Ref<EntityStore> npcRef, Ref<EntityStore> targetRef) {
+   private void aimNpcAtTarget(Store store, Ref npcRef, Ref targetRef) {
       if (store != null && npcRef != null && targetRef != null) {
          TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
          TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
@@ -3409,10 +5463,10 @@ public final class AmigoNpcManager {
             if (np != null && tp != null) {
                double npcH = Math.max(1.2, getEntityHeight(store, npcRef));
                double tgtH = Math.max(0.6, getEntityHeight(store, targetRef));
-               double eyeY = np.y() + npcH * 0.85;
-               double aimY = tp.y() + tgtH * 0.55;
-               double dx = tp.x() - np.x();
-               double dz = tp.z() - np.z();
+               double eyeY = np.getY() + npcH * 0.85;
+               double aimY = tp.getY() + tgtH * 0.55;
+               double dx = tp.getX() - np.getX();
+               double dz = tp.getZ() - np.getZ();
                double dy = aimY - eyeY;
                double h = Math.sqrt(dx * dx + dz * dz);
                if (!(h < 1.0E-4)) {
@@ -3427,16 +5481,16 @@ public final class AmigoNpcManager {
                      boolean ok = false;
 
                      try {
-                        invokeOneArg(rot, "setYaw", float.class, yaw);
-                        invokeOneArg(rot, "setPitch", float.class, pitch);
+                        invokeOneArg(rot, "setYaw", Float.TYPE, yaw);
+                        invokeOneArg(rot, "setPitch", Float.TYPE, pitch);
                         ok = true;
                      } catch (Throwable var31) {
                      }
 
                      if (!ok) {
                         try {
-                           invokeOneArg(rot, "setX", float.class, pitch);
-                           invokeOneArg(rot, "setY", float.class, yaw);
+                           invokeOneArg(rot, "setX", Float.TYPE, pitch);
+                           invokeOneArg(rot, "setY", Float.TYPE, yaw);
                         } catch (Throwable var30) {
                         }
                      }
@@ -3445,6 +5499,7 @@ public final class AmigoNpcManager {
                         invokeTeleportRotation(npcT, rot);
                      } catch (Throwable var29) {
                      }
+
                   }
                }
             }
@@ -3465,45 +5520,46 @@ public final class AmigoNpcManager {
                m.invoke(transformComponent, rotationObj);
             } catch (Throwable var4) {
             }
+
          }
       }
    }
 
-   private void tryEquipDefaultBow(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, long now) {
+   private void tryEquipDefaultBow(Store store, NpcRecord rec, long now) {
       try {
-         if (store == null || rec == null || !rec.autoWeaponSwitchEnabled || !(rec.refObj instanceof Ref<?> rawRef)) {
+         if (store == null || rec == null) {
             return;
          }
 
-         if (rec.backpack == null) {
-            rec.backpack = this.getOrLoadBackpack(rec.ownerId);
-         }
-
-         String rangedId = NpcWeaponSupport.selectBestBackpackWeapon(rec.backpack, true);
-         if (rangedId == null || rangedId.isBlank()) {
-            rec.rangedBowItemId = null;
-            rec.rangedBowReadyAtMillis = 0L;
+         if (!(rec.refObj instanceof Ref)) {
             return;
          }
 
-         rec.rangedBowItemId = rangedId;
-         @SuppressWarnings("unchecked")
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawRef;
-         if (NpcWeaponSupport.isHotbar0Item(store, npcRef, rangedId)) {
+         String bowId = resolveDefaultBowId();
+         if (bowId == null || bowId.isBlank()) {
+            return;
+         }
+
+         rec.rangedBowItemId = bowId;
+         Ref<EntityStore> npcRef = (Ref)rec.refObj;
+         if (this.isHotbar0Item(store, npcRef, bowId)) {
             if (rec.rangedBowReadyAtMillis <= 0L) {
                rec.rangedBowReadyAtMillis = now;
             }
+
             return;
          }
 
-         if (NpcWeaponSupport.equipWeaponInHotbar0(store, npcRef, rangedId)) {
+         boolean ok = this.equipWeaponInHotbar0(store, npcRef, bowId);
+         if (ok) {
             rec.rangedBowReadyAtMillis = now + 900L;
          }
-      } catch (Throwable ignored) {
+      } catch (Throwable var8) {
       }
+
    }
 
-   private void tryRangedAttack(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
+   private void tryRangedAttack(Store store, NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
       try {
          if (store == null || rec == null) {
             return;
@@ -3522,15 +5578,16 @@ public final class AmigoNpcManager {
          }
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
+         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
+         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         boolean ownerCombatContextActive = rec.ownerCombatContextUntilMillis > 0L && now <= rec.ownerCombatContextUntilMillis;
-         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER
-            ? ownerCombatContextActive && (isOwnerAggressor || isAssist)
-            : isAssist;
-         if (!authorized) {
+         if (!rec.defendeEnabled) {
+            if (!isAggressor) {
+               return;
+            }
+         } else if (!isAggressor && !isAssist) {
             return;
          }
-         boolean isAggressor = isOwnerAggressor;
 
          if (now - rec.lastRangedAttackMillis < 1150L) {
             return;
@@ -3548,28 +5605,34 @@ public final class AmigoNpcManager {
             return;
          }
 
-         Ref<EntityStore> targetRef = (Ref<EntityStore>)targetRefObj;
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+         Ref<EntityStore> targetRef = (Ref)targetRefObj;
+         Ref<EntityStore> npcRef = (Ref)rec.refObj;
          String bowId = rec.rangedBowItemId;
-         if (bowId == null || bowId.isBlank() || rec.backpack == null || !NpcWeaponSupport.backpackContainsWeapon(rec.backpack, bowId)) {
+         if (bowId == null || bowId.isBlank()) {
+            bowId = resolveDefaultBowId();
+         }
+
+         if (bowId == null || bowId.isBlank()) {
             return;
          }
 
-         if (!NpcWeaponSupport.isHotbar0Item(store, npcRef, bowId)) {
+         if (!this.isHotbar0Item(store, npcRef, bowId)) {
             rec.rangedBowReadyAtMillis = Math.max(rec.rangedBowReadyAtMillis, now + 200L);
+            return;
+         }
+
+         String bowIdCheck = rec.rangedBowItemId != null && !rec.rangedBowItemId.isBlank() ? rec.rangedBowItemId : resolveDefaultBowId();
+         if (bowIdCheck != null && !bowIdCheck.isBlank() && !this.isHotbar0Item(store, npcRef, bowIdCheck)) {
+            this.tryEquipDefaultBow(store, rec, now);
             return;
          }
 
          try {
             Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
-            if (maybePlayer != null) {
+            if (maybePlayer != null && !this.pvpEnabled) {
                return;
             }
          } catch (Throwable var58) {
-         }
-
-         if (this.isAmigoRef(targetRefObj) && !this.pvpEnabled) {
-            return;
          }
 
          TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
@@ -3588,16 +5651,16 @@ public final class AmigoNpcManager {
             return;
          }
 
-         double dx = tp.x() - np.x();
-         double dz = tp.z() - np.z();
-         double dy = tp.y() - np.y();
+         double dx = tp.getX() - np.getX();
+         double dz = tp.getZ() - np.getZ();
+         double dy = tp.getY() - np.getY();
          double dyAbs = Math.abs(dy);
          double horizontal = Math.sqrt(dx * dx + dz * dz);
-         if (horizontal > 20.0) {
+         if (horizontal > (double)20.0F) {
             return;
          }
 
-         if (dyAbs > 35.0) {
+         if (dyAbs > (double)35.0F) {
             return;
          }
 
@@ -3606,8 +5669,13 @@ public final class AmigoNpcManager {
          } catch (Throwable var57) {
          }
 
-         double base = NpcWeaponSupport.getWeaponBaseDamage(bowId);
-         float amount = (float)(base + rec.level * 0.03);
+         String weaponId = rec.equippedWeaponId;
+         if (weaponId == null || weaponId.isBlank()) {
+            weaponId = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(rec.level);
+         }
+
+         double base = getWeaponBaseDamage(weaponId);
+         float amount = (float)(base + (double)rec.level * 0.03);
          int swordLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
          if (swordLvl <= 30) {
             amount /= 3.0F;
@@ -3621,7 +5689,6 @@ public final class AmigoNpcManager {
          }
 
          amount = Math.min(24.0F, amount * 1.2F);
-         amount = this.capNpcDamageToOwnerSupport(store, ownerRefObj, amount);
          float hpBefore = -1.0F;
 
          try {
@@ -3646,21 +5713,11 @@ public final class AmigoNpcManager {
          } catch (Throwable var53) {
          }
 
-         Damage damage = new Damage(new EntitySource(npcRef), DamageCause.PHYSICAL, amount);
+         Damage damage = new Damage(new Damage.EntitySource(npcRef), DamageCause.PHYSICAL, amount);
          DamageSystems.executeDamage(targetRef, store, damage);
 
          try {
-            this.debugAttack(
-               rec,
-               rec.ownerId,
-               AmigoText.format(
-                  "core.debug.attack.ranged_hit",
-                  String.format(Locale.ROOT, "%.2f", amount),
-                  String.valueOf(bowId),
-                  String.format(Locale.ROOT, "%.2f", horizontal),
-                  String.format(Locale.ROOT, "%.2f", dy)
-               )
-            );
+            this.debugAttack(rec, rec.ownerId, String.format("RANGED HIT! dmg=%.2f bow=%s h=%.2f dy=%.2f", amount, String.valueOf(bowId), horizontal, dy));
          } catch (Throwable var52) {
          }
 
@@ -3679,58 +5736,43 @@ public final class AmigoNpcManager {
 
          int mobLevelForCtx = rec.currentTargetMobLevel;
          long xpGain;
-         boolean xpAlreadyAwarded = false;
          if (killed) {
             int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
             int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
             mobLevelForCtx = mobLevel;
-            long externalXpGain = consumeExternalCompanionKillXp(rec, targetRefObj, now);
-            if (externalXpGain >= 0L) {
-               xpGain = externalXpGain;
-               xpAlreadyAwarded = true;
-            } else {
-               double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
-               xpGain = coerceStage1XpGainToLong(rec, xpD);
+            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+            xpGain = coerceStage1XpGainToLong(rec, xpD);
 
-               try {
-                  if (AmigoZonesConfigService.get().debugLog) {
-                     double baseXp = RpgStage1Formulas.calculateBaseXPFromMonsterLevel(mobLevel, RPG_STAGE1_CFG);
-                     double diffMult = RpgStage1Formulas.calculateLevelDiffMultiplier(npcLevel, mobLevel, RPG_STAGE1_CFG);
-                     this.debugMobLevel(
-                        rec,
-                        rec.ownerId,
-                        AmigoText.format(
-                           "core.debug.moblevel.xp_kill",
-                           npcLevel,
-                           mobLevel,
-                           String.format(Locale.ROOT, "%.2f", baseXp),
-                           String.format(Locale.ROOT, "%.2f", diffMult),
-                           String.format(Locale.ROOT, "%.2f", RPG_STAGE1_CFG.getRateExp()),
-                           xpGain
-                        )
-                     );
-                  }
-               } catch (Throwable var50) {
+            try {
+               if (AmigoZonesConfigService.get().debugLog) {
+                  double baseXp = RpgStage1Formulas.calculateBaseXPFromMonsterLevel(mobLevel, RPG_STAGE1_CFG);
+                  double diffMult = RpgStage1Formulas.calculateLevelDiffMultiplier(npcLevel, mobLevel, RPG_STAGE1_CFG);
+                  this.debugMobLevel(rec, rec.ownerId, "XP-KILL: npcLevel=" + npcLevel + " mobLevel=" + mobLevel + " base=" + String.format(Locale.ROOT, "%.2f", baseXp) + " diffMult=" + String.format(Locale.ROOT, "%.2f", diffMult) + " rateExp=" + String.format(Locale.ROOT, "%.2f", RPG_STAGE1_CFG.getRateExp()) + " => xp=" + xpGain);
                }
+            } catch (Throwable var50) {
             }
          } else {
             xpGain = 0L;
          }
 
-         if (xpGain > 0L && !xpAlreadyAwarded) {
+         if (xpGain > 0L) {
             NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
             String wn = null;
 
             try {
-               if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
-                  wn = s;
+               Object n = invokeNoArg(rec.worldObj, "getName");
+               if (n instanceof String) {
+                  String s = (String)n;
+                  if (!s.isBlank()) {
+                     wn = s;
+                  }
                }
             } catch (Throwable var49) {
             }
 
             int zid = this.getZoneForHud(rec.ownerId);
             String mobId = rec.currentTargetMobUuid != null ? rec.currentTargetMobUuid.toString() : null;
-            NpcXpContext xpCtx = new NpcXpContext(wn, wn, null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
+            NpcXpContext xpCtx = new NpcXpContext(wn, wn, (String)null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
             this.addNpcXp(store, npcRef, rec.ownerId, rec, xpGain, xpSrc, xpCtx);
          }
 
@@ -3740,9 +5782,8 @@ public final class AmigoNpcManager {
                rec.autoLootStickDeadRefObj = targetRefObj;
 
                try {
-                  if (targetRefObj instanceof Ref<?> rawTargetRef) {
-                     @SuppressWarnings("unchecked")
-                     Ref<EntityStore> tgtRef3 = (Ref<EntityStore>)rawTargetRef;
+                  if (targetRefObj instanceof Ref) {
+                     Ref<EntityStore> tgtRef3 = (Ref)targetRefObj;
                      TransformComponent tgtT3 = (TransformComponent)store.getComponent(tgtRef3, TransformComponent.getComponentType());
                      if (tgtT3 != null && tgtT3.getPosition() != null) {
                         rec.autoLootStickAnchorPos = tgtT3.getPosition();
@@ -3756,14 +5797,15 @@ public final class AmigoNpcManager {
                }
             }
 
-            this.sendToOwner(rec.worldObj, rec.ownerId, AmigoText.format("core.npc.xp.received", xpGain));
+            this.sendToOwner(rec.worldObj, rec.ownerId, "Recebi " + xpGain + " de xp.");
             this.tryRetargetAfterKill(store, rec, ownerRefObj, npcRef, targetRefObj, now);
          }
       } catch (Throwable var59) {
       }
+
    }
 
-   private void tryMeleeAttack(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
+   private void tryMeleeAttack(Store store, NpcRecord rec, Object ownerRefObj, Object targetRefObj, long now) {
       try {
          if (store == null || rec == null) {
             return;
@@ -3782,17 +5824,18 @@ public final class AmigoNpcManager {
          }
 
          boolean isOwnerAggressor = rec.combatTargetRefObj != null && refEq(targetRefObj, rec.combatTargetRefObj);
+         boolean isNpcAggressor = rec.npcCombatTargetRefObj != null && refEq(targetRefObj, rec.npcCombatTargetRefObj);
+         boolean isAggressor = isOwnerAggressor || isNpcAggressor;
          boolean isAssist = rec.assistTargetRefObj != null && refEq(targetRefObj, rec.assistTargetRefObj);
-         boolean ownerCombatContextActive = rec.ownerCombatContextUntilMillis > 0L && now <= rec.ownerCombatContextUntilMillis;
-         boolean authorized = rec.combatMode == CombatMode.PROTECT_OWNER
-            ? ownerCombatContextActive && (isOwnerAggressor || isAssist)
-            : isAssist;
-         if (!authorized) {
+         if (!rec.defendeEnabled) {
+            if (!isAggressor) {
+               return;
+            }
+         } else if (!isAggressor && !isAssist) {
             return;
          }
-         boolean isAggressor = isOwnerAggressor;
 
-         long cd = 1000L;
+         long cd = isAggressor ? 650L : 850L;
          if (now - rec.lastMeleeAttackMillis < cd) {
             return;
          }
@@ -3806,81 +5849,59 @@ public final class AmigoNpcManager {
             return;
          }
 
-         Ref<EntityStore> targetRef = (Ref<EntityStore>)targetRefObj;
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+         Ref<EntityStore> targetRef = (Ref)targetRefObj;
+         Ref<EntityStore> npcRef = (Ref)rec.refObj;
 
          try {
             Player maybePlayer = (Player)store.getComponent(targetRef, Player.getComponentType());
-            if (maybePlayer != null) {
-               this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.pvp_blocked", rec.equippedWeaponId));
+            if (maybePlayer != null && !this.pvpEnabled) {
+               this.debugAttack(rec, ownerId, "Bloqueado PvP (alvo é player). Arma=" + rec.equippedWeaponId);
                return;
             }
          } catch (Throwable var62) {
          }
 
-         if (this.isAmigoRef(targetRefObj) && !this.pvpEnabled) {
-            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.pvp_blocked", rec.equippedWeaponId));
-            return;
-         }
-
          TransformComponent npcT = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
          TransformComponent tgtT = (TransformComponent)store.getComponent(targetRef, TransformComponent.getComponentType());
          if (npcT == null || tgtT == null) {
-            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.missing_transform", npcT != null, tgtT != null));
+            this.debugAttack(rec, ownerId, "Sem TransformComponent (npcT=" + (npcT != null) + ", tgtT=" + (tgtT != null) + ").");
             return;
          }
 
          Vector3d np = npcT.getPosition();
          Vector3d tp = tgtT.getPosition();
          if (np == null || tp == null) {
-            this.debugAttack(rec, ownerId, AmigoText.format("core.debug.attack.missing_position", np != null, tp != null));
+            this.debugAttack(rec, ownerId, "Sem posição (np=" + (np != null) + ", tp=" + (tp != null) + ").");
             return;
          }
 
-         double dx = tp.x() - np.x();
-         double dz = tp.z() - np.z();
-         double dy = tp.y() - np.y();
+         double dx = tp.getX() - np.getX();
+         double dz = tp.getZ() - np.getZ();
+         double dy = tp.getY() - np.getY();
          double horizontal = Math.sqrt(dx * dx + dz * dz);
          double targetHeight = getEntityHeight(store, targetRef);
          boolean tallTarget = targetHeight >= 1.9;
-         double allowedDy = tallTarget ? 3.0 : 2.0;
+         double allowedDy = tallTarget ? (double)3.0F : (double)2.0F;
          double targetRadius = getEntityRadiusXZ(store, targetRef);
-         double effectiveH = Math.max(0.0, horizontal - targetRadius);
+         double effectiveH = Math.max((double)0.0F, horizontal - targetRadius);
          double reach = 2.6;
          if (effectiveH > reach) {
-            this.debugAttack(
-               rec,
-               ownerId,
-               AmigoText.format(
-                  "core.debug.attack.out_of_range",
-                  String.format(Locale.ROOT, "%.2f", horizontal),
-                  String.format(Locale.ROOT, "%.2f", effectiveH),
-                  String.format(Locale.ROOT, "%.2f", targetRadius),
-                  String.format(Locale.ROOT, "%.2f", dy),
-                  String.valueOf(rec.equippedWeaponId)
-               )
-            );
+            this.debugAttack(rec, ownerId, String.format("Fora do alcance: h=%.2f eff=%.2f r=%.2f dy=%.2f arma=%s", horizontal, effectiveH, targetRadius, dy, String.valueOf(rec.equippedWeaponId)));
             return;
          }
 
          if (Math.abs(dy) > allowedDy) {
-            this.debugAttack(
-               rec,
-               ownerId,
-               AmigoText.format(
-                  "core.debug.attack.high_vertical_diff",
-                  String.format(Locale.ROOT, "%.2f", horizontal),
-                  String.format(Locale.ROOT, "%.2f", dy),
-                  String.format(Locale.ROOT, "%.2f", allowedDy),
-                  String.valueOf(rec.equippedWeaponId)
-               )
-            );
+            this.debugAttack(rec, ownerId, String.format("Diferença de altura alta: h=%.2f dy=%.2f allowedDy=%.2f arma=%s", horizontal, dy, allowedDy, String.valueOf(rec.equippedWeaponId)));
             return;
          }
 
-         String weaponId = resolveConfiguredOrLegacyMeleeWeaponId(rec);
-         double base = NpcWeaponSupport.getWeaponBaseDamage(weaponId);
-         float amount = (float)Math.min(20.0, base + rec.level * 0.03);
+         String weaponId = rec.equippedWeaponId;
+         if (weaponId == null || weaponId.isBlank()) {
+            weaponId = br.tones.amigonpc.core.swords.SwordProgression.weaponIdForLevel(rec.level);
+         }
+
+         double base = getWeaponBaseDamage(weaponId);
+         float amount = (float)Math.min((double)20.0F, base + (double)rec.level * 0.03);
          int swordLvl = br.tones.amigonpc.core.swords.SwordProgression.clampLevel(rec.level);
          if (swordLvl <= 30) {
             amount /= 3.0F;
@@ -3893,7 +5914,6 @@ public final class AmigoNpcManager {
          } catch (Throwable var61) {
          }
 
-         amount = this.capNpcDamageToOwnerSupport(store, ownerRefObj, amount);
          float hpBefore = -1.0F;
 
          try {
@@ -3905,10 +5925,10 @@ public final class AmigoNpcManager {
          }
 
          this.recordCombatTag(ownerId, targetRefObj, store);
-         Damage damage = new Damage(new EntitySource(npcRef), DamageCause.PHYSICAL, amount);
+         Damage damage = new Damage(new Damage.EntitySource(npcRef), DamageCause.PHYSICAL, amount);
 
          try {
-            Particles particles = new Particles(null, new WorldParticle[]{new WorldParticle("Impact_Sword_Basic", null, 1.0F, null, null)}, 64.0);
+            Damage.Particles particles = new Damage.Particles((ModelParticle[])null, new WorldParticle[]{new WorldParticle("Impact_Sword_Basic", (Color)null, 1.0F, (Vector3f)null, (Direction)null)}, (double)64.0F);
             damage.putMetaObject(Damage.IMPACT_PARTICLES, particles);
          } catch (Throwable var59) {
          }
@@ -3935,37 +5955,34 @@ public final class AmigoNpcManager {
 
          int mobLevelForCtx = rec.currentTargetMobLevel;
          long xpGain;
-         boolean xpAlreadyAwarded = false;
          if (killed) {
             int npcLevel = Math.max(1, XpProgression.levelFromTotalXp(rec.totalXp));
             int mobLevel = RpgStage1MobLevelHelper.getMonsterLevel(store, targetRef, targetRefObj, RPG_STAGE1_MOB_CALC, RPG_STAGE1_CFG);
             mobLevelForCtx = mobLevel;
-            long externalXpGain = consumeExternalCompanionKillXp(rec, targetRefObj, now);
-            if (externalXpGain >= 0L) {
-               xpGain = externalXpGain;
-               xpAlreadyAwarded = true;
-            } else {
-               double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
-               xpGain = coerceStage1XpGainToLong(rec, xpD);
-            }
+            double xpD = RpgStage1Formulas.xpFromKill(npcLevel, mobLevel, RPG_STAGE1_CFG);
+            xpGain = coerceStage1XpGainToLong(rec, xpD);
          } else {
             xpGain = 0L;
          }
 
-         if (xpGain > 0L && !xpAlreadyAwarded) {
+         if (xpGain > 0L) {
             NpcXpSource xpSrc = killed ? NpcXpSource.COMBAT_KILL : NpcXpSource.COMBAT_ASSIST;
             String wn = null;
 
             try {
-               if (invokeNoArg(rec.worldObj, "getName") instanceof String s && !s.isBlank()) {
-                  wn = s;
+               Object n = invokeNoArg(rec.worldObj, "getName");
+               if (n instanceof String) {
+                  String s = (String)n;
+                  if (!s.isBlank()) {
+                     wn = s;
+                  }
                }
             } catch (Throwable var56) {
             }
 
             int zid = this.getZoneForHud(ownerId);
             String mobId = rec.currentTargetMobUuid != null ? rec.currentTargetMobUuid.toString() : null;
-            NpcXpContext xpCtx = new NpcXpContext(wn, wn, null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
+            NpcXpContext xpCtx = new NpcXpContext(wn, wn, (String)null, zid, mobId, mobLevelForCtx, System.currentTimeMillis());
             this.addNpcXp(store, npcRef, ownerId, rec, xpGain, xpSrc, xpCtx);
          }
 
@@ -3986,21 +6003,11 @@ public final class AmigoNpcManager {
                }
             }
 
-            this.sendToOwner(rec.worldObj, ownerId, AmigoText.format("core.npc.xp.received", xpGain));
+            this.sendToOwner(rec.worldObj, ownerId, "Recebi " + xpGain + " de xp.");
             this.tryRetargetAfterKill(store, rec, ownerRefObj, npcRef, targetRefObj, now);
          }
 
-         this.debugAttack(
-            rec,
-            ownerId,
-            AmigoText.format(
-               "core.debug.attack.hit",
-               String.format(Locale.ROOT, "%.2f", amount),
-               String.valueOf(rec.equippedWeaponId),
-               String.format(Locale.ROOT, "%.2f", horizontal),
-               String.format(Locale.ROOT, "%.2f", dy)
-            )
-         );
+         this.debugAttack(rec, ownerId, String.format("HIT! dmg=%.2f arma=%s h=%.2f dy=%.2f", amount, String.valueOf(rec.equippedWeaponId), horizontal, dy));
          playWeaponAttackAnimation(store, npcRef, rec, weaponId, now);
          rec.lastMeleeAttackMillis = now;
          if (isAggressor) {
@@ -4008,9 +6015,10 @@ public final class AmigoNpcManager {
          }
       } catch (Throwable var63) {
       }
+
    }
 
-   private void pulseAggroToNpc(Store<EntityStore> store, Object targetRefObj, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+   private void pulseAggroToNpc(Store store, Object targetRefObj, Object npcRefObj, NpcRecord rec, long now) {
       try {
          if (store == null || targetRefObj == null || npcRefObj == null || rec == null) {
             return;
@@ -4034,20 +6042,20 @@ public final class AmigoNpcManager {
          }
       } catch (Throwable var10) {
       }
+
    }
 
-   private void tryRetargetAfterKill(Store<EntityStore> store, AmigoNpcManager.NpcRecord rec, Object ownerRefObj, Object npcRefObj, Object deadRefObj, long now) {
+   private void tryRetargetAfterKill(Store store, NpcRecord rec, Object ownerRefObj, Object npcRefObj, Object deadRefObj, long now) {
       try {
-         if (store == null || rec == null || rec.combatMode != CombatMode.WEAKEST_ENEMY) {
+         if (store == null || rec == null || !rec.defendeEnabled) {
             return;
          }
 
-         if (!(npcRefObj instanceof Ref<?>) || !(rec.refObj instanceof Ref<?> rawNpcRef)) {
+         if (!(npcRefObj instanceof Ref) || !(rec.refObj instanceof Ref)) {
             return;
          }
 
-         @SuppressWarnings("unchecked")
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
+         Ref<EntityStore> npcRef = (Ref)rec.refObj;
          TransformComponent nt = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
          if (nt == null || nt.getPosition() == null) {
             return;
@@ -4073,47 +6081,10 @@ public final class AmigoNpcManager {
          }
       } catch (Throwable var12) {
       }
+
    }
 
-   private float capNpcDamageToOwnerSupport(Store<EntityStore> store, Object ownerRefObj, float requestedAmount) {
-      float amount = Math.max(0.0F, requestedAmount);
-      if (store == null || ownerRefObj == null) {
-         return Math.min(amount, 3.0F);
-      }
-
-      try {
-         if (!(ownerRefObj instanceof Ref<?> rawOwnerRef)) {
-            return Math.min(amount, 3.0F);
-         }
-
-         @SuppressWarnings("unchecked")
-         Ref<EntityStore> ownerRef = (Ref<EntityStore>)rawOwnerRef;
-         Player ownerPlayer = (Player)store.getComponent(ownerRef, Player.getComponentType());
-         if (ownerPlayer == null) {
-            return Math.min(amount, 3.0F);
-         }
-
-         Object inventory = invokeNoArg(ownerPlayer, "getInventory", "inventory");
-         Object heldObj = inventory == null ? null : invokeNoArg(inventory, "getItemInHand", "getActiveHotbarItem");
-         String ownerWeaponId = null;
-         if (heldObj instanceof ItemStack stack && stack != null && !stack.isEmpty()) {
-            ownerWeaponId = stack.getItemId();
-         } else if (heldObj != null) {
-            Object id = invokeNoArg(heldObj, "getItemId", "itemId");
-            if (id instanceof String s && !s.isBlank()) {
-               ownerWeaponId = s;
-            }
-         }
-
-         double ownerBase = NpcWeaponSupport.getWeaponBaseDamage(ownerWeaponId);
-         float supportCeiling = (float)Math.max(1.0, ownerBase * 0.85);
-         return Math.min(amount, supportCeiling);
-      } catch (Throwable ignored) {
-         return Math.min(amount, 3.0F);
-      }
-   }
-
-   private static void playWeaponAttackAnimation(Store<EntityStore> store, Ref<EntityStore> npcRef, AmigoNpcManager.NpcRecord rec, String weaponId, long now) {
+   private static void playWeaponAttackAnimation(Store store, Ref npcRef, NpcRecord rec, String weaponId, long now) {
       try {
          if (store == null || npcRef == null || rec == null) {
             return;
@@ -4152,7 +6123,7 @@ public final class AmigoNpcManager {
          if (itemAnimsId == null || itemAnimsId.isBlank()) {
             try {
                itemAnimsId = "Default";
-            } catch (Throwable ignored) {
+            } catch (Throwable var13) {
                itemAnimsId = null;
             }
          }
@@ -4161,7 +6132,7 @@ public final class AmigoNpcManager {
             if (itemAnimsId != null && !itemAnimsId.isBlank()) {
                ipa = (ItemPlayerAnimations)ItemPlayerAnimations.getAssetMap().getAsset(itemAnimsId);
             }
-         } catch (Throwable ignored) {
+         } catch (Throwable var12) {
             ipa = null;
          }
 
@@ -4187,7 +6158,7 @@ public final class AmigoNpcManager {
                   key = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
                }
             }
-         } catch (Throwable ignored) {
+         } catch (Throwable var20) {
             key = null;
          }
 
@@ -4215,7 +6186,7 @@ public final class AmigoNpcManager {
                AnimationUtils.playAnimation(npcRef, AnimationSlot.Action, key, store);
                played = true;
             }
-         } catch (Throwable ignored) {
+         } catch (Throwable var17) {
             played = false;
          }
 
@@ -4233,9 +6204,10 @@ public final class AmigoNpcManager {
          }
       } catch (Throwable var22) {
       }
+
    }
 
-   private static void clearExpiredAttackAnimation(Store<EntityStore> store, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+   private static void clearExpiredAttackAnimation(Store store, Object npcRefObj, NpcRecord rec, long now) {
       try {
          if (store == null || rec == null) {
             return;
@@ -4256,12 +6228,11 @@ public final class AmigoNpcManager {
             return;
          }
 
-         if (!(npcRefObj instanceof Ref<?> rawNpcRef)) {
+         if (!(npcRefObj instanceof Ref)) {
             return;
          }
 
-         @SuppressWarnings("unchecked")
-         Ref<EntityStore> npcRef = (Ref<EntityStore>)rawNpcRef;
+         Ref<EntityStore> npcRef = (Ref)npcRefObj;
          ActiveAnimationComponent anim = (ActiveAnimationComponent)store.getComponent(npcRef, ActiveAnimationComponent.getComponentType());
          if (anim == null) {
             return;
@@ -4279,15 +6250,16 @@ public final class AmigoNpcManager {
          if (last.equals(current)) {
             try {
                AnimationUtils.stopAnimation(npcRef, AnimationSlot.Action, store);
-            } catch (Throwable ignored) {
-               anim.setPlayingAnimation(AnimationSlot.Action, null);
+            } catch (Throwable var12) {
+               anim.setPlayingAnimation(AnimationSlot.Action, (String)null);
             }
          }
       } catch (Throwable var14) {
       }
+
    }
 
-   private static void tickLevelUpFx(Store<EntityStore> store, Object ownerRefObj, Object npcRefObj, AmigoNpcManager.NpcRecord rec, long now) {
+   private static void tickLevelUpFx(Store store, Object ownerRefObj, Object npcRefObj, NpcRecord rec, long now) {
       if (store != null && rec != null && npcRefObj instanceof Ref) {
          if (rec.levelUpFxPendingCount <= 0) {
             rec.levelUpFxUntilMillis = 0L;
@@ -4298,13 +6270,13 @@ public final class AmigoNpcManager {
             rec.levelUpFxNextTickMillis = 0L;
          } else if (rec.levelUpFxNextTickMillis <= 0L || now >= rec.levelUpFxNextTickMillis) {
             try {
-               Ref<EntityStore> npcRef = (Ref<EntityStore>)npcRefObj;
+               Ref<EntityStore> npcRef = (Ref)npcRefObj;
                TransformComponent tc = (TransformComponent)store.getComponent(npcRef, TransformComponent.getComponentType());
                if (tc == null || tc.getPosition() == null) {
                   return;
                }
 
-               spawnParticleToOwner(store, null, tc.getPosition(), "POTION_MORPH_BURST");
+               spawnParticleToOwner(store, (Object)null, tc.getPosition(), "POTION_MORPH_BURST");
                rec.levelUpFxPendingCount = Math.max(0, rec.levelUpFxPendingCount - 1);
                if (rec.levelUpFxPendingCount > 0) {
                   rec.levelUpFxNextTickMillis = now + 200L;
@@ -4317,6 +6289,7 @@ public final class AmigoNpcManager {
                }
             } catch (Throwable var8) {
             }
+
          }
       }
    }
@@ -4325,65 +6298,65 @@ public final class AmigoNpcManager {
       if (weaponId != null && !weaponId.isBlank()) {
          String cacheKey = weaponId + (moving ? "|m" : "|s");
          if (WEAPON_ATTACK_ANIM_CACHE.containsKey(cacheKey)) {
-            String v = WEAPON_ATTACK_ANIM_CACHE.get(cacheKey);
+            String v = (String)WEAPON_ATTACK_ANIM_CACHE.get(cacheKey);
             return v != null && !v.isBlank() ? v : null;
+         } else {
+            String foundKey = null;
+
+            try {
+               Item it = (Item)Item.getAssetMap().getAsset(weaponId);
+               String animsId = null;
+               boolean usePlayerAnims = false;
+               if (it != null) {
+                  try {
+                     usePlayerAnims = it.getUsePlayerAnimations();
+                  } catch (Throwable var10) {
+                  }
+
+                  try {
+                     animsId = it.getPlayerAnimationsId();
+                  } catch (Throwable var9) {
+                  }
+               }
+
+               if ((animsId == null || animsId.isBlank()) && usePlayerAnims) {
+                  try {
+                     animsId = "Default";
+                  } catch (Throwable var8) {
+                  }
+               }
+
+               if (animsId != null && !animsId.isBlank()) {
+                  ItemPlayerAnimations ipa = (ItemPlayerAnimations)ItemPlayerAnimations.getAssetMap().getAsset(animsId);
+                  if (ipa != null) {
+                     foundKey = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
+                  }
+               }
+            } catch (Throwable var11) {
+            }
+
+            WEAPON_ATTACK_ANIM_CACHE.put(cacheKey, foundKey == null ? "" : foundKey);
+            return foundKey;
          }
-
-         String foundKey = null;
-
-         try {
-            Item it = (Item)Item.getAssetMap().getAsset(weaponId);
-            String animsId = null;
-            boolean usePlayerAnims = false;
-            if (it != null) {
-               try {
-                  usePlayerAnims = it.getUsePlayerAnimations();
-               } catch (Throwable var10) {
-               }
-
-               try {
-                  animsId = it.getPlayerAnimationsId();
-               } catch (Throwable var9) {
-               }
-            }
-
-            if ((animsId == null || animsId.isBlank()) && usePlayerAnims) {
-               try {
-                  animsId = "Default";
-               } catch (Throwable var8) {
-               }
-            }
-
-            if (animsId != null && !animsId.isBlank()) {
-               ItemPlayerAnimations ipa = (ItemPlayerAnimations)ItemPlayerAnimations.getAssetMap().getAsset(animsId);
-               if (ipa != null) {
-                  foundKey = pickAttackKeyFromPlayerAnimations(ipa.getAnimations());
-               }
-            }
-         } catch (Throwable var11) {
-         }
-
-         WEAPON_ATTACK_ANIM_CACHE.put(cacheKey, foundKey == null ? "" : foundKey);
-         return foundKey;
       } else {
          return null;
       }
    }
 
-   private static String pickAttackKeyFromPlayerAnimations(Map<String, ItemAnimation> map) {
+   private static String pickAttackKeyFromPlayerAnimations(Map map) {
       try {
          if (map != null && !map.isEmpty()) {
             String[] prefer = new String[]{"attack", "primary", "primary_attack", "melee", "melee_attack", "swing", "hit", "strike", "slash", "stab", "chop"};
 
-            for (String p : prefer) {
-               for (String k : map.keySet()) {
+            for(String p : prefer) {
+               for(String k : map.keySet()) {
                   if (k != null && k.equalsIgnoreCase(p)) {
                      return k;
                   }
                }
             }
 
-            for (String k : map.keySet()) {
+            for(String k : map.keySet()) {
                if (k != null) {
                   String lk = k.toLowerCase(Locale.ROOT);
                   if (lk.contains("attack") || lk.contains("melee") || lk.contains("swing") || lk.contains("hit") || lk.contains("strike")) {
@@ -4392,7 +6365,7 @@ public final class AmigoNpcManager {
                }
             }
 
-            for (String k : map.keySet()) {
+            for(String k : map.keySet()) {
                if (k != null && !k.isBlank()) {
                   return k;
                }
@@ -4402,35 +6375,28 @@ public final class AmigoNpcManager {
          } else {
             return null;
          }
-      } catch (Throwable ignored) {
+      } catch (Throwable var8) {
          return null;
       }
    }
 
-   private static String pickBowKeyFromPlayerAnimations(Map<String, ItemAnimation> map) {
+   private static String pickBowKeyFromPlayerAnimations(Map map) {
       try {
          if (map != null && !map.isEmpty()) {
             String[] prefer = new String[]{"shoot", "fire", "release", "use", "primary", "primary_use", "charge", "draw", "aim", "bow", "bow_shoot", "ranged"};
 
-            for (String p : prefer) {
-               for (String k : map.keySet()) {
+            for(String p : prefer) {
+               for(String k : map.keySet()) {
                   if (k != null && k.equalsIgnoreCase(p)) {
                      return k;
                   }
                }
             }
 
-            for (String k : map.keySet()) {
+            for(String k : map.keySet()) {
                if (k != null) {
                   String lk = k.toLowerCase(Locale.ROOT);
-                  if (lk.contains("shoot")
-                     || lk.contains("fire")
-                     || lk.contains("use")
-                     || lk.contains("charge")
-                     || lk.contains("draw")
-                     || lk.contains("aim")
-                     || lk.contains("bow")
-                     || lk.contains("ranged")) {
+                  if (lk.contains("shoot") || lk.contains("fire") || lk.contains("use") || lk.contains("charge") || lk.contains("draw") || lk.contains("aim") || lk.contains("bow") || lk.contains("ranged")) {
                      return k;
                   }
                }
@@ -4440,7 +6406,7 @@ public final class AmigoNpcManager {
          } else {
             return null;
          }
-      } catch (Throwable ignored) {
+      } catch (Throwable var8) {
          return null;
       }
    }
@@ -4449,7 +6415,7 @@ public final class AmigoNpcManager {
       try {
          Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
          return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> null);
-      } catch (Throwable ignored) {
+      } catch (Throwable var1) {
          return null;
       }
    }
@@ -4458,21 +6424,26 @@ public final class AmigoNpcManager {
       try {
          Class<?> tri = Class.forName("com.hypixel.hytale.function.consumer.TriConsumer");
          return Proxy.newProxyInstance(tri.getClassLoader(), new Class[]{tri}, (proxy, method, args) -> {
-            if (args != null && args.length >= 2 && args[1] instanceof Holder holder) {
-               try {
-                  holder.ensureComponent(EntityStatMap.getComponentType());
-                  EntityStatMap stats = (EntityStatMap)holder.ensureAndGetComponent(EntityStatMap.getComponentType());
-                  stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
-                  holder.ensureComponent(ActiveAnimationComponent.getComponentType());
-                  holder.ensureComponent(MovementStatesComponent.getComponentType());
-                  holder.putComponent(RespondToHit.getComponentType(), RespondToHit.INSTANCE);
-               } catch (Throwable var5) {
+            if (args != null && args.length >= 2) {
+               Object patt0$temp = args[1];
+               if (patt0$temp instanceof Holder) {
+                  Holder holder = (Holder)patt0$temp;
+
+                  try {
+                     holder.ensureComponent(EntityStatMap.getComponentType());
+                     EntityStatMap stats = (EntityStatMap)holder.ensureAndGetComponent(EntityStatMap.getComponentType());
+                     stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+                     holder.ensureComponent(ActiveAnimationComponent.getComponentType());
+                     holder.ensureComponent(MovementStatesComponent.getComponentType());
+                     holder.putComponent(RespondToHit.getComponentType(), RespondToHit.INSTANCE);
+                  } catch (Throwable var5) {
+                  }
                }
             }
 
             return null;
          });
-      } catch (Throwable ignored) {
+      } catch (Throwable var1) {
          return buildNoopTriConsumer();
       }
    }
@@ -4480,12 +6451,12 @@ public final class AmigoNpcManager {
    private static boolean hasSavedWardrobeCosmetics(UUID ownerId) {
       if (ownerId == null) {
          return false;
-      }
-
-      try {
-         return AmigoWardrobePersistence.hasSavedCosmetics(ownerId);
-      } catch (Throwable ignored) {
-         return false;
+      } else {
+         try {
+            return AmigoWardrobePersistence.hasSavedCosmetics(ownerId);
+         } catch (Throwable var2) {
+            return false;
+         }
       }
    }
 
@@ -4504,21 +6475,21 @@ public final class AmigoNpcManager {
       try {
          Class<?> modelAssetClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset");
          Method getAssetMap = modelAssetClass.getMethod("getAssetMap");
-         Object assetMap = getAssetMap.invoke(null);
+         Object assetMap = getAssetMap.invoke((Object)null);
          if (assetMap == null) {
             return null;
+         } else {
+            Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
+            Object asset = getAsset.invoke(assetMap, modelId);
+            if (asset == null) {
+               return null;
+            } else {
+               Class<?> modelClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.Model");
+               Method create = modelClass.getMethod("createScaledModel", modelAssetClass, Float.TYPE);
+               return create.invoke((Object)null, asset, scale);
+            }
          }
-
-         Method getAsset = assetMap.getClass().getMethod("getAsset", Object.class);
-         Object asset = getAsset.invoke(assetMap, modelId);
-         if (asset == null) {
-            return null;
-         }
-
-         Class<?> modelClass = Class.forName("com.hypixel.hytale.server.core.asset.type.model.config.Model");
-         Method create = modelClass.getMethod("createScaledModel", modelAssetClass, float.class);
-         return create.invoke(null, asset, scale);
-      } catch (Throwable ignored) {
+      } catch (Throwable var9) {
          return null;
       }
    }
@@ -4526,37 +6497,37 @@ public final class AmigoNpcManager {
    private static boolean looksLikeRef(Object o) {
       if (o == null) {
          return false;
+      } else {
+         String n = o.getClass().getName();
+         return n.endsWith(".Ref") || n.endsWith("Ref") || n.contains(".Ref");
       }
-
-      String n = o.getClass().getName();
-      return n.endsWith(".Ref") || n.endsWith("Ref") || n.contains(".Ref");
    }
 
    private static Object extractRefFromPair(Object pair) {
       if (pair == null) {
          return null;
-      }
+      } else {
+         String[] methods = new String[]{"getLeft", "getFirst", "getKey", "left", "first", "key"};
 
-      String[] methods = new String[]{"getLeft", "getFirst", "getKey", "left", "first", "key"};
-
-      for (String mname : methods) {
-         try {
-            Method m = pair.getClass().getMethod(mname);
-            Object v = m.invoke(pair);
-            if (v != null) {
-               return v;
+         for(String mname : methods) {
+            try {
+               Method m = pair.getClass().getMethod(mname);
+               Object v = m.invoke(pair);
+               if (v != null) {
+                  return v;
+               }
+            } catch (Throwable var8) {
             }
-         } catch (Throwable var8) {
          }
-      }
 
-      return null;
+         return null;
+      }
    }
 
    private static boolean doRemoveEntity(Object componentStore, Object savedRefOrPair) {
       Object ref = savedRefOrPair;
-      if (!looksLikeRef(ref)) {
-         Object extracted = extractRefFromPair(ref);
+      if (!looksLikeRef(savedRefOrPair)) {
+         Object extracted = extractRefFromPair(savedRefOrPair);
          if (extracted != null) {
             ref = extracted;
          }
@@ -4564,10 +6535,10 @@ public final class AmigoNpcManager {
 
       Object removeReason = getRemoveReasonBestEffort();
       if (removeReason == null) {
-         setError(AmigoText.text("core.error.remove_reason.unavailable"));
+         setError("Não encontrei RemoveReason nesta build.");
          return false;
       } else if (!tryInvokeRemoveEntity(componentStore, ref, removeReason)) {
-         setError(AmigoText.text("core.error.remove_entity.incompatible"));
+         setError("Não achei Store.removeEntity(ref, reason) compatível nesta build.");
          return false;
       } else {
          return true;
@@ -4577,7 +6548,7 @@ public final class AmigoNpcManager {
    private static Object getRemoveReasonBestEffort() {
       String[] enumCandidates = new String[]{"com.hypixel.hytale.component.RemoveReason", "com.hypixel.hytale.component.Store$RemoveReason"};
 
-      for (String cn : enumCandidates) {
+      for(String cn : enumCandidates) {
          Object r = getEnumConstantAny(cn, "DESPAWN", "COMMAND", "PLUGIN", "CUSTOM", "REMOVE", "SPAWN");
          if (r != null) {
             return r;
@@ -4599,9 +6570,9 @@ public final class AmigoNpcManager {
             return null;
          }
 
-         Class<? extends Enum> e = (Class<? extends Enum>)enumClass;
+         Class<? extends Enum> e = enumClass;
 
-         for (String n : names) {
+         for(String n : names) {
             try {
                return Enum.valueOf(e, n);
             } catch (IllegalArgumentException var9) {
@@ -4618,10 +6589,10 @@ public final class AmigoNpcManager {
          Class<?> enumClass = Class.forName(enumClassName);
          if (!enumClass.isEnum()) {
             return null;
+         } else {
+            Object[] vals = enumClass.getEnumConstants();
+            return vals != null && vals.length > 0 ? vals[0] : null;
          }
-
-         Object[] vals = enumClass.getEnumConstants();
-         return vals != null && vals.length > 0 ? vals[0] : null;
       } catch (Throwable var3) {
          return null;
       }
@@ -4629,7 +6600,7 @@ public final class AmigoNpcManager {
 
    private static boolean tryInvokeRemoveEntity(Object store, Object ref, Object reason) {
       try {
-         for (Method m : store.getClass().getMethods()) {
+         for(Method m : store.getClass().getMethods()) {
             if (m.getName().equals("removeEntity") && m.getParameterCount() == 2) {
                Class<?>[] p = m.getParameterTypes();
                if (p[1].isInstance(reason)) {
@@ -4647,42 +6618,42 @@ public final class AmigoNpcManager {
    private static Object tryGetSenderPosition(Object senderObj) {
       if (senderObj == null) {
          return null;
-      }
+      } else {
+         Object p = invokeNoArg(senderObj, "getPosition", "position");
+         if (p != null) {
+            return p;
+         } else {
+            Object transform = invokeNoArg(senderObj, "getTransform", "transform");
+            if (transform != null) {
+               Object p2 = invokeNoArg(transform, "getPosition", "position");
+               if (p2 != null) {
+                  return p2;
+               }
+            }
 
-      Object p = invokeNoArg(senderObj, "getPosition", "position");
-      if (p != null) {
-         return p;
-      }
-
-      Object transform = invokeNoArg(senderObj, "getTransform", "transform");
-      if (transform != null) {
-         Object p2 = invokeNoArg(transform, "getPosition", "position");
-         if (p2 != null) {
-            return p2;
+            return null;
          }
       }
-
-      return null;
    }
 
    private static Float tryGetSenderYaw(Object senderObj) {
       if (senderObj == null) {
          return null;
-      }
-
-      try {
-         Object transform = invokeNoArg(senderObj, "getTransformComponent", "getTransform", "transform", "transformComponent");
-         if (transform != null) {
-            Object rot = invokeNoArg(transform, "getRotation", "rotation");
-            Float y = extractYawFromRotation(rot);
-            if (y != null) {
-               return y;
+      } else {
+         try {
+            Object transform = invokeNoArg(senderObj, "getTransformComponent", "getTransform", "transform", "transformComponent");
+            if (transform != null) {
+               Object rot = invokeNoArg(transform, "getRotation", "rotation");
+               Float y = extractYawFromRotation(rot);
+               if (y != null) {
+                  return y;
+               }
             }
+         } catch (Throwable var4) {
          }
-      } catch (Throwable var4) {
-      }
 
-      return null;
+         return null;
+      }
    }
 
    private static Float tryGetOwnerYawFromWorldStore(Object worldObj, Object componentStore, UUID ownerId) {
@@ -4691,22 +6662,22 @@ public final class AmigoNpcManager {
             Object ref = invokeOneArg(worldObj, "getEntityRef", UUID.class, ownerId);
             if (ref == null) {
                return null;
+            } else {
+               Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
+               Method getCt = tcClass.getMethod("getComponentType");
+               Object componentType = getCt.invoke((Object)null);
+               if (componentType == null) {
+                  return null;
+               } else {
+                  Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
+                  if (tc == null) {
+                     return null;
+                  } else {
+                     Object rot = invokeNoArg(tc, "getRotation", "rotation");
+                     return extractYawFromRotation(rot);
+                  }
+               }
             }
-
-            Class<?> tcClass = Class.forName("com.hypixel.hytale.server.core.modules.entity.component.TransformComponent");
-            Method getCt = tcClass.getMethod("getComponentType");
-            Object componentType = getCt.invoke(null);
-            if (componentType == null) {
-               return null;
-            }
-
-            Object tc = invokeStoreGetComponent(componentStore, ref, componentType);
-            if (tc == null) {
-               return null;
-            }
-
-            Object rot = invokeNoArg(tc, "getRotation", "rotation");
-            return extractYawFromRotation(rot);
          } catch (Throwable var9) {
             return null;
          }
@@ -4718,63 +6689,61 @@ public final class AmigoNpcManager {
    private static Float extractYawFromRotation(Object rot) {
       if (rot == null) {
          return null;
-      }
-
-      try {
-         Object v = invokeNoArg(rot, "getYaw");
-         if (v instanceof Number) {
-            return ((Number)v).floatValue();
+      } else {
+         try {
+            Object v = invokeNoArg(rot, "getYaw");
+            if (v instanceof Number) {
+               return ((Number)v).floatValue();
+            }
+         } catch (Throwable var6) {
          }
-      } catch (Throwable var6) {
-      }
 
-      try {
-         Object v = invokeNoArg(rot, "getY", "y");
-         if (v instanceof Number) {
-            return ((Number)v).floatValue();
+         try {
+            Object v = invokeNoArg(rot, "getY", "y");
+            if (v instanceof Number) {
+               return ((Number)v).floatValue();
+            }
+         } catch (Throwable var5) {
          }
-      } catch (Throwable var5) {
-      }
 
-      try {
-         Field f = rot.getClass().getField("y");
-         Object v = f.get(rot);
-         if (v instanceof Number) {
-            return ((Number)v).floatValue();
+         try {
+            Field f = rot.getClass().getField("y");
+            Object v = f.get(rot);
+            if (v instanceof Number) {
+               return ((Number)v).floatValue();
+            }
+         } catch (Throwable var4) {
          }
-      } catch (Throwable var4) {
-      }
 
-      try {
-         Field f = rot.getClass().getDeclaredField("y");
-         f.setAccessible(true);
-         Object v = f.get(rot);
-         if (v instanceof Number) {
-            return ((Number)v).floatValue();
+         try {
+            Field f = rot.getClass().getDeclaredField("y");
+            f.setAccessible(true);
+            Object v = f.get(rot);
+            if (v instanceof Number) {
+               return ((Number)v).floatValue();
+            }
+         } catch (Throwable var3) {
          }
-      } catch (Throwable var3) {
-      }
 
-      return null;
+         return null;
+      }
    }
 
    private static Object offsetInFrontOfYaw(Object posVec3d, Float yawDegOrNull, double dist) {
       Object pos = coerceToVector3d(posVec3d);
       if (pos == null) {
          return posVec3d;
+      } else if (yawDegOrNull == null) {
+         return offsetVector3d(pos, dist, (double)0.0F, (double)0.0F);
+      } else {
+         double yaw = Math.toRadians((double)yawDegOrNull);
+         double ox = -Math.sin(yaw) * dist;
+         double oz = -Math.cos(yaw) * dist;
+         return offsetVector3d(pos, ox, (double)0.0F, oz);
       }
-
-      if (yawDegOrNull == null) {
-         return offsetVector3d(pos, dist, 0.0, 0.0);
-      }
-
-      double yaw = Math.toRadians(yawDegOrNull.floatValue());
-      double ox = -Math.sin(yaw) * dist;
-      double oz = -Math.cos(yaw) * dist;
-      return offsetVector3d(pos, ox, 0.0, oz);
    }
 
-   private static boolean hasCeilingAboveBestEffort(Store<EntityStore> store, Vector3d ownerPos) {
+   private static boolean hasCeilingAboveBestEffort(Store store, Vector3d ownerPos) {
       try {
          if (store == null || ownerPos == null) {
             return false;
@@ -4790,12 +6759,12 @@ public final class AmigoNpcManager {
             return false;
          }
 
-         int x = (int)Math.floor(ownerPos.x());
-         int z = (int)Math.floor(ownerPos.z());
-         int y = (int)Math.floor(ownerPos.y());
+         int x = (int)Math.floor(ownerPos.getX());
+         int z = (int)Math.floor(ownerPos.getZ());
+         int y = (int)Math.floor(ownerPos.getY());
          int startY = y + 2;
 
-         for (int i = 0; i < 12; i++) {
+         for(int i = 0; i < 12; ++i) {
             int blockId = world.getBlock(x, startY + i, z);
             if (blockId != 0) {
                return true;
@@ -4807,14 +6776,14 @@ public final class AmigoNpcManager {
       return false;
    }
 
-   private static void spawnParticleToOwner(Store<EntityStore> store, Object ownerRefObj, Vector3d pos, String particleId) {
+   private static void spawnParticleToOwner(Store store, Object ownerRefObj, Vector3d pos, String particleId) {
       try {
          if (store == null || pos == null || particleId == null || particleId.isBlank()) {
             return;
          }
 
          if (ownerRefObj instanceof Ref) {
-            List<Ref<EntityStore>> viewers = Collections.singletonList((Ref<EntityStore>)ownerRefObj);
+            List<Ref<EntityStore>> viewers = Collections.singletonList((Ref)ownerRefObj);
             ParticleUtil.spawnParticleEffect(particleId, pos, viewers, store);
             return;
          }
@@ -4822,9 +6791,10 @@ public final class AmigoNpcManager {
          ParticleUtil.spawnParticleEffect(particleId, pos, store);
       } catch (Throwable var5) {
       }
+
    }
 
-   private static void playNpcSpawnFx(Store<EntityStore> store, Ref<EntityStore> npcRef, Object ownerRefObj) {
+   private static void playNpcSpawnFx(Store store, Ref npcRef, Object ownerRefObj) {
       try {
          if (store == null || npcRef == null) {
             return;
@@ -4845,9 +6815,10 @@ public final class AmigoNpcManager {
          playSfx3d(store, p, "SFX_DIVINE_RESPAWN", 10.0F, -9.0F);
       } catch (Throwable var7) {
       }
+
    }
 
-   private static void playSfx3d(Store<EntityStore> store, Vector3d pos, String soundId, float volumeDb, float pitchSt) {
+   private static void playSfx3d(Store store, Vector3d pos, String soundId, float volumeDb, float pitchSt) {
       try {
          if (store == null || pos == null || soundId == null || soundId.isBlank()) {
             return;
@@ -4858,38 +6829,37 @@ public final class AmigoNpcManager {
             return;
          }
 
-         SoundUtil.playSoundEvent3d(idx, SoundCategory.SFX, pos.x(), pos.y(), pos.z(), dbToGain(volumeDb), stToPitch(pitchSt), store);
+         SoundUtil.playSoundEvent3d(idx, SoundCategory.SFX, pos.getX(), pos.getY(), pos.getZ(), dbToGain(volumeDb), stToPitch(pitchSt), store);
       } catch (Throwable var6) {
       }
+
    }
 
    private static int soundIndex(String id) {
       try {
          return SoundEvent.getAssetMap().getIndexOrDefault(id, 0);
-      } catch (Throwable ignored) {
+      } catch (Throwable var2) {
          return 0;
       }
    }
 
    private static float dbToGain(float db) {
-      return (float)Math.pow(10.0, db / 20.0);
+      return (float)Math.pow((double)10.0F, (double)db / (double)20.0F);
    }
 
    private static float stToPitch(float st) {
-      return (float)Math.pow(2.0, st / 12.0);
+      return (float)Math.pow((double)2.0F, (double)st / (double)12.0F);
    }
 
    private static Object coerceToVector3d(Object maybe) {
       if (maybe == null) {
          return null;
-      }
-
-      if (hasXYZ(maybe)) {
+      } else if (hasXYZ(maybe)) {
          return maybe;
+      } else {
+         Object pos = invokeNoArg(maybe, "getPosition", "position");
+         return pos != null && hasXYZ(pos) ? pos : null;
       }
-
-      Object pos = invokeNoArg(maybe, "getPosition", "position");
-      return pos != null && hasXYZ(pos) ? pos : null;
    }
 
    private static boolean hasXYZ(Object v) {
@@ -4897,8 +6867,10 @@ public final class AmigoNpcManager {
          return false;
       } else if (hasMethod(v, "getX") && hasMethod(v, "getY") && hasMethod(v, "getZ")) {
          return true;
+      } else if (hasMethod(v, "x") && hasMethod(v, "y") && hasMethod(v, "z")) {
+         return true;
       } else {
-         return hasMethod(v, "x") && hasMethod(v, "y") && hasMethod(v, "z") ? true : hasField(v, "x") && hasField(v, "y") && hasField(v, "z");
+         return hasField(v, "x") && hasField(v, "y") && hasField(v, "z");
       }
    }
 
@@ -4906,7 +6878,7 @@ public final class AmigoNpcManager {
       try {
          v.getClass().getMethod(name);
          return true;
-      } catch (Throwable ignored) {
+      } catch (Throwable var3) {
          return false;
       }
    }
@@ -4915,11 +6887,11 @@ public final class AmigoNpcManager {
       try {
          v.getClass().getField(name);
          return true;
-      } catch (Throwable ignoredPublic) {
+      } catch (Throwable var5) {
          try {
             v.getClass().getDeclaredField(name);
             return true;
-         } catch (Throwable ignoredDeclared) {
+         } catch (Throwable var4) {
             return false;
          }
       }
@@ -4932,8 +6904,8 @@ public final class AmigoNpcManager {
          double z = readCoord(vec, "z");
 
          try {
-            return vec.getClass().getConstructor(double.class, double.class, double.class).newInstance(x + ox, y + oy, z + oz);
-         } catch (Throwable ignoredCtor) {
+            return vec.getClass().getConstructor(Double.TYPE, Double.TYPE, Double.TYPE).newInstance(x + ox, y + oy, z + oz);
+         } catch (Throwable var15) {
             Object v2 = newVector3d(x + ox, y + oy, z + oz);
             return v2 != null ? v2 : vec;
          }
@@ -4956,7 +6928,7 @@ public final class AmigoNpcManager {
             try {
                Object r = vec.getClass().getField(axis).get(vec);
                return ((Number)r).doubleValue();
-            } catch (Throwable ignoredPublic) {
+            } catch (Throwable var6) {
                Field f = vec.getClass().getDeclaredField(axis);
                f.setAccessible(true);
                Object r = f.get(vec);
@@ -4967,18 +6939,12 @@ public final class AmigoNpcManager {
    }
 
    private static Object newVector3d(double x, double y, double z) {
-      String[] candidates = new String[]{
-         "org.joml.Vector3d",
-         "com.hypixel.hytale.math.Vector3d",
-         "com.hypixel.hytale.util.math.Vector3d",
-         "com.hypixel.hytale.protocol.util.Vector3d",
-         "com.hypixel.hytale.server.core.math.Vector3d"
-      };
+      String[] candidates = new String[]{"com.hypixel.hytale.math.vector.Vector3d", "com.hypixel.hytale.math.Vector3d", "com.hypixel.hytale.util.math.Vector3d", "com.hypixel.hytale.protocol.util.Vector3d", "com.hypixel.hytale.server.core.math.Vector3d"};
 
-      for (String cn : candidates) {
+      for(String cn : candidates) {
          try {
             Class<?> c = Class.forName(cn);
-            return c.getConstructor(double.class, double.class, double.class).newInstance(x, y, z);
+            return c.getConstructor(Double.TYPE, Double.TYPE, Double.TYPE).newInstance(x, y, z);
          } catch (Throwable var12) {
          }
       }
@@ -4987,18 +6953,12 @@ public final class AmigoNpcManager {
    }
 
    private static Object newVector3f(float a, float b, float c0) {
-      String[] candidates = new String[]{
-         "com.hypixel.hytale.math.vector.Vector3f",
-         "com.hypixel.hytale.math.Vector3f",
-         "com.hypixel.hytale.util.math.Vector3f",
-         "com.hypixel.hytale.protocol.util.Vector3f",
-         "com.hypixel.hytale.server.core.math.Vector3f"
-      };
+      String[] candidates = new String[]{"com.hypixel.hytale.math.vector.Vector3f", "com.hypixel.hytale.math.Vector3f", "com.hypixel.hytale.util.math.Vector3f", "com.hypixel.hytale.protocol.util.Vector3f", "com.hypixel.hytale.server.core.math.Vector3f"};
 
-      for (String cn : candidates) {
+      for(String cn : candidates) {
          try {
             Class<?> c = Class.forName(cn);
-            return c.getConstructor(float.class, float.class, float.class).newInstance(a, b, c0);
+            return c.getConstructor(Float.TYPE, Float.TYPE, Float.TYPE).newInstance(a, b, c0);
          } catch (Throwable var9) {
          }
       }
@@ -5009,29 +6969,29 @@ public final class AmigoNpcManager {
    private static Object invokeNoArg(Object target, String... methodNames) {
       if (target == null) {
          return null;
-      }
-
-      for (String name : methodNames) {
-         try {
-            Method m = target.getClass().getMethod(name);
-            return m.invoke(target);
-         } catch (Throwable var7) {
+      } else {
+         for(String name : methodNames) {
+            try {
+               Method m = target.getClass().getMethod(name);
+               return m.invoke(target);
+            } catch (Throwable var7) {
+            }
          }
-      }
 
-      return null;
+         return null;
+      }
    }
 
-   private static Object invokeOneArg(Object target, String methodName, Class<?> argType, Object arg) {
+   private static Object invokeOneArg(Object target, String methodName, Class argType, Object arg) {
       if (target == null) {
          return null;
-      }
-
-      try {
-         Method m = target.getClass().getMethod(methodName, argType);
-         return m.invoke(target, arg);
-      } catch (Throwable var5) {
-         return null;
+      } else {
+         try {
+            Method m = target.getClass().getMethod(methodName, argType);
+            return m.invoke(target, arg);
+         } catch (Throwable var5) {
+            return null;
+         }
       }
    }
 
@@ -5039,7 +6999,7 @@ public final class AmigoNpcManager {
       try {
          Class<?> c = Class.forName(className);
          Method m = c.getMethod(methodName);
-         return m.invoke(null);
+         return m.invoke((Object)null);
       } catch (Throwable var4) {
          return null;
       }
@@ -5049,53 +7009,74 @@ public final class AmigoNpcManager {
       try {
          Class<?> c = Class.forName(className);
          Field f = c.getField(fieldName);
-         return f.get(null);
+         return f.get((Object)null);
       } catch (Throwable var4) {
          return null;
       }
    }
 
    private static String firstStringFromArray(Object arr) {
-      return arr instanceof String[] a && a.length > 0 ? a[0] : null;
-   }
-
-   private static boolean invokeTwoArgs(Object target, String methodName, Class<?> argType1, Class<?> argType2, Object arg1, Object arg2) {
-      if (target == null) {
-         return false;
+      if (arr instanceof String[] a) {
+         if (a.length > 0) {
+            return a[0];
+         }
       }
 
-      try {
+      return null;
+   }
+
+   private static boolean invokeTwoArgs(Object target, String methodName, Class argType1, Class argType2, Object arg1, Object arg2) {
+      if (target == null) {
+         return false;
+      } else {
          try {
-            Method m = target.getClass().getMethod(methodName, argType1, argType2);
-            m.invoke(target, arg1, arg2);
-            return true;
-         } catch (NoSuchMethodException ignored) {
-            for (Method m : target.getClass().getMethods()) {
-               if (m.getName().equals(methodName) && m.getParameterCount() == 2) {
-                  Class<?>[] p = m.getParameterTypes();
-                  boolean ok1 = arg1 == null || p[0].isAssignableFrom(arg1.getClass()) || p[0].isAssignableFrom(argType1);
-                  boolean ok2 = arg2 == null || p[1].isAssignableFrom(arg2.getClass()) || p[1].isAssignableFrom(argType2);
-                  if (ok1 && ok2) {
-                     m.invoke(target, arg1, arg2);
-                     return true;
+            try {
+               Method m = target.getClass().getMethod(methodName, argType1, argType2);
+               m.invoke(target, arg1, arg2);
+               return true;
+            } catch (NoSuchMethodException var14) {
+               for(Method m : target.getClass().getMethods()) {
+                  if (m.getName().equals(methodName) && m.getParameterCount() == 2) {
+                     Class<?>[] p = m.getParameterTypes();
+                     boolean ok1 = arg1 == null || p[0].isAssignableFrom(arg1.getClass()) || p[0].isAssignableFrom(argType1);
+                     boolean ok2 = arg2 == null || p[1].isAssignableFrom(arg2.getClass()) || p[1].isAssignableFrom(argType2);
+                     if (ok1 && ok2) {
+                        m.invoke(target, arg1, arg2);
+                        return true;
+                     }
                   }
                }
             }
+         } catch (Throwable var15) {
          }
-      } catch (Throwable var15) {
-      }
 
-      return false;
+         return false;
+      }
    }
 
-   static final class NpcRecord {
+   static {
+      RPG_STAGE1_MOB_CALC = new RpgStage1MobLevelCalculator(RPG_STAGE1_CFG);
+      DEF_STAT_INDEX = null;
+   }
+
+   private static enum State {
+      SPAWNING,
+      ACTIVE,
+      DESPAWNING;
+
+      // $FF: synthetic method
+      private static State[] $values() {
+         return new State[]{SPAWNING, ACTIVE, DESPAWNING};
+      }
+   }
+
+   private static final class NpcRecord {
       final Object worldObj;
       final UUID ownerId;
       volatile Object refObj;
-      volatile AmigoNpcManager.State state;
+      volatile State state;
       volatile boolean downed;
       volatile long downedUntilMillis;
-      volatile long nextDownedMessageMillis;
       volatile SimpleItemContainer backpack;
       volatile long nextAutoLootMillis;
       volatile boolean lootPausedInventoryFull;
@@ -5108,7 +7089,7 @@ public final class AmigoNpcManager {
       volatile Vector3d autoLootStickAnchorPos;
       volatile boolean ownerUnderground;
       volatile long nextUndergroundCheckMillis;
-      final ArrayList<CombatTag> combatTags = new ArrayList<>();
+      final ArrayList combatTags = new ArrayList();
       volatile long lastCombatEndMillis;
       volatile long lootStickUntilMillis;
       volatile long lastCombatTagMillis;
@@ -5117,24 +7098,20 @@ public final class AmigoNpcManager {
       volatile boolean lootingActive;
       volatile Object lootTargetRefObj;
       volatile long lootTargetSinceMillis;
-      final ArrayList<Object> pendingLootRefObjs = new ArrayList<>();
-      final Map<Object, Long> lootProcessedUntil = new ConcurrentHashMap<>();
-      final Map<String, Integer> lootChatAcc = new LinkedHashMap<>();
+      final ArrayList pendingLootRefObjs = new ArrayList();
+      final Map lootProcessedUntil = new ConcurrentHashMap();
+      final Map lootChatAcc = new LinkedHashMap();
       volatile long lootChatSendAtMillis;
       volatile int level = 1;
       volatile String equippedWeaponId;
-      volatile double xpInLevel = 0.0;
+      volatile double xpInLevel = (double)0.0F;
       volatile long totalXp = 0L;
       volatile int npcLevelCached = 1;
-      volatile double stage1XpRemainder = 0.0;
-      volatile Object externalCompanionKillXpTargetRefObj;
-      volatile long externalCompanionKillXpAtMillis;
-      volatile long externalCompanionKillXpGain;
+      volatile double stage1XpRemainder = (double)0.0F;
       volatile long baseHp = -1L;
       volatile long baseDef = -1L;
       volatile String modelId;
       volatile double modelScale;
-      volatile String customName;
       volatile boolean respawnRequested;
       volatile Object respawnWorldObj;
       volatile Object respawnSenderObj;
@@ -5160,7 +7137,6 @@ public final class AmigoNpcManager {
       volatile long rangedBowReadyAtMillis;
       volatile long lastCombatNudgeMillis;
       volatile long lastAggroPulseMillis;
-      volatile long lastInterruptMillis;
       volatile String lastAttackAnimId;
       volatile long clearAttackAnimAtMillis;
       volatile long debugNextEquipMillis;
@@ -5177,24 +7153,13 @@ public final class AmigoNpcManager {
       volatile long npcCombatUntilMillis;
       volatile Object assistTargetRefObj;
       volatile long assistUntilMillis;
-      volatile long ownerCombatContextUntilMillis;
       volatile long targetLostSinceMillis;
       volatile long targetStuckSinceMillis;
-      volatile double lastTargetHorizontal = -1.0;
+      volatile double lastTargetHorizontal = (double)-1.0F;
       volatile long lastTargetSampleMillis;
       volatile boolean chaseDisengaged;
-      volatile CombatMode combatMode = CombatMode.PROTECT_OWNER;
-      volatile boolean defendeEnabled = true;
-      volatile boolean autoWeaponSwitchEnabled = true;
-      volatile boolean interruptAttacksEnabled = true;
+      volatile boolean defendeEnabled;
       volatile boolean autoLootEnabled = true;
-      volatile float cachedHealth;
-      volatile float cachedMaxHealth;
-      volatile CompanionActivityState activityState = CompanionActivityState.FOLLOWING;
-      volatile long nextGatherScanMillis;
-      volatile int gatherTargetX = Integer.MIN_VALUE;
-      volatile int gatherTargetY = Integer.MIN_VALUE;
-      volatile int gatherTargetZ = Integer.MIN_VALUE;
       volatile boolean debugLogEnabled;
       volatile boolean godMode;
       volatile long deathDespawnAtMillis;
@@ -5214,7 +7179,7 @@ public final class AmigoNpcManager {
       volatile int zoneInferredFromMobLevel;
       volatile long zoneInferredAtMillis;
 
-      NpcRecord(Object worldObj, UUID ownerId, Object refObj, AmigoNpcManager.State state) {
+      NpcRecord(Object worldObj, UUID ownerId, Object refObj, State state) {
          this.worldObj = worldObj;
          this.ownerId = ownerId;
          this.refObj = refObj;
@@ -5224,9 +7189,74 @@ public final class AmigoNpcManager {
       }
    }
 
-   enum State {
-      SPAWNING,
-      ACTIVE,
-      DESPAWNING;
+   public static final class NpcDebugSnapshot {
+      public String ownerUuid;
+      public boolean hasRecord;
+      public boolean hasNpcRef;
+      public String state;
+      public boolean downed;
+      public long downedUntilMillis;
+      public long deathDespawnAtMillis;
+      public int npcLevel;
+      public long totalXp;
+      public double xpRemainder;
+      public boolean inCombatRecently;
+      public long lastCombatTagMillis;
+      public long lastCombatEndMillis;
+      public boolean lootingActive;
+      public long lootStickUntilMillis;
+      public boolean regenActive;
+      public long regenStartAtMillis;
+      public long regenLastApplyMillis;
+      public boolean lootPausedInventoryFull;
+      public Vec3 lastOwnerPos;
+      public Vec3 lastNpcPos;
+      public Vec3 lastBattleCenter;
+      public int backpackSlotsUsed;
+      public int backpackSlotsTotal;
+   }
+
+   public static final class Vec3 {
+      public double x;
+      public double y;
+      public double z;
+
+      public Vec3() {
+      }
+
+      public Vec3(double x, double y, double z) {
+         this.x = x;
+         this.y = y;
+         this.z = z;
+      }
+   }
+
+   private static final class PendingRespawn {
+      final Object worldObj;
+      final Object senderObj;
+      final long atMillis;
+      final String message;
+
+      PendingRespawn(Object worldObj, Object senderObj, long atMillis, String message) {
+         this.worldObj = worldObj;
+         this.senderObj = senderObj;
+         this.atMillis = atMillis;
+         this.message = message;
+      }
+   }
+
+   private static final class CombatTag {
+      final Object targetRefObj;
+      Vector3d pos;
+      long lastSeenMillis;
+
+      CombatTag(Object targetRefObj, Vector3d pos, long lastSeenMillis) {
+         this.targetRefObj = targetRefObj;
+         this.pos = pos;
+         this.lastSeenMillis = lastSeenMillis;
+      }
+   }
+
+   public static record LevelProgressSnapshot(int level, long xp, long xpNeeded) {
    }
 }

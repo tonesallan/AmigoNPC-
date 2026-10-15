@@ -24,16 +24,11 @@ public final class AmigoNoDamageSystem extends DamageEventSystem {
       return DamageModule.get().getFilterDamageGroup();
    }
 
-   public void handle(
-      int index,
-      @Nonnull ArchetypeChunk<EntityStore> chunk,
-      @Nonnull Store<EntityStore> store,
-      @Nonnull CommandBuffer<EntityStore> buffer,
-      @Nonnull Damage damage
-   ) {
+   public void handle(int index, @Nonnull ArchetypeChunk chunk, @Nonnull Store store, @Nonnull CommandBuffer buffer, @Nonnull Damage damage) {
       Object targetRef = chunk.getReferenceTo(index);
       if (AmigoNpcManager.getShared().isAmigoRef(targetRef)) {
          damage.setCancelled(true);
       }
+
    }
 }

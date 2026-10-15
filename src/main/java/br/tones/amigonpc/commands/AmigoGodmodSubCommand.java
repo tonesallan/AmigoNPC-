@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -18,19 +17,19 @@ public final class AmigoGodmodSubCommand extends AbstractPlayerCommand {
    }
 
    public AmigoGodmodSubCommand() {
-      super("godmod", AmigoText.text("cmd.desc.amigo.godmod"));
+      super("godmod", "Liga/desliga o modo de invencibilidade do AmigoNPC");
       this.setAllowsExtraArguments(false);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       UUID ownerId = playerRef.getUuid();
       AmigoNpcManager mgr = AmigoNpcManager.getShared();
       if (!mgr.hasNpc(ownerId)) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.godmode.no_npc")));
+         ctx.sendMessage(Message.raw("§7[AmigoNPC] Você ainda não tem um NPC. Use §f/amigo spawn§7."));
       } else {
          mgr.toggleGodModeWithStore(store, ownerId);
          boolean enabled = mgr.isGodMode(ownerId);
-         ctx.sendMessage(Message.raw(AmigoText.text(enabled ? "cmd.amigo.godmode.status_on" : "cmd.amigo.godmode.status_off")));
+         ctx.sendMessage(Message.raw("§7[AmigoNPC] GodMode: " + (enabled ? "§aON§7 (invencível)" : "§cOFF§7")));
       }
    }
 }

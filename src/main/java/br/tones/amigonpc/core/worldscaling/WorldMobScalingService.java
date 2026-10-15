@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WorldMobScalingService {
    private static final WorldMobScalingService SHARED = new WorldMobScalingService();
    private static final String HP_MOD_KEY = "amigonpc_mob_hpmax";
-   private final Map<UUID, WorldMobScalingService.CacheEntry> cache = new ConcurrentHashMap<>();
+   private final Map cache = new ConcurrentHashMap();
    private final MobLevelVarianceCalculator lvlCalc = new MobLevelVarianceCalculator();
 
    public static WorldMobScalingService getShared() {
@@ -42,75 +42,76 @@ public final class WorldMobScalingService {
       WorldMobScalingConfig cfg = WorldMobScalingConfigService.get();
       if (!cfg.enableWorldMobScaling) {
          return false;
-      }
-
-      String wn = worldName == null ? "" : worldName.trim();
-      String in = instanceId == null ? "" : instanceId.trim();
-      boolean okWorld = false;
-      if (cfg.whitelistWorlds != null) {
-         for (String w : cfg.whitelistWorlds) {
-            if (w != null && w.equalsIgnoreCase(wn)) {
-               okWorld = true;
-               break;
+      } else {
+         String wn = worldName == null ? "" : worldName.trim();
+         String in = instanceId == null ? "" : instanceId.trim();
+         boolean okWorld = false;
+         if (cfg.whitelistWorlds != null) {
+            for(String w : cfg.whitelistWorlds) {
+               if (w != null && w.equalsIgnoreCase(wn)) {
+                  okWorld = true;
+                  break;
+               }
             }
          }
-      }
 
-      boolean okInst = false;
-      if (cfg.whitelistInstances != null) {
-         for (String w : cfg.whitelistInstances) {
-            if (w != null && w.equalsIgnoreCase(in)) {
-               okInst = true;
-               break;
+         boolean okInst = false;
+         if (cfg.whitelistInstances != null) {
+            for(String w : cfg.whitelistInstances) {
+               if (w != null && w.equalsIgnoreCase(in)) {
+                  okInst = true;
+                  break;
+               }
             }
          }
-      }
 
-      boolean anyList = cfg.whitelistWorlds != null && !cfg.whitelistWorlds.isEmpty() || cfg.whitelistInstances != null && !cfg.whitelistInstances.isEmpty();
-      return !anyList ? false : okWorld || okInst;
+         boolean anyList = cfg.whitelistWorlds != null && !cfg.whitelistWorlds.isEmpty() || cfg.whitelistInstances != null && !cfg.whitelistInstances.isEmpty();
+         if (!anyList) {
+            return false;
+         } else {
+            return okWorld || okInst;
+         }
+      }
    }
 
-   public int maybeApplyHpScaling(Store<EntityStore> store, Ref<EntityStore> mobRef, World world) {
+   public int maybeApplyHpScaling(Store store, Ref mobRef, World world) {
       if (store != null && mobRef != null && world != null) {
          WorldMobScalingConfig cfg = WorldMobScalingConfigService.get();
          if (!cfg.enableWorldMobScaling) {
             return 0;
-         }
-
-         String worldName = safeWorldName(world);
-         String instanceId = worldName;
-         if (!this.isWhitelisted(worldName, instanceId)) {
-            this.removeHpModifier(store, mobRef);
-            return 0;
-         }
-
-         if (store.getComponent(mobRef, Player.getComponentType()) != null) {
-            return 0;
-         }
-
-         UUID mobUuid = null;
-
-         try {
-            UUIDComponent u = (UUIDComponent)store.getComponent(mobRef, UUIDComponent.getComponentType());
-            if (u != null) {
-               mobUuid = u.getUuid();
-            }
-         } catch (Throwable var12) {
-         }
-
-         if (mobUuid == null) {
-            return 0;
          } else {
-            long now = System.currentTimeMillis();
-            WorldMobScalingService.CacheEntry ce = this.cache.get(mobUuid);
-            if (ce != null && now - ce.atMillis < cfg.cacheTtlMs) {
-               this.applyHpModifierIfMissing(store, mobRef, ce.level, cfg);
-               return ce.level;
+            String worldName = safeWorldName(world);
+            if (!this.isWhitelisted(worldName, worldName)) {
+               this.removeHpModifier(store, mobRef);
+               return 0;
+            } else if (store.getComponent(mobRef, Player.getComponentType()) != null) {
+               return 0;
             } else {
-               int mobLevel = this.computeMobLevel(store, mobRef, world, mobUuid);
-               this.cache.put(mobUuid, new WorldMobScalingService.CacheEntry(mobLevel, now));
-               this.applyHpModifierIfMissing(store, mobRef, mobLevel, cfg);
-               return mobLevel;
+               UUID mobUuid = null;
+
+               try {
+                  UUIDComponent u = (UUIDComponent)store.getComponent(mobRef, UUIDComponent.getComponentType());
+                  if (u != null) {
+                     mobUuid = u.getUuid();
+                  }
+               } catch (Throwable var12) {
+               }
+
+               if (mobUuid == null) {
+                  return 0;
+               } else {
+                  long now = System.currentTimeMillis();
+                  CacheEntry ce = (CacheEntry)this.cache.get(mobUuid);
+                  if (ce != null && now - ce.atMillis < cfg.cacheTtlMs) {
+                     this.applyHpModifierIfMissing(store, mobRef, ce.level, cfg);
+                     return ce.level;
+                  } else {
+                     int mobLevel = this.computeMobLevel(store, mobRef, world, mobUuid);
+                     this.cache.put(mobUuid, new CacheEntry(mobLevel, now));
+                     this.applyHpModifierIfMissing(store, mobRef, mobLevel, cfg);
+                     return mobLevel;
+                  }
+               }
             }
          }
       } else {
@@ -118,71 +119,68 @@ public final class WorldMobScalingService {
       }
    }
 
-   public float scaleOutgoingDamage(Store<EntityStore> store, Ref<EntityStore> attackerRef, World world, float amount) {
+   public float scaleOutgoingDamage(Store store, Ref attackerRef, World world, float amount) {
       if (!(amount <= 0.0F) && store != null && attackerRef != null && world != null) {
          WorldMobScalingConfig cfg = WorldMobScalingConfigService.get();
          if (!cfg.enableWorldMobScaling) {
             return amount;
-         }
-
-         String worldName = safeWorldName(world);
-         String instanceId = worldName;
-         if (!this.isWhitelisted(worldName, instanceId)) {
-            return amount;
-         }
-
-         if (store.getComponent(attackerRef, Player.getComponentType()) != null) {
-            return amount;
-         }
-
-         UUID mobUuid = null;
-
-         try {
-            UUIDComponent u = (UUIDComponent)store.getComponent(attackerRef, UUIDComponent.getComponentType());
-            if (u != null) {
-               mobUuid = u.getUuid();
-            }
-         } catch (Throwable var15) {
-         }
-
-         if (mobUuid == null) {
-            return amount;
-         }
-
-         long now = System.currentTimeMillis();
-         WorldMobScalingService.CacheEntry ce = this.cache.get(mobUuid);
-         int level;
-         if (ce != null && now - ce.atMillis < cfg.cacheTtlMs) {
-            level = ce.level;
          } else {
-            level = this.computeMobLevel(store, attackerRef, world, mobUuid);
-            this.cache.put(mobUuid, new WorldMobScalingService.CacheEntry(level, now));
-         }
+            String worldName = safeWorldName(world);
+            if (!this.isWhitelisted(worldName, worldName)) {
+               return amount;
+            } else if (store.getComponent(attackerRef, Player.getComponentType()) != null) {
+               return amount;
+            } else {
+               UUID mobUuid = null;
 
-         double out = amount;
-         if (cfg.damagePerLevelPercent != 0.0) {
-            out += out * (cfg.damagePerLevelPercent * level);
-         }
+               try {
+                  UUIDComponent u = (UUIDComponent)store.getComponent(attackerRef, UUIDComponent.getComponentType());
+                  if (u != null) {
+                     mobUuid = u.getUuid();
+                  }
+               } catch (Throwable var15) {
+               }
 
-         if (cfg.damageAddPerLevel != 0.0) {
-            out += cfg.damageAddPerLevel * level;
-         }
+               if (mobUuid == null) {
+                  return amount;
+               } else {
+                  long now = System.currentTimeMillis();
+                  CacheEntry ce = (CacheEntry)this.cache.get(mobUuid);
+                  int level;
+                  if (ce != null && now - ce.atMillis < cfg.cacheTtlMs) {
+                     level = ce.level;
+                  } else {
+                     level = this.computeMobLevel(store, attackerRef, world, mobUuid);
+                     this.cache.put(mobUuid, new CacheEntry(level, now));
+                  }
 
-         if (out < 0.0) {
-            out = 0.0;
-         }
+                  double out = (double)amount;
+                  if (cfg.damagePerLevelPercent != (double)0.0F) {
+                     out += out * cfg.damagePerLevelPercent * (double)level;
+                  }
 
-         if (out > Float.MAX_VALUE) {
-            out = Float.MAX_VALUE;
-         }
+                  if (cfg.damageAddPerLevel != (double)0.0F) {
+                     out += cfg.damageAddPerLevel * (double)level;
+                  }
 
-         return (float)out;
+                  if (out < (double)0.0F) {
+                     out = (double)0.0F;
+                  }
+
+                  if (out > (double)Float.MAX_VALUE) {
+                     out = (double)Float.MAX_VALUE;
+                  }
+
+                  return (float)out;
+               }
+            }
+         }
       } else {
          return amount;
       }
    }
 
-   private int computeMobLevel(Store<EntityStore> store, Ref<EntityStore> mobRef, World world, UUID mobUuid) {
+   private int computeMobLevel(Store store, Ref mobRef, World world, UUID mobUuid) {
       float maxHp = 1.0F;
 
       try {
@@ -228,8 +226,8 @@ public final class WorldMobScalingService {
       }
    }
 
-   private void applyHpModifierIfMissing(Store<EntityStore> store, Ref<EntityStore> mobRef, int level, WorldMobScalingConfig cfg) {
-      if (cfg.hpPerLevelPercent != 0.0 || cfg.hpAddPerLevel != 0.0) {
+   private void applyHpModifierIfMissing(Store store, Ref mobRef, int level, WorldMobScalingConfig cfg) {
+      if (cfg.hpPerLevelPercent != (double)0.0F || cfg.hpAddPerLevel != (double)0.0F) {
          try {
             EntityStatMap stats = (EntityStatMap)store.getComponent(mobRef, EntityStatMap.getComponentType());
             if (stats == null) {
@@ -249,20 +247,20 @@ public final class WorldMobScalingService {
             }
 
             float baseMax = Math.max(1.0F, stats.get(healthIdx).getMax());
-            double desired = baseMax;
-            if (cfg.hpPerLevelPercent != 0.0) {
-               desired += baseMax * (cfg.hpPerLevelPercent * level);
+            double desired = (double)baseMax;
+            if (cfg.hpPerLevelPercent != (double)0.0F) {
+               desired += (double)baseMax * cfg.hpPerLevelPercent * (double)level;
             }
 
-            if (cfg.hpAddPerLevel != 0.0) {
-               desired += cfg.hpAddPerLevel * level;
+            if (cfg.hpAddPerLevel != (double)0.0F) {
+               desired += cfg.hpAddPerLevel * (double)level;
             }
 
-            if (desired < 1.0) {
-               desired = 1.0;
+            if (desired < (double)1.0F) {
+               desired = (double)1.0F;
             }
 
-            double delta = desired - baseMax;
+            double delta = desired - (double)baseMax;
             if (Math.abs(delta) < 1.0E-4) {
                try {
                   store.putComponent(mobRef, EntityStatMap.getComponentType(), stats);
@@ -273,9 +271,9 @@ public final class WorldMobScalingService {
             }
 
             float amt;
-            if (delta > Float.MAX_VALUE) {
+            if (delta > (double)Float.MAX_VALUE) {
                amt = Float.MAX_VALUE;
-            } else if (delta < -Float.MAX_VALUE) {
+            } else if (delta < (double)-Float.MAX_VALUE) {
                amt = -Float.MAX_VALUE;
             } else {
                amt = (float)delta;
@@ -297,10 +295,11 @@ public final class WorldMobScalingService {
             }
          } catch (Throwable var20) {
          }
+
       }
    }
 
-   private void removeHpModifier(Store<EntityStore> store, Ref<EntityStore> mobRef) {
+   private void removeHpModifier(Store store, Ref mobRef) {
       try {
          EntityStatMap stats = (EntityStatMap)store.getComponent(mobRef, EntityStatMap.getComponentType());
          if (stats == null) {
@@ -325,18 +324,19 @@ public final class WorldMobScalingService {
          }
       } catch (Throwable var9) {
       }
+
    }
 
    private static String safeWorldName(World w) {
       if (w == null) {
          return "";
-      }
-
-      try {
-         String n = w.getName();
-         return n != null ? n : "";
-      } catch (Throwable ignored) {
-         return "";
+      } else {
+         try {
+            String n = w.getName();
+            return n != null ? n : "";
+         } catch (Throwable var2) {
+            return "";
+         }
       }
    }
 

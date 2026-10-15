@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.hud.levelprogress.LevelProgressHudService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -14,33 +13,34 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 public final class AmigoHudSubCommand extends AbstractPlayerCommand {
-   private final OptionalArg actionArg = this.withOptionalArg("action", AmigoText.text("cmd.arg.amigo.hud.action"), ArgTypes.STRING);
+   private final OptionalArg actionArg;
 
    protected boolean canGeneratePermission() {
       return false;
    }
 
    public AmigoHudSubCommand() {
-      super("hud", AmigoText.text("cmd.desc.amigo.hud"));
+      super("hud", "HUD do AmigoNPC");
+      this.actionArg = this.withOptionalArg("action", "toggle", ArgTypes.STRING);
       this.setAllowsExtraArguments(false);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       String action = this.actionArg.provided(ctx) ? String.valueOf(this.actionArg.get(ctx)) : "";
       action = action.trim().toLowerCase();
       if (!"toggle".equals(action)) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.hud.usage")));
+         ctx.sendMessage(Message.raw("§7[AmigoNPC] Use: §f/amigo hud toggle"));
       } else {
          boolean enabled = false;
 
          try {
-            enabled = LevelProgressHudService.getShared().toggleEnabledPersisted(playerRef.getUuid());
+            enabled = LevelProgressHudService.getShared().toggleEnabledPersisted();
          } catch (Throwable t) {
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.hud.toggle_failed", t.getClass().getSimpleName())));
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Falha ao alternar HUD: " + t.getClass().getSimpleName()));
             return;
          }
 
-         ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.hud.status", AmigoText.coloredOnOff(enabled))));
+         ctx.sendMessage(Message.raw("§7[AmigoNPC] HUD agora: " + (enabled ? "§aON" : "§cOFF")));
       }
    }
 }

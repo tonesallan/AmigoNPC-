@@ -1,6 +1,5 @@
 package br.tones.amigonpc.core;
 
-import br.tones.amigonpc.core.i18n.AmigoText;
 import java.lang.reflect.Method;
 
 public final class Permissions {
@@ -26,10 +25,12 @@ public final class Permissions {
       if (sender != null && permissionNode != null && !permissionNode.isBlank()) {
          String[] candidates = new String[]{"hasPermission", "hasPerm", "can"};
 
-         for (String name : candidates) {
+         for(String name : candidates) {
             try {
                Method m = sender.getClass().getMethod(name, String.class);
-               if (m.invoke(sender, permissionNode) instanceof Boolean b) {
+               Object r = m.invoke(sender, permissionNode);
+               if (r instanceof Boolean) {
+                  Boolean b = (Boolean)r;
                   return b;
                }
             } catch (Throwable var12) {
@@ -38,10 +39,12 @@ public final class Permissions {
 
          Object pm = tryNoArg(sender, "getPermissionManager", "permissionManager", "getPermissions", "permissions");
          if (pm != null) {
-            for (String name : candidates) {
+            for(String name : candidates) {
                try {
                   Method m = pm.getClass().getMethod(name, String.class);
-                  if (m.invoke(pm, permissionNode) instanceof Boolean b) {
+                  Object r = m.invoke(pm, permissionNode);
+                  if (r instanceof Boolean) {
+                     Boolean b = (Boolean)r;
                      return b;
                   }
                } catch (Throwable var11) {
@@ -49,7 +52,7 @@ public final class Permissions {
             }
          }
 
-         setError(AmigoText.text("core.permissions.error.no_permission_method"));
+         setError("Nenhum método de permissão encontrado no sender nesta build (modo permissivo ativo).");
          return true;
       } else {
          return true;
@@ -57,7 +60,7 @@ public final class Permissions {
    }
 
    private static Object tryNoArg(Object target, String... names) {
-      for (String n : names) {
+      for(String n : names) {
          try {
             Method m = target.getClass().getMethod(n);
             return m.invoke(target);

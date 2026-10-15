@@ -13,28 +13,27 @@ final class MultipleHudBackend implements HudBackend {
    MultipleHudBackend() throws Exception {
       Class<?> mhudClass = Class.forName("com.buuz135.mhud.MultipleHUD");
       Method getInstance = mhudClass.getMethod("getInstance");
-      this.mhudInstance = getInstance.invoke(null);
+      this.mhudInstance = getInstance.invoke((Object)null);
       this.setCustomHudMethod = mhudClass.getMethod("setCustomHud", Player.class, PlayerRef.class, String.class, CustomUIHud.class);
       this.hideCustomHudMethod = mhudClass.getMethod("hideCustomHud", Player.class, PlayerRef.class, String.class);
    }
 
-   @Override
    public void show(Player player, PlayerRef playerRef, String hudId, CustomUIHud hud) {
       try {
          this.setCustomHudMethod.invoke(this.mhudInstance, player, playerRef, hudId, hud);
       } catch (Throwable var6) {
       }
+
    }
 
-   @Override
    public void hide(Player player, PlayerRef playerRef, String hudId) {
       try {
          this.hideCustomHudMethod.invoke(this.mhudInstance, player, playerRef, hudId);
       } catch (Throwable var5) {
       }
+
    }
 
-   @Override
    public boolean supportsIncrementalUpdates() {
       return true;
    }

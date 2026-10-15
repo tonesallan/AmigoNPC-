@@ -32,11 +32,11 @@ public final class RewardCommandRunner {
          String[] parts = cmd.trim().split("\\s+");
          if (parts.length < 3) {
             return -1;
+         } else {
+            String last = parts[parts.length - 1];
+            return Integer.parseInt(last);
          }
-
-         String last = parts[parts.length - 1];
-         return Integer.parseInt(last);
-      } catch (Throwable ignored) {
+      } catch (Throwable var3) {
          return -1;
       }
    }

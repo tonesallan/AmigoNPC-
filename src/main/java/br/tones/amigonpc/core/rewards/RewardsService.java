@@ -23,22 +23,22 @@ public final class RewardsService {
    private RewardsService() {
    }
 
-   public List<AmigoLevelRewardsConfig.RewardEntry> getEligibleUnlocked(UUID ownerId, int level, RewardsState state) {
+   public List getEligibleUnlocked(UUID ownerId, int level, RewardsState state) {
       AmigoLevelRewardsConfig cfg = AmigoLevelRewardsConfigService.getShared().get();
       if (cfg.Rewards != null && !cfg.Rewards.isEmpty()) {
          if (state == null) {
             state = RewardsStateService.getShared().load(ownerId);
          }
 
-         List<AmigoLevelRewardsConfig.RewardEntry> out = new ArrayList<>();
+         List<AmigoLevelRewardsConfig.RewardEntry> out = new ArrayList();
 
-         for (AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
+         for(AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
             if (r != null && r.Level > 0 && level >= r.Level && !state.claimedRewardLevels.contains(r.Level)) {
                out.add(r);
             }
          }
 
-         out.sort(Comparator.comparingInt(a -> a.Level));
+         out.sort(Comparator.comparingInt((a) -> a.Level));
          return out;
       } else {
          return List.of();
@@ -50,51 +50,49 @@ public final class RewardsService {
       return st.claimedRewardLevels.contains(rewardLevel);
    }
 
-   public RewardsService.ClaimResult claim(UUID ownerId, String ownerName, int currentLevel, int rewardLevel) {
+   public ClaimResult claim(UUID ownerId, String ownerName, int currentLevel, int rewardLevel) {
       AmigoLevelRewardsConfig cfg = AmigoLevelRewardsConfigService.getShared().get();
       AmigoLevelRewardsConfig.RewardEntry entry = findReward(cfg, rewardLevel);
       if (entry == null) {
          return RewardsService.ClaimResult.error("not_found");
+      } else {
+         RewardsState st = RewardsStateService.getShared().load(ownerId);
+         if (st.claimedRewardLevels.contains(entry.Level)) {
+            return RewardsService.ClaimResult.error("already_claimed");
+         } else if (currentLevel < entry.Level) {
+            return RewardsService.ClaimResult.error("locked");
+         } else {
+            boolean ok = applyReward(ownerId, ownerName, entry, st);
+            return ok ? RewardsService.ClaimResult.success() : RewardsService.ClaimResult.error("failed");
+         }
       }
-
-      RewardsState st = RewardsStateService.getShared().load(ownerId);
-      if (st.claimedRewardLevels.contains(entry.Level)) {
-         return RewardsService.ClaimResult.error("already_claimed");
-      }
-
-      if (currentLevel < entry.Level) {
-         return RewardsService.ClaimResult.error("locked");
-      }
-
-      boolean ok = applyReward(ownerId, ownerName, entry, st);
-      return ok ? RewardsService.ClaimResult.success() : RewardsService.ClaimResult.error("failed");
    }
 
-   public RewardsService.ClaimAllResult claimAll(UUID ownerId, String ownerName, int currentLevel) {
+   public ClaimAllResult claimAll(UUID ownerId, String ownerName, int currentLevel) {
       RewardsState st = RewardsStateService.getShared().load(ownerId);
       List<AmigoLevelRewardsConfig.RewardEntry> eligible = this.getEligibleUnlocked(ownerId, currentLevel, st);
       if (eligible.isEmpty()) {
-         return new RewardsService.ClaimAllResult(0, 0);
-      }
+         return new ClaimAllResult(0, 0);
+      } else {
+         int applied = 0;
+         int skipped = 0;
 
-      int applied = 0;
-      int skipped = 0;
-
-      for (AmigoLevelRewardsConfig.RewardEntry r : eligible) {
-         boolean ok = applyReward(ownerId, ownerName, r, st);
-         if (ok) {
-            applied++;
-         } else {
-            skipped++;
+         for(AmigoLevelRewardsConfig.RewardEntry r : eligible) {
+            boolean ok = applyReward(ownerId, ownerName, r, st);
+            if (ok) {
+               ++applied;
+            } else {
+               ++skipped;
+            }
          }
-      }
 
-      return new RewardsService.ClaimAllResult(applied, skipped);
+         return new ClaimAllResult(applied, skipped);
+      }
    }
 
    private static AmigoLevelRewardsConfig.RewardEntry findReward(AmigoLevelRewardsConfig cfg, int level) {
       if (cfg != null && cfg.Rewards != null) {
-         for (AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
+         for(AmigoLevelRewardsConfig.RewardEntry r : cfg.Rewards) {
             if (r != null && r.Level == level) {
                return r;
             }
@@ -134,10 +132,7 @@ public final class RewardsService {
          st.claimedRewardLevels.add(r.Level);
          RewardsStateService.getShared().save(ownerId, st);
          if (debug) {
-            System.out
-               .println(
-                  String.format(Locale.ROOT, "[AmigoNPC][Rewards] claimed level=%d owner=%s resetPoints %d -> %d", r.Level, ownerId, before, st.resetPoints)
-               );
+            System.out.println(String.format(Locale.ROOT, "[AmigoNPC][Rewards] claimed level=%d owner=%s resetPoints %d -> %d", r.Level, ownerId, before, st.resetPoints));
          }
 
          return true;
@@ -146,16 +141,16 @@ public final class RewardsService {
       }
    }
 
-   private static boolean grantItems(UUID ownerId, List<AmigoLevelRewardsConfig.ItemEntry> items, boolean debug) {
+   private static boolean grantItems(UUID ownerId, List items, boolean debug) {
       AmigoNpcManager mgr = AmigoNpcManager.getShared();
       SimpleItemContainer bag = mgr.getOrLoadBackpack(ownerId);
       boolean okAll = true;
       Iterator var6 = items.iterator();
 
-      while (true) {
+      while(true) {
          String itemId;
          ItemStack stack;
-         while (true) {
+         while(true) {
             if (!var6.hasNext()) {
                try {
                   AmigoPersistence.saveBackpack(ownerId, bag);
@@ -178,7 +173,7 @@ public final class RewardsService {
 
                      okAll = false;
                      System.out.println("[AmigoNPC][Rewards] ItemId inválido: " + itemId);
-                  } catch (Throwable t) {
+                  } catch (Throwable var18) {
                      okAll = false;
                      System.out.println("[AmigoNPC][Rewards] Falha criando ItemStack: " + itemId);
                   }
@@ -204,7 +199,7 @@ public final class RewardsService {
                   System.out.println("[AmigoNPC][Rewards] Mochila cheia/sem espaço p/ " + itemId + " rem=" + remQty);
                }
             }
-         } catch (Throwable t) {
+         } catch (Throwable var17) {
             okAll = false;
             System.out.println("[AmigoNPC][Rewards] Falha adicionando item na mochila: " + itemId);
          }
@@ -215,7 +210,7 @@ public final class RewardsService {
       if (ownerId != null) {
          RewardsState st = RewardsStateService.getShared().load(ownerId);
          if (!st.claimedRewardLevels.isEmpty()) {
-            st.claimedRewardLevels.removeIf(lvl -> lvl == null || lvl > newLevel);
+            st.claimedRewardLevels.removeIf((lvl) -> lvl == null || lvl > newLevel);
             RewardsStateService.getShared().save(ownerId, st);
          }
       }
@@ -226,7 +221,7 @@ public final class RewardsService {
       long totalXp = XpProgression.xpStartOfLevel(L);
       AmigoPersistence.saveTotalXp(ownerId, totalXp);
       if (debug) {
-         System.out.println("[AmigoNPC][Rewards] built-in setlevel owner=" + ownerId + " level=" + L + " totalXp=" + totalXp);
+         System.out.println("[AmigoNPC][Rewards] built-in setlevel owner=" + String.valueOf(ownerId) + " level=" + L + " totalXp=" + totalXp);
       }
 
       try {
@@ -237,16 +232,16 @@ public final class RewardsService {
       getShared().adjustClaimedOnLevelDecrease(ownerId, L);
    }
 
-   public record ClaimAllResult(int applied, int skipped) {
+   public static record ClaimResult(boolean ok, String error) {
+      public static ClaimResult success() {
+         return new ClaimResult(true, (String)null);
+      }
+
+      public static ClaimResult error(String e) {
+         return new ClaimResult(false, e);
+      }
    }
 
-   public record ClaimResult(boolean ok, String error) {
-      public static RewardsService.ClaimResult success() {
-         return new RewardsService.ClaimResult(true, null);
-      }
-
-      public static RewardsService.ClaimResult error(String e) {
-         return new RewardsService.ClaimResult(false, e);
-      }
+   public static record ClaimAllResult(int applied, int skipped) {
    }
 }

@@ -23,32 +23,32 @@ public final class RewardsStateService {
       RewardsState st = new RewardsState();
       if (ownerId == null) {
          return st;
-      }
+      } else {
+         BsonDocument doc = AmigoPersistence.loadAmigoRewards(ownerId);
+         if (doc != null && !doc.isEmpty()) {
+            try {
+               st.resetPoints = Math.max(0, doc.getInt32("resetPoints", new BsonInt32(0)).getValue());
+            } catch (Throwable var8) {
+            }
 
-      BsonDocument doc = AmigoPersistence.loadAmigoRewards(ownerId);
-      if (doc != null && !doc.isEmpty()) {
-         try {
-            st.resetPoints = Math.max(0, doc.getInt32("resetPoints", new BsonInt32(0)).getValue());
-         } catch (Throwable var8) {
-         }
-
-         try {
-            if (doc.containsKey("claimed") && doc.get("claimed").isArray()) {
-               for (BsonValue v : doc.getArray("claimed")) {
-                  if (v != null && v.isInt32()) {
-                     int lvl = v.asInt32().getValue();
-                     if (lvl > 0) {
-                        st.claimedRewardLevels.add(lvl);
+            try {
+               if (doc.containsKey("claimed") && doc.get("claimed").isArray()) {
+                  for(BsonValue v : doc.getArray("claimed")) {
+                     if (v != null && v.isInt32()) {
+                        int lvl = v.asInt32().getValue();
+                        if (lvl > 0) {
+                           st.claimedRewardLevels.add(lvl);
+                        }
                      }
                   }
                }
+            } catch (Throwable var9) {
             }
-         } catch (Throwable var9) {
-         }
 
-         return st;
-      } else {
-         return st;
+            return st;
+         } else {
+            return st;
+         }
       }
    }
 
@@ -58,7 +58,7 @@ public final class RewardsStateService {
          doc.put("resetPoints", new BsonInt32(Math.max(0, st.resetPoints)));
          BsonArray arr = new BsonArray();
 
-         for (Integer lvl : st.claimedRewardLevels) {
+         for(Integer lvl : st.claimedRewardLevels) {
             if (lvl != null && lvl > 0) {
                arr.add(new BsonInt32(lvl));
             }
@@ -76,15 +76,15 @@ public final class RewardsStateService {
    public boolean consumeResetPoint(UUID ownerId) {
       if (ownerId == null) {
          return false;
+      } else {
+         RewardsState st = this.load(ownerId);
+         if (st.resetPoints <= 0) {
+            return false;
+         } else {
+            --st.resetPoints;
+            this.save(ownerId, st);
+            return true;
+         }
       }
-
-      RewardsState st = this.load(ownerId);
-      if (st.resetPoints <= 0) {
-         return false;
-      }
-
-      st.resetPoints--;
-      this.save(ownerId, st);
-      return true;
    }
 }

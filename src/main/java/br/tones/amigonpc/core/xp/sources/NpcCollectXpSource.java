@@ -11,7 +11,7 @@ public final class NpcCollectXpSource {
    public static void onPickup(UUID ownerId, int pickedCount, String worldName) {
       if (ownerId != null) {
          if (pickedCount > 0) {
-            NpcXpContext ctx = new NpcXpContext(worldName, worldName, null, 0, null, 0, System.currentTimeMillis());
+            NpcXpContext ctx = new NpcXpContext(worldName, worldName, (String)null, 0, (String)null, 0, System.currentTimeMillis());
             NpcXpAwardService.getShared().awardCollect(ownerId, NpcXpSource.COLLECT_PICKUP, ctx);
          }
       }

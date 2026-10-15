@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -32,9 +33,9 @@ public final class ErrorDumpService {
    private static final ErrorDumpService SHARED = new ErrorDumpService();
    private static final int MAX_ERROR_FILES = 10;
    private static final long SERVER_ERROR_RATE_LIMIT_MS = 30000L;
-   private static final Map<String, Long> LAST_SERVER_DUMP_BY_KEY = new ConcurrentHashMap<>();
+   private static final Map LAST_SERVER_DUMP_BY_KEY = new ConcurrentHashMap();
    private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss");
-   private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+   private static final Gson GSON = (new GsonBuilder()).disableHtmlEscaping().setPrettyPrinting().create();
 
    public static ErrorDumpService getShared() {
       return SHARED;
@@ -44,10 +45,10 @@ public final class ErrorDumpService {
    }
 
    public void dumpOnServerError(UUID playerId, String tag, Throwable t) {
-      this.dumpOnServerError(playerId, tag, t, null);
+      this.dumpOnServerError(playerId, tag, t, (Map)null);
    }
 
-   public void dumpOnServerError(UUID playerId, String tag, Throwable t, Map<String, Object> extra) {
+   public void dumpOnServerError(UUID playerId, String tag, Throwable t, Map extra) {
       try {
          if (tag == null) {
             tag = "";
@@ -57,9 +58,9 @@ public final class ErrorDumpService {
             return;
          }
 
-         String key = tag + "|" + playerId;
+         String key = tag + "|" + String.valueOf(playerId);
          long now = System.currentTimeMillis();
-         Long last = LAST_SERVER_DUMP_BY_KEY.get(key);
+         Long last = (Long)LAST_SERVER_DUMP_BY_KEY.get(key);
          if (last != null && now - last < 30000L) {
             return;
          }
@@ -68,15 +69,32 @@ public final class ErrorDumpService {
          Path dir = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("errors");
          this.ensureDir(dir);
          this.enforceFileLimit(dir);
-         ErrorDumpService.ErrorReport report = this.buildServerErrorReport(playerId, tag, t, extra);
-         String baseName = "error-" + ZonedDateTime.now().format(FILE_TS) + ".json";
+         ErrorReport report = this.buildServerErrorReport(playerId, tag, t, extra);
+         ZonedDateTime var10000 = ZonedDateTime.now();
+         String baseName = "error-" + var10000.format(FILE_TS) + ".json";
          Path out = this.resolveUnique(dir, baseName);
+         BufferedWriter w = Files.newBufferedWriter(out, StandardCharsets.UTF_8);
 
-         try (BufferedWriter w = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
+         try {
             GSON.toJson(report, w);
+         } catch (Throwable var17) {
+            if (w != null) {
+               try {
+                  w.close();
+               } catch (Throwable var16) {
+                  var17.addSuppressed(var16);
+               }
+            }
+
+            throw var17;
+         }
+
+         if (w != null) {
+            w.close();
          }
       } catch (Throwable var18) {
       }
+
    }
 
    public void maybeDumpOnDisconnect(UUID playerId, Object evt) {
@@ -95,41 +113,58 @@ public final class ErrorDumpService {
          Path dir = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("errors");
          this.ensureDir(dir);
          this.enforceFileLimit(dir);
-         ErrorDumpService.ErrorReport report = this.buildReport(playerId, evt, reason, reasonMatches, heuristicMatches);
-         String fileName = "error-" + ZonedDateTime.now().format(FILE_TS) + ".json";
+         ErrorReport report = this.buildReport(playerId, evt, reason, reasonMatches, heuristicMatches);
+         ZonedDateTime var10000 = ZonedDateTime.now();
+         String fileName = "error-" + var10000.format(FILE_TS) + ".json";
          Path out = this.resolveUnique(dir, fileName);
+         BufferedWriter w = Files.newBufferedWriter(out, StandardCharsets.UTF_8);
 
-         try (BufferedWriter w = Files.newBufferedWriter(out, StandardCharsets.UTF_8)) {
+         try {
             GSON.toJson(report, w);
+         } catch (Throwable var14) {
+            if (w != null) {
+               try {
+                  w.close();
+               } catch (Throwable var13) {
+                  var14.addSuppressed(var13);
+               }
+            }
+
+            throw var14;
+         }
+
+         if (w != null) {
+            w.close();
          }
       } catch (Throwable var15) {
       }
+
    }
 
    private Path resolveUnique(Path dir, String fileName) {
       try {
          Path p = dir.resolve(fileName);
-         if (!Files.exists(p)) {
+         if (!Files.exists(p, new LinkOption[0])) {
+            return p;
+         } else {
+            String base = fileName;
+            String ext = "";
+            int dot = fileName.lastIndexOf(46);
+            if (dot > 0) {
+               base = fileName.substring(0, dot);
+               ext = fileName.substring(dot);
+            }
+
+            for(int i = 1; i <= 50; ++i) {
+               Path candidate = dir.resolve(base + "-" + i + ext);
+               if (!Files.exists(candidate, new LinkOption[0])) {
+                  return candidate;
+               }
+            }
+
             return p;
          }
-
-         String base = fileName;
-         String ext = "";
-         int dot = fileName.lastIndexOf(46);
-         if (dot > 0) {
-            base = fileName.substring(0, dot);
-            ext = fileName.substring(dot);
-         }
-
-         for (int i = 1; i <= 50; i++) {
-            Path candidate = dir.resolve(base + "-" + i + ext);
-            if (!Files.exists(candidate)) {
-               return candidate;
-            }
-         }
-
-         return p;
-      } catch (Throwable ignored) {
+      } catch (Throwable var9) {
          return dir.resolve(fileName);
       }
    }
@@ -144,8 +179,8 @@ public final class ErrorDumpService {
          long windowMs = 12000L;
          List<ActionTraceService.TraceEvent> events = ActionTraceService.getShared().snapshotLast20m(playerId);
 
-         for (int i = events.size() - 1; i >= 0; i--) {
-            ActionTraceService.TraceEvent e = events.get(i);
+         for(int i = events.size() - 1; i >= 0; --i) {
+            ActionTraceService.TraceEvent e = (ActionTraceService.TraceEvent)events.get(i);
             if (e != null) {
                long dt = now - e.epochMillis;
                if (dt > 12000L) {
@@ -166,41 +201,43 @@ public final class ErrorDumpService {
    private boolean looksLikeUiSelectorDisconnect(String reason) {
       if (reason == null) {
          return false;
+      } else {
+         String r = reason.toLowerCase(Locale.ROOT);
+         if (!r.contains("customui") || !r.contains("selector") && !r.contains("selected element") && !r.contains("not found")) {
+            return r.contains("selected element") && r.contains("selector");
+         } else {
+            return true;
+         }
       }
-
-      String r = reason.toLowerCase(Locale.ROOT);
-      return !r.contains("customui") || !r.contains("selector") && !r.contains("selected element") && !r.contains("not found")
-         ? r.contains("selected element") && r.contains("selector")
-         : true;
    }
 
    private String extractDisconnectReasonBestEffort(Object evt) {
       if (evt == null) {
          return null;
-      }
-
-      Object o = this.invokeNoArg(evt, "getReason", "getDisconnectReason", "getKickReason", "getMessage", "reason", "message");
-      if (o == null) {
-         o = this.invokeNoArg(evt, "getCause", "cause");
-      }
-
-      if (o == null) {
-         try {
-            return evt.toString();
-         } catch (Throwable ignored) {
-            return null;
-         }
       } else {
-         try {
-            return String.valueOf(o);
-         } catch (Throwable ignored) {
-            return null;
+         Object o = this.invokeNoArg(evt, "getReason", "getDisconnectReason", "getKickReason", "getMessage", "reason", "message");
+         if (o == null) {
+            o = this.invokeNoArg(evt, "getCause", "cause");
+         }
+
+         if (o == null) {
+            try {
+               return evt.toString();
+            } catch (Throwable var4) {
+               return null;
+            }
+         } else {
+            try {
+               return String.valueOf(o);
+            } catch (Throwable var5) {
+               return null;
+            }
          }
       }
    }
 
    private Object invokeNoArg(Object obj, String... names) {
-      for (String n : names) {
+      for(String n : names) {
          try {
             Method m = obj.getClass().getMethod(n);
             return m.invoke(obj);
@@ -217,37 +254,52 @@ public final class ErrorDumpService {
    }
 
    private void ensureDir(Path dir) throws IOException {
-      if (!Files.exists(dir)) {
+      if (!Files.exists(dir, new LinkOption[0])) {
          Files.createDirectories(dir);
       }
    }
 
    private void enforceFileLimit(Path dir) {
       try {
-         List<Path> files = new ArrayList<>();
+         List<Path> files = new ArrayList();
+         DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "error-*.json");
 
-         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "error-*.json")) {
-            for (Path p : ds) {
-               if (Files.isRegularFile(p)) {
+         try {
+            for(Path p : ds) {
+               if (Files.isRegularFile(p, new LinkOption[0])) {
                   files.add(p);
                }
             }
+         } catch (Throwable var8) {
+            if (ds != null) {
+               try {
+                  ds.close();
+               } catch (Throwable var6) {
+                  var8.addSuppressed(var6);
+               }
+            }
+
+            throw var8;
+         }
+
+         if (ds != null) {
+            ds.close();
          }
 
          if (files.size() < 10) {
             return;
          }
 
-         files.sort(Comparator.comparingLong(px -> {
+         files.sort(Comparator.comparingLong((px) -> {
             try {
                return Files.getLastModifiedTime(px).toMillis();
-            } catch (Throwable ignored) {
+            } catch (Throwable var2) {
                return Long.MAX_VALUE;
             }
          }));
 
-         while (files.size() >= 10) {
-            Path oldest = files.remove(0);
+         while(files.size() >= 10) {
+            Path oldest = (Path)files.remove(0);
 
             try {
                Files.deleteIfExists(oldest);
@@ -256,10 +308,11 @@ public final class ErrorDumpService {
          }
       } catch (Throwable var9) {
       }
+
    }
 
-   private ErrorDumpService.ErrorReport buildReport(UUID playerId, Object evt, String reason, boolean reasonMatches, boolean heuristicMatches) {
-      ErrorDumpService.ErrorReport r = new ErrorDumpService.ErrorReport();
+   private ErrorReport buildReport(UUID playerId, Object evt, String reason, boolean reasonMatches, boolean heuristicMatches) {
+      ErrorReport r = new ErrorReport();
       ZoneId zone = ZoneId.systemDefault();
       ZonedDateTime nowLocal = ZonedDateTime.now(zone);
       Instant nowUtc = Instant.now();
@@ -280,14 +333,14 @@ public final class ErrorDumpService {
       r.trigger = reasonMatches ? "disconnectReason" : "heuristicRecentUiAction";
       r.requestedFileNameFormat = "error-data-hora:minuto:segundo.json";
       r.actualFileNameFormat = "error-YYYY-MM-DD-HH-mm-ss.json";
-      r.lastErrors = new HashMap<>();
+      r.lastErrors = new HashMap();
       r.lastErrors.put("HytaleBridge", HytaleBridge.getLastError());
       r.lastErrors.put("UiBridge", UiBridge.getLastError());
       r.lastErrors.put("AmigoUiFactory", AmigoUiFactory.getLastError());
 
       try {
          r.npcSnapshot = AmigoNpcManager.getShared().getNpcDebugSnapshot(playerId);
-      } catch (Throwable ignored) {
+      } catch (Throwable var11) {
          r.npcSnapshot = null;
       }
 
@@ -295,8 +348,8 @@ public final class ErrorDumpService {
       return r;
    }
 
-   private ErrorDumpService.ErrorReport buildServerErrorReport(UUID playerId, String tag, Throwable t, Map<String, Object> extra) {
-      ErrorDumpService.ErrorReport r = new ErrorDumpService.ErrorReport();
+   private ErrorReport buildServerErrorReport(UUID playerId, String tag, Throwable t, Map extra) {
+      ErrorReport r = new ErrorReport();
       ZoneId zone = ZoneId.systemDefault();
       ZonedDateTime nowLocal = ZonedDateTime.now(zone);
       Instant nowUtc = Instant.now();
@@ -323,14 +376,14 @@ public final class ErrorDumpService {
       r.extra = extra;
       r.requestedFileNameFormat = "error-data-hora:minuto:segundo.json";
       r.actualFileNameFormat = "error-YYYY-MM-DD-HH-mm-ss.json";
-      r.lastErrors = new HashMap<>();
+      r.lastErrors = new HashMap();
       r.lastErrors.put("HytaleBridge", HytaleBridge.getLastError());
       r.lastErrors.put("UiBridge", UiBridge.getLastError());
       r.lastErrors.put("AmigoUiFactory", AmigoUiFactory.getLastError());
       if (playerId != null) {
          try {
             r.npcSnapshot = AmigoNpcManager.getShared().getNpcDebugSnapshot(playerId);
-         } catch (Throwable ignored) {
+         } catch (Throwable var11) {
             r.npcSnapshot = null;
          }
 
@@ -341,7 +394,7 @@ public final class ErrorDumpService {
 
          try {
             r.last20mActionsByPlayer = ActionTraceService.getShared().snapshotLast20mForMostRecentPlayers(5);
-         } catch (Throwable ignored) {
+         } catch (Throwable var10) {
             r.last20mActionsByPlayer = null;
          }
       }
@@ -355,37 +408,30 @@ public final class ErrorDumpService {
          int lines = 0;
          Throwable cur = t;
 
-         while (cur != null && lines < maxLines) {
+         while(cur != null && lines < maxLines) {
             sb.append(cur.getClass().getName());
             if (cur.getMessage() != null) {
                sb.append(": ").append(cur.getMessage());
             }
 
             sb.append("\n");
-            StackTraceElement[] var6 = cur.getStackTrace();
-            int var7 = var6.length;
-            int var8 = 0;
 
-            while (true) {
-               if (var8 < var7) {
-                  StackTraceElement el = var6[var8];
-                  if (lines++ < maxLines) {
-                     sb.append("  at ").append(el.toString()).append("\n");
-                     var8++;
-                     continue;
-                  }
+            for(StackTraceElement el : cur.getStackTrace()) {
+               if (lines++ >= maxLines) {
+                  break;
                }
 
-               cur = cur.getCause();
-               if (cur != null && lines < maxLines) {
-                  sb.append("Caused by:\n");
-               }
-               break;
+               sb.append("  at ").append(el.toString()).append("\n");
+            }
+
+            cur = cur.getCause();
+            if (cur != null && lines < maxLines) {
+               sb.append("Caused by:\n");
             }
          }
 
          return sb.toString();
-      } catch (Throwable ignored) {
+      } catch (Throwable var10) {
          return null;
       }
    }
@@ -393,18 +439,18 @@ public final class ErrorDumpService {
    private String extractPlayerNameBestEffort(Object evt) {
       if (evt == null) {
          return null;
-      }
-
-      Object pr = this.invokeNoArg(evt, "getPlayerRef", "getPlayer", "playerRef");
-      if (pr != null) {
-         Object name = this.invokeNoArg(pr, "getName", "name", "getUsername", "getDisplayName");
-         if (name != null) {
-            return String.valueOf(name);
+      } else {
+         Object pr = this.invokeNoArg(evt, "getPlayerRef", "getPlayer", "playerRef");
+         if (pr != null) {
+            Object name = this.invokeNoArg(pr, "getName", "name", "getUsername", "getDisplayName");
+            if (name != null) {
+               return String.valueOf(name);
+            }
          }
-      }
 
-      Object name2 = this.invokeNoArg(evt, "getName", "name", "getUsername", "getDisplayName");
-      return name2 != null ? String.valueOf(name2) : null;
+         Object name2 = this.invokeNoArg(evt, "getName", "name", "getUsername", "getDisplayName");
+         return name2 != null ? String.valueOf(name2) : null;
+      }
    }
 
    public static final class ErrorReport {
@@ -430,10 +476,10 @@ public final class ErrorDumpService {
       public String serverErrorClass;
       public String serverErrorMessage;
       public String serverErrorStack;
-      public Map<String, Object> extra;
-      public Map<String, String> lastErrors;
-      public NpcDebugSnapshot npcSnapshot;
-      public List<ActionTraceService.TraceEvent> last20mActions;
-      public Map<String, List<ActionTraceService.TraceEvent>> last20mActionsByPlayer;
+      public Map extra;
+      public Map lastErrors;
+      public AmigoNpcManager.NpcDebugSnapshot npcSnapshot;
+      public List last20mActions;
+      public Map last20mActionsByPlayer;
    }
 }

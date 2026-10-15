@@ -1,6 +1,5 @@
 package br.tones.amigonpc.core;
 
-import br.tones.amigonpc.core.i18n.AmigoText;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -24,30 +23,31 @@ public final class HytaleBridge {
       try {
          if (commandContext == null) {
             return null;
-         }
+         } else {
+            Method senderMethod = commandContext.getClass().getMethod("sender");
+            Object sender = senderMethod.invoke(commandContext);
+            if (sender == null) {
+               return null;
+            } else {
+               String[] candidates = new String[]{"getWorld", "world", "getCurrentWorld", "getPlayerWorld"};
 
-         Method senderMethod = commandContext.getClass().getMethod("sender");
-         Object sender = senderMethod.invoke(commandContext);
-         if (sender == null) {
-            return null;
-         }
-
-         String[] candidates = new String[]{"getWorld", "world", "getCurrentWorld", "getPlayerWorld"};
-
-         for (String name : candidates) {
-            try {
-               Method m = sender.getClass().getMethod(name);
-               Object world = m.invoke(sender);
-               if (world != null) {
-                  return world;
+               for(String name : candidates) {
+                  try {
+                     Method m = sender.getClass().getMethod(name);
+                     Object world = m.invoke(sender);
+                     if (world != null) {
+                        return world;
+                     }
+                  } catch (Throwable var10) {
+                  }
                }
-            } catch (Throwable var10) {
+
+               return null;
             }
          }
-
-         return null;
       } catch (Throwable t) {
-         setError(AmigoText.format("core.bridge.error.get_world_from_context_failed", t.getClass().getSimpleName(), t.getMessage()));
+         String var10000 = t.getClass().getSimpleName();
+         setError("tryGetWorldFromCommandContext falhou: " + var10000 + " - " + t.getMessage());
          return null;
       }
    }
@@ -64,7 +64,7 @@ public final class HytaleBridge {
                m.invoke(world, task);
                return true;
             } catch (Throwable var3) {
-               setError(AmigoText.text("core.bridge.error.world_execute_incompatible"));
+               setError("Não achei método world.execute/run compatível nesta build.");
                return false;
             }
          }
@@ -75,23 +75,23 @@ public final class HytaleBridge {
 
    public static boolean spawnBasicNpc(Object worldObj, UUID ownerId) {
       if (worldObj == null) {
-         setError(AmigoText.text("core.bridge.error.world_null"));
+         setError("World é null (não foi possível obter world do player).");
          return false;
       } else if (ownerId == null) {
-         setError(AmigoText.text("core.bridge.error.owner_id_null"));
+         setError("ownerId é null.");
          return false;
       } else {
          return worldExecute(worldObj, () -> {
             try {
                Object store = invokeNoArg(worldObj, "getEntityStore", "entityStore");
                if (store == null) {
-                  setError(AmigoText.text("core.bridge.error.entity_store_missing"));
+                  setError("World.getEntityStore() não encontrado.");
                   return;
                }
 
                Object holder = createEntityHolder();
                if (holder == null) {
-                  setError(AmigoText.text("core.bridge.error.create_holder_failed"));
+                  setError("Não consegui criar Holder via EntityStore.REGISTRY.newHolder().");
                   return;
                }
 
@@ -102,7 +102,7 @@ public final class HytaleBridge {
                if (addReasonSpawn == null) {
                   boolean ok = invokeAddEntityWithoutReason(store, holder);
                   if (!ok) {
-                     setError(AmigoText.text("core.bridge.error.add_entity_without_reason_failed"));
+                     setError("Não consegui chamar addEntity(holder[, reason]) nesta build.");
                   }
 
                   return;
@@ -110,11 +110,13 @@ public final class HytaleBridge {
 
                boolean ok = invokeAddEntityWithReason(store, holder, addReasonSpawn);
                if (!ok) {
-                  setError(AmigoText.text("core.bridge.error.add_entity_with_reason_failed"));
+                  setError("Não consegui chamar addEntity(holder, AddReason.SPAWN) nesta build.");
                }
             } catch (Throwable t) {
-               setError(AmigoText.format("core.bridge.error.spawn_basic_npc_failed", t.getClass().getSimpleName(), t.getMessage()));
+               String var10000 = t.getClass().getSimpleName();
+               setError("spawnBasicNpc falhou: " + var10000 + " - " + t.getMessage());
             }
+
          });
       }
    }
@@ -123,22 +125,23 @@ public final class HytaleBridge {
       try {
          Class<?> entityStoreClass = Class.forName("com.hypixel.hytale.server.core.universe.world.storage.EntityStore");
          Field registryField = entityStoreClass.getField("REGISTRY");
-         Object registry = registryField.get(null);
+         Object registry = registryField.get((Object)null);
          if (registry == null) {
             return null;
+         } else {
+            Method newHolder = registry.getClass().getMethod("newHolder");
+            return newHolder.invoke(registry);
          }
-
-         Method newHolder = registry.getClass().getMethod("newHolder");
-         return newHolder.invoke(registry);
       } catch (Throwable t) {
-         setError(AmigoText.format("core.bridge.error.create_entity_holder_failed", t.getClass().getSimpleName(), t.getMessage()));
+         String var10000 = t.getClass().getSimpleName();
+         setError("createEntityHolder falhou: " + var10000 + " - " + t.getMessage());
          return null;
       }
    }
 
    private static boolean invokeAddEntityWithReason(Object store, Object holder, Object addReasonSpawn) {
       try {
-         for (Method m : store.getClass().getMethods()) {
+         for(Method m : store.getClass().getMethods()) {
             if (m.getName().equals("addEntity")) {
                Class<?>[] p = m.getParameterTypes();
                if (p.length == 2 && p[1].isInstance(addReasonSpawn)) {
@@ -160,7 +163,7 @@ public final class HytaleBridge {
          return true;
       } catch (Throwable var8) {
          try {
-            for (Method m : store.getClass().getMethods()) {
+            for(Method m : store.getClass().getMethods()) {
                if (m.getName().equals("addEntity")) {
                   Class<?>[] p = m.getParameterTypes();
                   if (p.length == 1) {
@@ -177,32 +180,25 @@ public final class HytaleBridge {
    }
 
    private static void tryAddTransform(Object holder) {
-      String[] classNames = new String[]{
-         "com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent",
-         "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"
-      };
+      String[] classNames = new String[]{"com.hypixel.hytale.server.core.universe.world.entity.component.TransformComponent", "com.hypixel.hytale.server.core.universe.world.entity.components.TransformComponent"};
       Object comp = tryInstantiateFirstExisting(classNames);
       if (comp != null) {
          invokeHolderAdd(holder, comp);
       }
+
    }
 
    private static void tryAddUUIDComponent(Object holder, UUID ownerId) {
-      String[] classNames = new String[]{
-         "com.hypixel.hytale.server.core.universe.world.entity.component.UUIDComponent",
-         "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"
-      };
+      String[] classNames = new String[]{"com.hypixel.hytale.server.core.universe.world.entity.component.UUIDComponent", "com.hypixel.hytale.server.core.universe.world.entity.components.UUIDComponent"};
       Object comp = tryInstantiateUUIDComponent(classNames, ownerId);
       if (comp != null) {
          invokeHolderAdd(holder, comp);
       }
+
    }
 
    private static void tryAddNetworkId(Object holder, Object store) {
-      String[] classNames = new String[]{
-         "com.hypixel.hytale.server.core.universe.world.entity.component.NetworkIdComponent",
-         "com.hypixel.hytale.server.core.universe.world.entity.components.NetworkIdComponent"
-      };
+      String[] classNames = new String[]{"com.hypixel.hytale.server.core.universe.world.entity.component.NetworkIdComponent", "com.hypixel.hytale.server.core.universe.world.entity.components.NetworkIdComponent"};
       Object networkId = null;
 
       try {
@@ -218,12 +214,13 @@ public final class HytaleBridge {
          if (comp != null) {
             invokeHolderAdd(holder, comp);
          }
+
       }
    }
 
    private static void invokeHolderAdd(Object holder, Object component) {
       try {
-         for (Method m : holder.getClass().getMethods()) {
+         for(Method m : holder.getClass().getMethods()) {
             if (m.getName().equals("add")) {
                Class<?>[] p = m.getParameterTypes();
                if (p.length == 1) {
@@ -234,10 +231,11 @@ public final class HytaleBridge {
          }
       } catch (Throwable var7) {
       }
+
    }
 
    private static Object invokeNoArg(Object target, String... methodNames) {
-      for (String name : methodNames) {
+      for(String name : methodNames) {
          try {
             Method m = target.getClass().getMethod(name);
             return m.invoke(target);
@@ -253,27 +251,17 @@ public final class HytaleBridge {
          Class<?> enumClass = Class.forName(enumClassName);
          if (!enumClass.isEnum()) {
             return null;
+         } else {
+            Object constant = Enum.valueOf(enumClass, constantName);
+            return constant;
          }
-
-         Object[] constants = enumClass.getEnumConstants();
-         if (constants == null) {
-            return null;
-         }
-
-         for (Object constant : constants) {
-            if (constant instanceof Enum<?> enumValue && enumValue.name().equals(constantName)) {
-               return constant;
-            }
-         }
-
-         return null;
-      } catch (Throwable ignored) {
+      } catch (Throwable var4) {
          return null;
       }
    }
 
    private static Object tryInstantiateFirstExisting(String[] classNames) {
-      for (String cn : classNames) {
+      for(String cn : classNames) {
          try {
             Class<?> c = Class.forName(cn);
             Constructor<?> ctor = c.getDeclaredConstructor();
@@ -287,7 +275,7 @@ public final class HytaleBridge {
    }
 
    private static Object tryInstantiateUUIDComponent(String[] classNames, UUID ownerId) {
-      for (String cn : classNames) {
+      for(String cn : classNames) {
          try {
             Class<?> c = Class.forName(cn);
 
@@ -304,7 +292,7 @@ public final class HytaleBridge {
                Object obj = ctor.newInstance();
                String[] setters = new String[]{"setUuid", "setId", "setValue"};
 
-               for (String s : setters) {
+               for(String s : setters) {
                   try {
                      Method m = c.getMethod(s, UUID.class);
                      m.invoke(obj, ownerId);
@@ -315,7 +303,7 @@ public final class HytaleBridge {
 
                String[] fields = new String[]{"uuid", "id", "value"};
 
-               for (String f : fields) {
+               for(String f : fields) {
                   try {
                      Field field = c.getDeclaredField(f);
                      field.setAccessible(true);
@@ -334,11 +322,11 @@ public final class HytaleBridge {
    }
 
    private static Object tryInstantiateSingleArgFirstExisting(String[] classNames, Object arg) {
-      for (String cn : classNames) {
+      for(String cn : classNames) {
          try {
             Class<?> c = Class.forName(cn);
 
-            for (Constructor<?> ctor : c.getDeclaredConstructors()) {
+            for(Constructor ctor : c.getDeclaredConstructors()) {
                Class<?>[] p = ctor.getParameterTypes();
                if (p.length == 1 && (arg == null || p[0].isInstance(arg) || isPrimitiveWrapperMatch(p[0], arg.getClass()))) {
                   ctor.setAccessible(true);
@@ -352,23 +340,25 @@ public final class HytaleBridge {
       return null;
    }
 
-   private static boolean isPrimitiveWrapperMatch(Class<?> paramType, Class<?> argType) {
+   private static boolean isPrimitiveWrapperMatch(Class paramType, Class argType) {
       if (!paramType.isPrimitive()) {
          return false;
-      } else if (paramType == int.class && argType == Integer.class) {
+      } else if (paramType == Integer.TYPE && argType == Integer.class) {
          return true;
-      } else if (paramType == long.class && argType == Long.class) {
+      } else if (paramType == Long.TYPE && argType == Long.class) {
          return true;
-      } else if (paramType == boolean.class && argType == Boolean.class) {
+      } else if (paramType == Boolean.TYPE && argType == Boolean.class) {
          return true;
-      } else if (paramType == double.class && argType == Double.class) {
+      } else if (paramType == Double.TYPE && argType == Double.class) {
          return true;
-      } else if (paramType == float.class && argType == Float.class) {
+      } else if (paramType == Float.TYPE && argType == Float.class) {
          return true;
-      } else if (paramType == short.class && argType == Short.class) {
+      } else if (paramType == Short.TYPE && argType == Short.class) {
+         return true;
+      } else if (paramType == Byte.TYPE && argType == Byte.class) {
          return true;
       } else {
-         return paramType == byte.class && argType == Byte.class ? true : paramType == char.class && argType == Character.class;
+         return paramType == Character.TYPE && argType == Character.class;
       }
    }
 }

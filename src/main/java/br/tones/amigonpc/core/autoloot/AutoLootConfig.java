@@ -6,7 +6,7 @@ import java.util.Map;
 public final class AutoLootConfig {
    public boolean EnableCategoryFilter = true;
    public int VerticalScanBlocks = 10;
-   public Map<String, Boolean> Categories = new LinkedHashMap<>();
+   public Map Categories = new LinkedHashMap();
 
    public static AutoLootConfig defaults() {
       return new AutoLootConfig();

@@ -14,9 +14,7 @@ public final class NpcExperienceGainedEvent {
    private final NpcXpSource source;
    private final NpcXpContext context;
 
-   public NpcExperienceGainedEvent(
-      UUID ownerId, long amount, long oldTotalXp, long newTotalXp, int oldLevel, int newLevel, NpcXpSource source, NpcXpContext context
-   ) {
+   public NpcExperienceGainedEvent(UUID ownerId, long amount, long oldTotalXp, long newTotalXp, int oldLevel, int newLevel, NpcXpSource source, NpcXpContext context) {
       this.ownerId = ownerId;
       this.amount = amount;
       this.oldTotalXp = oldTotalXp;

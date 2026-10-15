@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -18,13 +17,13 @@ public final class AmigoLogSubCommand extends AbstractPlayerCommand {
    }
 
    public AmigoLogSubCommand() {
-      super("log", AmigoText.text("cmd.desc.amigo.log"));
+      super("log", "Alterna o log de debug do AmigoNPC no chat");
       this.setAllowsExtraArguments(false);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       UUID ownerId = playerRef.getUuid();
       boolean enabled = AmigoNpcManager.getShared().toggleDebugLog(ownerId);
-      ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.log.status", AmigoText.coloredOnOff(enabled))));
+      ctx.sendMessage(Message.raw("§7[AmigoNPC] Log agora: " + (enabled ? "§aON" : "§cOFF")));
    }
 }

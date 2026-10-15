@@ -10,7 +10,7 @@ public final class AmigoNPCApi {
    public static boolean isAvailable() {
       try {
          return AmigoNpcManager.getShared() != null;
-      } catch (Throwable t) {
+      } catch (Throwable var1) {
          return false;
       }
    }
@@ -18,7 +18,7 @@ public final class AmigoNPCApi {
    public static long getNpcTotalXp(UUID ownerId) {
       try {
          return AmigoNpcManager.getShared().getNpcTotalXp(ownerId);
-      } catch (Throwable t) {
+      } catch (Throwable var2) {
          return 0L;
       }
    }
@@ -26,7 +26,7 @@ public final class AmigoNPCApi {
    public static int getNpcLevel(UUID ownerId) {
       try {
          return AmigoNpcManager.getShared().getNpcLevel(ownerId);
-      } catch (Throwable t) {
+      } catch (Throwable var2) {
          return 1;
       }
    }
@@ -34,7 +34,7 @@ public final class AmigoNPCApi {
    public static boolean addNpcXp(UUID ownerId, long amount, NpcXpSource source, NpcXpContext ctx) {
       try {
          return AmigoNpcManager.getShared().addNpcXpViaApi(ownerId, amount, source, ctx);
-      } catch (Throwable t) {
+      } catch (Throwable var6) {
          return false;
       }
    }

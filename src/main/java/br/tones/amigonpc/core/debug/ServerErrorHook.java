@@ -1,29 +1,29 @@
 package br.tones.amigonpc.core.debug;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.HashMap;
+import java.util.UUID;
 
 public final class ServerErrorHook {
    private static volatile boolean INSTALLED;
-   private static volatile UncaughtExceptionHandler PREV;
+   private static volatile Thread.UncaughtExceptionHandler PREV;
 
    private ServerErrorHook() {
    }
 
-   public static synchronized void install() {
+   public static void install() {
       if (!INSTALLED) {
          INSTALLED = true;
 
          try {
             PREV = Thread.getDefaultUncaughtExceptionHandler();
-         } catch (Throwable ignored) {
+         } catch (Throwable var2) {
             PREV = null;
          }
 
          try {
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
                try {
-                  HashMap<String, Object> extra = new HashMap<>();
+                  HashMap<String, Object> extra = new HashMap();
 
                   try {
                      extra.put("threadName", thread != null ? thread.getName() : null);
@@ -35,7 +35,7 @@ public final class ServerErrorHook {
                   } catch (Throwable var5) {
                   }
 
-                  ErrorDumpService.getShared().dumpOnServerError(null, "uncaught_exception", throwable, extra);
+                  ErrorDumpService.getShared().dumpOnServerError((UUID)null, "uncaught_exception", throwable, extra);
                } catch (Throwable var7) {
                }
 
@@ -45,23 +45,11 @@ public final class ServerErrorHook {
                   }
                } catch (Throwable var4) {
                }
+
             });
          } catch (Throwable var1) {
          }
-      }
-   }
 
-   public static synchronized void uninstall() {
-      if (!INSTALLED) {
-         return;
-      }
-
-      try {
-         Thread.setDefaultUncaughtExceptionHandler(PREV);
-      } catch (Throwable ignored) {
-      } finally {
-         PREV = null;
-         INSTALLED = false;
       }
    }
 }

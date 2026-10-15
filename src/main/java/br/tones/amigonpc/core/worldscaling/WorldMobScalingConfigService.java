@@ -6,12 +6,13 @@ import com.google.gson.GsonBuilder;
 import com.hypixel.hytale.server.core.Constants;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 public final class WorldMobScalingConfigService {
-   private static final Gson GSON = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
-   private static final Path CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_MobScaling.json");
-   private static final Path LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("WorldMobScalingConfig.json");
+   private static final Gson GSON;
+   private static final Path CONFIG_PATH;
+   private static final Path LEGACY_PATH;
    private static volatile WorldMobScalingConfig CACHED;
 
    private WorldMobScalingConfigService() {
@@ -20,7 +21,7 @@ public final class WorldMobScalingConfigService {
    public static WorldMobScalingConfig get() {
       WorldMobScalingConfig c = CACHED;
       if (c == null) {
-         synchronized (WorldMobScalingConfigService.class) {
+         synchronized(WorldMobScalingConfigService.class) {
             c = CACHED;
             if (c == null) {
                c = reloadNow();
@@ -36,9 +37,9 @@ public final class WorldMobScalingConfigService {
       Path loadedFrom = null;
 
       try {
-         if (Files.isRegularFile(CONFIG_PATH)) {
+         if (Files.isRegularFile(CONFIG_PATH, new LinkOption[0])) {
             loadedFrom = CONFIG_PATH;
-         } else if (Files.isRegularFile(LEGACY_PATH)) {
+         } else if (Files.isRegularFile(LEGACY_PATH, new LinkOption[0])) {
             loadedFrom = LEGACY_PATH;
          }
 
@@ -77,6 +78,13 @@ public final class WorldMobScalingConfigService {
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg), StandardCharsets.UTF_8);
          } catch (Throwable var2) {
          }
+
       }
+   }
+
+   static {
+      GSON = (new GsonBuilder()).setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE).setPrettyPrinting().create();
+      CONFIG_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("Conf-NPC_MobScaling.json");
+      LEGACY_PATH = Constants.UNIVERSE_PATH.resolve("amigonpc").resolve("WorldMobScalingConfig.json");
    }
 }

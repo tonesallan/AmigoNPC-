@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -15,17 +14,18 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 
 public final class AmigoDefendeSubCommand extends AbstractPlayerCommand {
-   private final OptionalArg valueArg = this.withOptionalArg("valor", AmigoText.text("cmd.arg.amigo.defende.value"), ArgTypes.STRING);
+   private final OptionalArg valueArg;
 
    protected boolean canGeneratePermission() {
       return false;
    }
 
    public AmigoDefendeSubCommand() {
-      super("defende", AmigoText.text("cmd.desc.amigo.defende"));
+      super("defende", "Alterna o modo de defesa/assistência do AmigoNPC (ON/OFF)");
+      this.valueArg = this.withOptionalArg("valor", "on/off (sem argumento alterna)", ArgTypes.STRING);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       AmigoNpcManager manager = AmigoNpcManager.getShared();
       UUID owner = playerRef.getUuid();
       boolean current = manager.isDefendeEnabled(owner);
@@ -39,7 +39,7 @@ public final class AmigoDefendeSubCommand extends AbstractPlayerCommand {
             next = !current;
          } else if (!s.equals("on") && !s.equals("true") && !s.equals("1") && !s.equals("sim")) {
             if (!s.equals("off") && !s.equals("false") && !s.equals("0") && !s.equals("nao") && !s.equals("não")) {
-               ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.defende.usage")));
+               ctx.sendMessage(Message.raw("§e[AmigoNPC] Use: §f/amigo defende §7(para alternar) §eou §f/amigo defende on|off"));
                return;
             }
 
@@ -51,9 +51,10 @@ public final class AmigoDefendeSubCommand extends AbstractPlayerCommand {
 
       manager.setDefendeEnabled(owner, next);
       if (next) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.defende.on")));
+         ctx.sendMessage(Message.raw("§a[AmigoNPC] Defesa: §fON§a. (O NPC vai atacar quem te atacar e ajudar no seu alvo)"));
       } else {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.defende.off")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Defesa: §fOFF§c. (O NPC não causará dano)"));
       }
+
    }
 }

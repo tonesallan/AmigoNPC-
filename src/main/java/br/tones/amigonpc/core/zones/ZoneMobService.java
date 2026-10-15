@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.io.PrintStream;
 import java.util.UUID;
 
 public final class ZoneMobService {
@@ -26,69 +27,57 @@ public final class ZoneMobService {
       this.mobLevels.reloadConfig();
    }
 
-   public ZoneMobService.ZoneSnapshot computeZoneSnapshot(Object worldObj, Store<EntityStore> store, Object ownerRefObj, int ownerLevel) {
+   public ZoneSnapshot computeZoneSnapshot(Object worldObj, Store store, Object ownerRefObj, int ownerLevel) {
       AmigoZonesConfig cfg = AmigoZonesConfigService.get();
       if (!cfg.enableZones) {
-         return new ZoneMobService.ZoneSnapshot(0, 0, 0, ZoneModel.WHITE);
-      }
+         return new ZoneSnapshot(0, 0, 0, ZoneModel.WHITE);
+      } else {
+         ZoneResolver.ZoneContext ctx = ZoneResolver.resolve(worldObj, store, ownerRefObj);
+         int expected = ZoneModel.expectedZoneForLevel(ownerLevel);
+         Integer current = ZoneModel.currentZoneFromContext(ctx.zoneId(), ctx.instanceLevelMin(), ctx.instanceLevelMax());
+         int currentZone = current != null ? current : 0;
+         Color color = currentZone > 0 ? ZoneModel.colorForNpcLevel(ownerLevel, currentZone) : ZoneModel.WHITE;
+         if (cfg.debugLog) {
+            PrintStream var10000 = System.out;
+            int var10001 = ctx.zoneId();
+            var10000.println("[AmigoNPC][Zones] rawZoneId=" + var10001 + " expected=" + expected + " current=" + currentZone + " biome=" + String.valueOf(ctx.biomeName()) + " instanceId=" + String.valueOf(ctx.instanceId()));
+         }
 
-      ZoneResolver.ZoneContext ctx = ZoneResolver.resolve(worldObj, store, ownerRefObj);
-      int expected = ZoneModel.expectedZoneForLevel(ownerLevel);
-      Integer current = ZoneModel.currentZoneFromContext(ctx.zoneId(), ctx.instanceLevelMin(), ctx.instanceLevelMax());
-      int currentZone = current != null ? current : 0;
-      Color color = currentZone > 0 ? ZoneModel.colorForNpcLevel(ownerLevel, currentZone) : ZoneModel.WHITE;
-      if (cfg.debugLog) {
-         System.out
-            .println(
-               "[AmigoNPC][Zones] rawZoneId="
-                  + ctx.zoneId()
-                  + " expected="
-                  + expected
-                  + " current="
-                  + currentZone
-                  + " biome="
-                  + ctx.biomeName()
-                  + " instanceId="
-                  + ctx.instanceId()
-            );
+         return new ZoneSnapshot(ctx.zoneId(), expected, currentZone, color);
       }
-
-      return new ZoneMobService.ZoneSnapshot(ctx.zoneId(), expected, currentZone, color);
    }
 
-   public MobLevelVarianceCalculator.Result computeMobLevel(
-      Store<EntityStore> store, Ref<EntityStore> targetRef, Object worldObj, int zoneId, int instMin, int instMax, String instanceId
-   ) {
+   public MobLevelVarianceCalculator.Result computeMobLevel(Store store, Ref targetRef, Object worldObj, int zoneId, int instMin, int instMax, String instanceId) {
       AmigoZonesConfig cfg = AmigoZonesConfigService.get();
       if (!cfg.enableMobLevelVariance && !cfg.enableZones) {
          return new MobLevelVarianceCalculator.Result(0, 0, 0, 0, true);
+      } else {
+         float maxHp = extractMaxHp(store, targetRef);
+         if (!(maxHp > 0.0F)) {
+            return new MobLevelVarianceCalculator.Result(0, 0, 0, 0, true);
+         } else {
+            UUID uuid = extractUuid(store, targetRef);
+            return this.mobLevels.compute(uuid, maxHp, zoneId, instMin, instMax, instanceId);
+         }
       }
-
-      float maxHp = extractMaxHp(store, targetRef);
-      if (!(maxHp > 0.0F)) {
-         return new MobLevelVarianceCalculator.Result(0, 0, 0, 0, true);
-      }
-
-      UUID uuid = extractUuid(store, targetRef);
-      return this.mobLevels.compute(uuid, maxHp, zoneId, instMin, instMax, instanceId);
    }
 
-   private static float extractMaxHp(Store<EntityStore> store, Ref<EntityStore> targetRef) {
+   private static float extractMaxHp(Store store, Ref targetRef) {
       try {
          EntityStatMap stats = (EntityStatMap)store.getComponent(targetRef, EntityStatMap.getComponentType());
          if (stats == null) {
             return 0.0F;
+         } else {
+            int idx = DefaultEntityStatTypes.getHealth();
+            EntityStatValue v = stats.get(idx);
+            return v == null ? 0.0F : v.getMax();
          }
-
-         int idx = DefaultEntityStatTypes.getHealth();
-         EntityStatValue v = stats.get(idx);
-         return v == null ? 0.0F : v.getMax();
-      } catch (Throwable ignored) {
+      } catch (Throwable var5) {
          return 0.0F;
       }
    }
 
-   private static UUID extractUuid(Store<EntityStore> store, Ref<EntityStore> ref) {
+   private static UUID extractUuid(Store store, Ref ref) {
       try {
          UUIDComponent uc = (UUIDComponent)store.getComponent(ref, UUIDComponent.getComponentType());
          if (uc != null) {
@@ -98,12 +87,12 @@ public final class ZoneMobService {
       }
 
       try {
-         return UUID.nameUUIDFromBytes(("AmigoNPC:mob:" + ref).getBytes());
-      } catch (Throwable ignored) {
+         return UUID.nameUUIDFromBytes(("AmigoNPC:mob:" + String.valueOf(ref)).getBytes());
+      } catch (Throwable var3) {
          return UUID.randomUUID();
       }
    }
 
-   public record ZoneSnapshot(int rawZoneId, int expectedZone, int currentZone, Color color) {
+   public static record ZoneSnapshot(int rawZoneId, int expectedZone, int currentZone, Color color) {
    }
 }

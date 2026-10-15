@@ -1,6 +1,5 @@
 package br.tones.amigonpc.commands;
 
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -17,17 +16,18 @@ import java.util.Collections;
 import java.util.List;
 
 public final class AmigoTiposSubCommand extends AbstractPlayerCommand {
-   private final OptionalArg filtroArg = this.withOptionalArg("filtro", AmigoText.text("cmd.arg.amigo.tipos.filter"), ArgTypes.STRING);
+   private final OptionalArg filtroArg;
 
    protected boolean canGeneratePermission() {
       return false;
    }
 
    public AmigoTiposSubCommand() {
-      super("tipos", AmigoText.text("cmd.desc.amigo.tipos"));
+      super("tipos", "Lista os tipos (npcType) disponíveis");
+      this.filtroArg = this.withOptionalArg("filtro", "Filtrar por texto (ex.: villager, citizen, human)", ArgTypes.STRING);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       String filtro = null;
       if (this.filtroArg.provided(ctx)) {
          Object v = this.filtroArg.get(ctx);
@@ -42,33 +42,34 @@ public final class AmigoTiposSubCommand extends AbstractPlayerCommand {
 
       List<String> tipos = fetchRoleTemplateNames(true);
       if (tipos.isEmpty()) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.tipos.unavailable")));
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Não consegui listar tipos nesta build."));
       } else {
          if (filtro != null) {
             String f = filtro.toLowerCase();
-            tipos.removeIf(s -> s == null || !s.toLowerCase().contains(f));
+            tipos.removeIf((s) -> s == null || !s.toLowerCase().contains(f));
          }
 
          if (tipos.isEmpty()) {
-            String filterText = filtro != null ? AmigoText.format("cmd.amigo.tipos.none_filter_suffix", filtro) : "";
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.tipos.none", filterText)));
+            String var15 = filtro != null ? " para filtro: §f" + filtro : "";
+            ctx.sendMessage(Message.raw("§e[AmigoNPC] Nenhum tipo encontrado" + var15 + "§e."));
          } else {
             Collections.sort(tipos, String::compareToIgnoreCase);
-            String filterLabel = filtro != null ? AmigoText.format("cmd.amigo.tipos.header_filter_suffix", filtro) : "";
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.amigo.tipos.header", filterLabel, tipos.size())));
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigo.tipos.usage")));
+            String var10001 = filtro != null ? " (filtro: §f" + filtro + "§a)" : "";
+            ctx.sendMessage(Message.raw("§a[AmigoNPC] Tipos disponíveis" + var10001 + ": §f" + tipos.size()));
+            ctx.sendMessage(Message.raw("§7[AmigoNPC] Use: §f/amigo tipo <nome>"));
             int maxPerLine = 6;
             int shown = 0;
             StringBuilder line = new StringBuilder("§f");
 
-            for (String t : tipos) {
+            for(String t : tipos) {
                if (t != null) {
                   if (shown > 0) {
                      line.append("§7, §f");
                   }
 
                   line.append(t);
-                  if (++shown >= maxPerLine) {
+                  ++shown;
+                  if (shown >= maxPerLine) {
                      ctx.sendMessage(Message.raw(line.toString()));
                      line = new StringBuilder("§f");
                      shown = 0;
@@ -79,24 +80,26 @@ public final class AmigoTiposSubCommand extends AbstractPlayerCommand {
             if (shown > 0) {
                ctx.sendMessage(Message.raw(line.toString()));
             }
+
          }
       }
    }
 
-   private static List<String> fetchRoleTemplateNames(boolean spawnableOnly) {
+   private static List fetchRoleTemplateNames(boolean spawnableOnly) {
       try {
          Class<?> npcPluginClass = Class.forName("com.hypixel.hytale.server.npc.NPCPlugin");
          Method get = npcPluginClass.getMethod("get");
-         Object npcPlugin = get.invoke(null);
+         Object npcPlugin = get.invoke((Object)null);
          if (npcPlugin == null) {
             return List.of();
          }
 
-         Method m = npcPlugin.getClass().getMethod("getRoleTemplateNames", boolean.class);
-         if (m.invoke(npcPlugin, spawnableOnly) instanceof List<?> list) {
-            ArrayList<String> r = new ArrayList<>();
+         Method m = npcPlugin.getClass().getMethod("getRoleTemplateNames", Boolean.TYPE);
+         Object out = m.invoke(npcPlugin, spawnableOnly);
+         if (out instanceof List list) {
+            ArrayList<String> r = new ArrayList();
 
-            for (Object v : list) {
+            for(Object v : list) {
                if (v != null) {
                   r.add(String.valueOf(v));
                }

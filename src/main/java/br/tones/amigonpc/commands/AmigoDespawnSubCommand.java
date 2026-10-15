@@ -2,7 +2,6 @@ package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoService;
 import br.tones.amigonpc.core.debug.ActionTraceService;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
@@ -19,13 +18,12 @@ public final class AmigoDespawnSubCommand extends AbstractPlayerCommand {
    }
 
    public AmigoDespawnSubCommand(AmigoService service) {
-      super("despawn", AmigoText.text("cmd.desc.amigo.despawn"));
-      this.requireNoPermission();
+      super("despawn", "Remove o NPC do jogador");
       this.service = service;
       this.setAllowsExtraArguments(false);
    }
 
-   protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> playerEntityRef, PlayerRef playerRef, World world) {
+   protected void execute(CommandContext ctx, Store store, Ref playerEntityRef, PlayerRef playerRef, World world) {
       try {
          ActionTraceService.getShared().record(ctx.sender().getUuid(), "command", "/amigo despawn");
       } catch (Throwable var7) {

@@ -1,7 +1,6 @@
 package br.tones.amigonpc.commands;
 
 import br.tones.amigonpc.core.AmigoNpcManager;
-import br.tones.amigonpc.core.i18n.AmigoText;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
@@ -10,68 +9,68 @@ import java.util.concurrent.CompletableFuture;
 
 public final class AutoLootCommand extends AbstractCommand {
    public AutoLootCommand() {
-      super("autoloot", AmigoText.text("cmd.desc.autoloot"));
+      super("autoloot", "Ativa/desativa o auto-loot do AmigoNPC.");
       this.setAllowsExtraArguments(true);
-      this.addSubCommand(new AutoLootCommand.On());
-      this.addSubCommand(new AutoLootCommand.Off());
+      this.addSubCommand(new On());
+      this.addSubCommand(new Off());
    }
 
    public boolean canGeneratePermission() {
       return false;
    }
 
-   protected CompletableFuture<Void> execute(CommandContext ctx) {
+   protected CompletableFuture execute(CommandContext ctx) {
       if (!ctx.isPlayer()) {
-         ctx.sendMessage(Message.raw(AmigoText.text("cmd.autoloot.only_players")));
-         return CompletableFuture.completedFuture(null);
+         ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));
+         return CompletableFuture.completedFuture((Object)null);
       } else {
          UUID ownerId = ctx.sender().getUuid();
          boolean enabled = AmigoNpcManager.getShared().toggleAutoLoot(ownerId);
-         ctx.sendMessage(Message.raw(AmigoText.format("cmd.autoloot.status", AmigoText.onOff(enabled))));
-         return CompletableFuture.completedFuture(null);
-      }
-   }
-
-   private static final class Off extends AbstractCommand {
-      Off() {
-         super("off", AmigoText.text("cmd.desc.autoloot.off"));
-      }
-
-      public boolean canGeneratePermission() {
-         return false;
-      }
-
-      protected CompletableFuture<Void> execute(CommandContext ctx) {
-         if (!ctx.isPlayer()) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.autoloot.only_players")));
-            return CompletableFuture.completedFuture(null);
-         } else {
-            UUID ownerId = ctx.sender().getUuid();
-            AmigoNpcManager.getShared().setAutoLootEnabled(ownerId, false);
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.autoloot.status", AmigoText.text("common.off"))));
-            return CompletableFuture.completedFuture(null);
-         }
+         ctx.sendMessage(Message.raw("§7[AmigoNPC] AutoLoot: §f" + (enabled ? "ON" : "OFF")));
+         return CompletableFuture.completedFuture((Object)null);
       }
    }
 
    private static final class On extends AbstractCommand {
       On() {
-         super("on", AmigoText.text("cmd.desc.autoloot.on"));
+         super("on", "Ativar auto-loot");
       }
 
       public boolean canGeneratePermission() {
          return false;
       }
 
-      protected CompletableFuture<Void> execute(CommandContext ctx) {
+      protected CompletableFuture execute(CommandContext ctx) {
          if (!ctx.isPlayer()) {
-            ctx.sendMessage(Message.raw(AmigoText.text("cmd.autoloot.only_players")));
-            return CompletableFuture.completedFuture(null);
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));
+            return CompletableFuture.completedFuture((Object)null);
          } else {
             UUID ownerId = ctx.sender().getUuid();
             AmigoNpcManager.getShared().setAutoLootEnabled(ownerId, true);
-            ctx.sendMessage(Message.raw(AmigoText.format("cmd.autoloot.status", AmigoText.text("common.on"))));
-            return CompletableFuture.completedFuture(null);
+            ctx.sendMessage(Message.raw("§7[AmigoNPC] AutoLoot: §fON"));
+            return CompletableFuture.completedFuture((Object)null);
+         }
+      }
+   }
+
+   private static final class Off extends AbstractCommand {
+      Off() {
+         super("off", "Desativar auto-loot");
+      }
+
+      public boolean canGeneratePermission() {
+         return false;
+      }
+
+      protected CompletableFuture execute(CommandContext ctx) {
+         if (!ctx.isPlayer()) {
+            ctx.sendMessage(Message.raw("§c[AmigoNPC] Este comando só pode ser usado por players."));
+            return CompletableFuture.completedFuture((Object)null);
+         } else {
+            UUID ownerId = ctx.sender().getUuid();
+            AmigoNpcManager.getShared().setAutoLootEnabled(ownerId, false);
+            ctx.sendMessage(Message.raw("§7[AmigoNPC] AutoLoot: §fOFF"));
+            return CompletableFuture.completedFuture((Object)null);
          }
       }
    }

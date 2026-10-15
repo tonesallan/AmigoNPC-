@@ -23,42 +23,40 @@ public final class LootService {
    private LootService() {
    }
 
-   public boolean openLoot(UUID ownerId, PlayerRef viewerPlayerRef, Ref<EntityStore> viewerEntityRef, Store<EntityStore> store) {
+   public boolean openLoot(UUID ownerId, PlayerRef viewerPlayerRef, Ref viewerEntityRef, Store store) {
       if (ownerId != null && viewerPlayerRef != null && viewerEntityRef != null && store != null) {
-         if (viewerPlayerRef.getUuid() == null || !ownerId.equals(viewerPlayerRef.getUuid())) {
-            return false;
-         }
          AmigoNpcManager manager = AmigoNpcManager.getShared();
          if (!manager.hasNpc(ownerId)) {
             return false;
-         }
+         } else {
+            SimpleItemContainer bag = manager.getOrLoadBackpack(ownerId);
 
-         SimpleItemContainer bag = manager.getOrLoadBackpack(ownerId);
-
-         World world;
-         try {
-            world = ((EntityStore)store.getExternalData()).getWorld();
-         } catch (Throwable t) {
-            return false;
-         }
-
-         if (world == null) {
-            return false;
-         }
-
-         world.execute(() -> {
+            World world;
             try {
-               Player playerComponent = (Player)store.getComponent(viewerEntityRef, Player.getComponentType());
-               if (playerComponent == null) {
-                  return;
-               }
-
-               ContainerWindow window = new ContainerWindow(bag);
-               playerComponent.getPageManager().setPageWithWindows(viewerEntityRef, store, Page.Bench, true, new Window[]{window});
-            } catch (Throwable var5x) {
+               world = ((EntityStore)store.getExternalData()).getWorld();
+            } catch (Throwable var9) {
+               return false;
             }
-         });
-         return true;
+
+            if (world == null) {
+               return false;
+            } else {
+               world.execute(() -> {
+                  try {
+                     Player playerComponent = (Player)store.getComponent(viewerEntityRef, Player.getComponentType());
+                     if (playerComponent == null) {
+                        return;
+                     }
+
+                     ContainerWindow window = new ContainerWindow(bag);
+                     playerComponent.getPageManager().setPageWithWindows(viewerEntityRef, store, Page.Bench, true, new Window[]{window});
+                  } catch (Throwable var5) {
+                  }
+
+               });
+               return true;
+            }
+         }
       } else {
          return false;
       }
