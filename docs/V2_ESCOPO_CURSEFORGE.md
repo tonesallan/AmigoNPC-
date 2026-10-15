@@ -99,3 +99,22 @@ Estes documentos descrevem o comportamento desejado, além do que a página do C
 - Os documentos citam a branch `recovery/amigonpc-2.0.1-source`, que é outra recuperação. Não usar como base.
 - Fórmula de XP e valores por nível não estão definidos.
 - O comportamento de revive com F depende de detectar tecla contínua e cancelamento, o que precisa confirmar na API.
+
+## Mods de referência enviados pelo dono (estudo, sem copiar código)
+
+Licenças de terceiros não foram verificadas: usar só como referência de padrões, sem copiar código.
+
+| Mod | Versão | Servidor alvo (manifest) | Relevância para a v2 |
+|---|---|---|---|
+| FH_CompanionNPCs | 0.8.0 | 0.6.0 | Companheiro via `NPCPlugin` e asset de role JSON. Padrão mais próximo do nosso. |
+| RPGCompanion | 1.10.0 | 2026.02.18 | Pet de combate com equipamento e UI. Spawn por nome de role; log aponta erro de validação do role JSON. Depende de HyUI e MultipleHUD. |
+| HyCompanion | 1.1.8 | =0.5.6 | Companheiro com IA via LLM. Fora do escopo; servidor antigo. |
+| HyUI | 0.9.8 | >=0.5.0 <0.6.0 | Biblioteca de UI. Não compatível com 0.7.2 pelo manifest. Não depender dela. |
+| RPGLeveling | 0.4.2 | ^0.7.0 | XP e nível para 0.7. Referência para a fórmula de XP em aberto. |
+| MMOSkillTree | 1.7.1 | >=0.7.0 <0.8.0 | Árvore de habilidades e hotbar. Referência futura. |
+| TravelingMounts | 1.1.2 | 2026.03.26 | Companheiros montáveis. Referência futura. |
+
+Achados:
+- O jar original recorre a reflexão para achar `spawnNPC` (5 parâmetros) e `spawnEntity` (7 parâmetros). É frágil. Os companheiros acima chamam `NPCPlugin.spawnNPC` pelo nome do role, com o comportamento definido em JSON de role. Recomendação: seguir esse padrão, conferido com `javap` no 0.7.2.
+- O jar original tem seis arquivos `.ui` e roles em `Server/NPC/Roles/`, incluindo `Amigo_Follow.json` em várias pastas. Antes de portar, confirmar qual é o role efetivamente usado.
+- Não depender de HyUI: o manifest exige servidor 0.5.x.
