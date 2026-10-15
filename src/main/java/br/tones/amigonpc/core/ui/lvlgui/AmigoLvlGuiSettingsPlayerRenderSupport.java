@@ -49,28 +49,8 @@ final class AmigoLvlGuiSettingsPlayerRenderSupport {
          AmigoText.format("ui.settings.toggle.autoloot", AmigoText.onOff(settingsPending.autoLoot))
       );
       cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsCombatProtectOwner.Text",
-         (settingsPending.combatMode == CombatMode.PROTECT_OWNER ? "(*) " : "( ) ") + AmigoText.text("ui.settings.combat.protect_owner")
-      );
-      cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsCombatWeakest.Text",
-         (settingsPending.combatMode == CombatMode.WEAKEST_ENEMY ? "(*) " : "( ) ") + AmigoText.text("ui.settings.combat.weakest")
-      );
-      cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAutoWeaponToggle.Text",
-         AmigoText.format("ui.settings.toggle.auto_weapon", AmigoText.onOff(settingsPending.autoWeaponSwitch))
-      );
-      cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsInterruptToggle.Text",
-         AmigoText.format("ui.settings.toggle.interrupt", AmigoText.onOff(settingsPending.interruptAttacks))
-      );
-      cmd.set(
          "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsHudToggle.Text",
          AmigoText.format("ui.settings.toggle.hud", AmigoText.onOff(settingsPending.hud))
-      );
-      cmd.set(
-         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsLanguageValue.Text",
-         AmigoLvlGuiSettingsLanguageSupport.displayName(AmigoText.localeForPlayer(ownerId))
       );
       cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsSpawnButton.Disabled", hasNpc);
       cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsDespawnButton.Disabled", !hasNpc);
@@ -105,7 +85,6 @@ final class AmigoLvlGuiSettingsPlayerRenderSupport {
       }
 
       if (!settingsModelPrefillDone) {
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsNpcNameInput.Value", npcName);
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelIdInput.Value", modelId);
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelScaleInput.Value", String.valueOf(scale));
          settingsModelPrefillDone = true;

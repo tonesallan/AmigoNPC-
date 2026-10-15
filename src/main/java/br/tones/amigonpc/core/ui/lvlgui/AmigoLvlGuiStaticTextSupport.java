@@ -17,47 +17,19 @@ final class AmigoLvlGuiStaticTextSupport {
          cmd.set("#NavRewardsButton.Text", AmigoText.text("ui.nav.rewards"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsTitle.Text", AmigoText.text("ui.settings.title"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsSubtitle.Text", AmigoText.text("ui.settings.subtitle"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPlayerSectionTitle.Text", AmigoText.text("ui.settings.section.player"));
-         cmd.set(
-            "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPlayerQuickActionsTitle.Text", AmigoText.text("ui.settings.section.quick_actions")
-         );
-         cmd.set(
-            "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPlayerPreferencesTitle.Text", AmigoText.text("ui.settings.section.preferences")
-         );
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsLanguageLabel.Text", AmigoText.text("ui.settings.player.field.language"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsLanguageHint.Text", AmigoText.text("ui.settings.player.language.hint"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPlayerModelSkinTitle.Text", AmigoText.text("ui.settings.section.model_skin"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsNpcNameLabel.Text", AmigoText.text("ui.settings.player.field.name"));
-         cmd.set(
-            "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsNpcNameInput.PlaceholderText",
-            AmigoText.text("ui.settings.player.field.name.placeholder")
-         );
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsApplyNameButton.Text", AmigoText.text("ui.settings.player.name.apply"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsNameOffButton.Text", AmigoText.text("ui.settings.player.name.off"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelIdLabel.Text", AmigoText.text("ui.settings.player.field.model_id"));
          cmd.set(
             "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelIdInput.PlaceholderText",
             AmigoText.text("ui.settings.player.field.model_id.placeholder")
          );
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelScaleLabel.Text", AmigoText.text("ui.settings.player.field.scale"));
          cmd.set(
             "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelScaleInput.PlaceholderText",
             AmigoText.text("ui.settings.player.field.scale.placeholder")
          );
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsApplyModelButton.Text", AmigoText.text("ui.settings.player.model.apply"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsModelOffButton.Text", AmigoText.text("ui.settings.player.model.off"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsPlayerModelHint.Text", AmigoText.text("ui.settings.player.model.hint"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsSpawnButton.Text", AmigoText.text("ui.settings.player.spawn"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsDespawnButton.Text", AmigoText.text("ui.settings.player.despawn"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsLootButton.Text", AmigoText.text("ui.settings.player.loot"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminSectionTitle.Text", AmigoText.text("ui.settings.section.admin"));
-         cmd.set(
-            "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminDebugActionsTitle.Text", AmigoText.text("ui.settings.section.admin_actions")
-         );
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminAddXpTitle.Text", AmigoText.text("ui.settings.section.admin_add_xp"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminStatsTitle.Text", AmigoText.text("ui.settings.section.admin_stats"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminRewardsTitle.Text", AmigoText.text("ui.settings.section.admin_rewards"));
-         cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminSwordTitle.Text", AmigoText.text("ui.settings.section.admin_sword"));
          cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminDebugInfoButton.Text", AmigoText.text("ui.settings.admin.debug_info"));
          cmd.set(
             "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminAddXpAmountInput.PlaceholderText",

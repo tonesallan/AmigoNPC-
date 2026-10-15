@@ -34,12 +34,6 @@ final class AmigoLvlGuiRenderSupport {
       );
       String nameText = AmigoText.format("ui.header.npc_name", displayName);
       String statusText = AmigoText.format("ui.header.status", activity);
-      cmd.set("#StatsPageContainer #StatsPage #PlayerHeaderNameLabel.Text", nameText);
-      cmd.set("#RewardsPageContainer #RewardsPage #PlayerHeaderNameLabel.Text", nameText);
-      cmd.set("#StatsPageContainer #StatsPage #PlayerHeaderStatusLabel.Text", statusText);
-      cmd.set("#RewardsPageContainer #RewardsPage #PlayerHeaderStatusLabel.Text", statusText);
-      cmd.set("#StatsPageContainer #StatsPage #PlayerHeaderHealthLabel.Text", healthText);
-      cmd.set("#RewardsPageContainer #RewardsPage #PlayerHeaderHealthLabel.Text", healthText);
 
       NpcLevelDataView view = NpcLevelDataView.fromOwner(ownerId);
       String levelText = AmigoText.format("ui.header.level", view.level);

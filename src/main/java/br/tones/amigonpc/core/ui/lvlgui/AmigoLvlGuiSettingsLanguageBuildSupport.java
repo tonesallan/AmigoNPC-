@@ -7,7 +7,5 @@ final class AmigoLvlGuiSettingsLanguageBuildSupport {
    }
 
    static void bind(UIEventBuilder events) {
-      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsLanguagePrevButton", "settings_language_prev");
-      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsLanguageNextButton", "settings_language_next");
    }
 }

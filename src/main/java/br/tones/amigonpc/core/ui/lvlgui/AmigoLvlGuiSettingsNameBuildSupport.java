@@ -9,12 +9,5 @@ final class AmigoLvlGuiSettingsNameBuildSupport {
    }
 
    static void bind(UIEventBuilder events) {
-      events.addEventBinding(
-         CustomUIEventBindingType.Activating,
-         "#SettingsApplyNameButton",
-         EventData.of("Action", "settings_name_apply").append("@NpcName", "#SettingsNpcNameInput.Value"),
-         false
-      );
-      AmigoLvlGuiEventBindingSupport.addSimpleActionBinding(events, "#SettingsNameOffButton", "settings_name_off");
    }
 }
