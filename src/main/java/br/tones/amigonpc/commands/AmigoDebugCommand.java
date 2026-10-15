@@ -3,12 +3,15 @@ package br.tones.amigonpc.commands;
 import br.tones.amigonpc.core.AmigoNpcManager;
 import br.tones.amigonpc.core.HytaleBridge;
 import br.tones.amigonpc.core.debug.BuildInfo;
+import br.tones.amigonpc.diag.UiDump;
 import br.tones.amigonpc.core.i18n.AmigoText;
 import br.tones.amigonpc.ui.AmigoUiFactory;
 import br.tones.amigonpc.ui.UiBridge;
+import com.hypixel.hytale.server.core.Constants;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -61,6 +64,10 @@ public final class AmigoDebugCommand extends AbstractCommand {
       ctx.sendMessage(
          Message.raw(AmigoText.format("cmd.amigodebug.bridge_status", "AmigoUiFactory", uf == null ? AmigoText.text("cmd.amigodebug.bridge_ok") : uf))
       );
+      Path amigoDir = Constants.UNIVERSE_PATH.resolve("amigonpc");
+      int pages = UiDump.dumpAll(amigoDir.resolve("ui"));
+      ctx.sendMessage(Message.raw("§7- UiDump: §f" + pages + " página(s) §7em §f" + amigoDir.resolve("ui")));
+      ctx.sendMessage(Message.raw("§7- Erros: §f" + amigoDir.resolve("errors")));
       ctx.sendMessage(Message.raw(AmigoText.text("cmd.amigodebug.tip")));
       return CompletableFuture.completedFuture(null);
    }
