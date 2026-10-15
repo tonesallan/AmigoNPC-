@@ -4,7 +4,14 @@ import br.tones.amigonpc.core.AmigoNpcManager;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChain;
+import com.hypixel.hytale.server.core.Constants;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -39,6 +46,7 @@ public final class ManualReviveService {
             return current;
          }
 
+         trace("BEGIN helper=" + helperId + " owner=" + npcOwnerId);
          return new Attempt(npcOwnerId, now, now);
       });
    }
@@ -60,6 +68,9 @@ public final class ManualReviveService {
 
       long now = System.currentTimeMillis();
       InteractionState state = chain.state;
+      trace("CHAIN helper=" + helperId + " chainId=" + chain.chainId + " state=" + state
+         + " attemptChainId=" + attempt.chainId + " holdConfirmed=" + attempt.holdConfirmed
+         + " elapsedMs=" + (now - attempt.startedAtMillis));
       if (state == InteractionState.NotFinished) {
          if (attempt.chainId != Integer.MIN_VALUE && attempt.chainId != chain.chainId) {
             return;
@@ -90,17 +101,20 @@ public final class ManualReviveService {
          }
 
          if (!AmigoNpcManager.getShared().isDowned(attempt.npcOwnerId)) {
+            trace("END-NOT-DOWNED helper=" + helperId);
             this.attempts.remove(helperId, attempt);
             continue;
          }
 
          if (now - attempt.startedAtMillis > ABANDONED_ATTEMPT_TIMEOUT_MILLIS) {
+            trace("END-ABANDONED helper=" + helperId + " holdConfirmed=" + attempt.holdConfirmed);
             this.attempts.remove(helperId, attempt);
             continue;
          }
 
          if (attempt.holdConfirmed && now - attempt.startedAtMillis >= REQUIRED_HOLD_MILLIS) {
             if (this.attempts.remove(helperId, attempt)) {
+               trace("REVIVE helper=" + helperId + " owner=" + attempt.npcOwnerId);
                AmigoNpcManager.getShared().revive(attempt.npcOwnerId, true);
             }
          }
@@ -108,8 +122,19 @@ public final class ManualReviveService {
    }
 
    public void cancel(UUID helperId) {
-      if (helperId != null) {
-         this.attempts.remove(helperId);
+      if (helperId != null && this.attempts.remove(helperId) != null) {
+         trace("CANCEL helper=" + helperId);
+      }
+   }
+
+   private static void trace(String message) {
+      try {
+         Path dir = Constants.UNIVERSE_PATH.resolve("amigonpc");
+         Files.createDirectories(dir);
+         String line = Instant.now().toString() + " " + message + System.lineSeparator();
+         Files.writeString(dir.resolve("revive-trace.log"), line, StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+      } catch (IOException | RuntimeException ignored) {
       }
    }
 
