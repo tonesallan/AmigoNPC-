@@ -70,7 +70,6 @@ final class NpcGatheringSupport {
       try {
          if (world.getGameplayConfig() == null
             || world.getGameplayConfig().getWorldConfig() == null
-            || !world.getGameplayConfig().getWorldConfig().isBlockBreakingAllowed()
             || !world.getGameplayConfig().getWorldConfig().isBlockGatheringAllowed()) {
             clearTarget(rec);
             return Result.FOLLOWING;
@@ -99,19 +98,19 @@ final class NpcGatheringSupport {
          return Result.FULL;
       }
 
-      WorldChunk chunk = world.getChunkIfLoaded(ChunkUtil.indexChunkFromBlock(target.x, target.z));
+      WorldChunk chunk = chunkAt(world, target.x, target.z); // TODO(0.7.2): porta pendente
       if (chunk == null) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
 
-      BlockType current = chunk.getBlockType(target.x, target.y, target.z);
+      BlockType current = blockTypeAt(chunk, target.x, target.y, target.z); // TODO(0.7.2)
       if (current == null || current.getId() == null || !current.getId().equals(target.blockType.getId())) {
          clearTarget(rec);
          return Result.FOLLOWING;
       }
 
-      if (!chunk.breakBlock(target.x, target.y, target.z, 0)) {
+      if (!breakBlockAt(chunk, target.x, target.y, target.z)) { // TODO(0.7.2)
          clearTarget(rec);
          return Result.FOLLOWING;
       }
@@ -127,6 +126,20 @@ final class NpcGatheringSupport {
       rec.gatherTargetZ = target.z;
 
       return Result.GATHERED;
+   }
+
+   // TODO(0.7.2): a API de blocos mudou (ChunkStore/BlockSection/BlockOperations).
+   // Estes shims deixam a coleta desativada ate a porta ser feita.
+   private static WorldChunk chunkAt(World world, int x, int z) {
+      return null;
+   }
+
+   private static BlockType blockTypeAt(WorldChunk chunk, int x, int y, int z) {
+      return null;
+   }
+
+   private static boolean breakBlockAt(WorldChunk chunk, int x, int y, int z) {
+      return false;
    }
 
    private static ResourceBlock findNearestResource(World world, Vector3d npcPos) {
@@ -151,14 +164,14 @@ final class NpcGatheringSupport {
 
                int x = cx + dx;
                int z = cz + dz;
-               WorldChunk chunk = world.getChunkIfLoaded(ChunkUtil.indexChunkFromBlock(x, z));
+               WorldChunk chunk = chunkAt(world, x, z);
                if (chunk == null) {
                   continue;
                }
 
                BlockType type;
                try {
-                  type = chunk.getBlockType(x, y, z);
+                  type = blockTypeAt(chunk, x, y, z);
                } catch (Throwable ignored) {
                   continue;
                }

@@ -4796,7 +4796,7 @@ public final class AmigoNpcManager {
          int startY = y + 2;
 
          for (int i = 0; i < 12; i++) {
-            int blockId = world.getBlock(x, startY + i, z);
+            int blockId = blockIdAt(world, x, startY + i, z); // TODO(0.7.2): porta pendente
             if (blockId != 0) {
                return true;
             }
@@ -4805,6 +4805,11 @@ public final class AmigoNpcManager {
       }
 
       return false;
+   }
+
+   // TODO(0.7.2): leitura de bloco ainda nao portada para a API 0.7.2.
+   private static int blockIdAt(World world, int x, int y, int z) {
+      return 0;
    }
 
    private static void spawnParticleToOwner(Store<EntityStore> store, Object ownerRefObj, Vector3d pos, String particleId) {
