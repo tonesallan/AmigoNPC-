@@ -53,6 +53,8 @@ public final class AmigoText {
       Map.entry("ui.settings.combat.protect_owner", "Foco em quem me ataca (combate em dupla)"),
       Map.entry("ui.settings.combat.weakest", "Foco em inimigos frágeis"),
       Map.entry("ui.settings.toggle.auto_weapon", "Troca automática de arma: {0}"),
+      Map.entry("ui.settings.toggle.mod_pvp", "PvP (admin): {0}"),
+      Map.entry("ui.settings.toggle.mod_godmode", "Modo deus (admin): {0}"),
       Map.entry("ui.settings.toggle.interrupt", "Interromper ataques inimigos: {0}"),
       Map.entry("ui.settings.feedback.combat_protect_pending", "Modo de combate: proteger o jogador (pendente)"),
       Map.entry("ui.settings.feedback.combat_weakest_pending", "Modo de combate: inimigo com menos vida (pendente)"),

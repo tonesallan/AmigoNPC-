@@ -597,28 +597,48 @@ public final class AmigoNpcManager {
    }
 
    public boolean isGodMode(UUID ownerId) {
-      return false;
+      if (ownerId == null) {
+         return false;
+      }
+
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      return rec != null ? rec.godMode : AmigoPersistence.loadGodMode(ownerId);
    }
 
    public boolean toggleGodModeWithStore(Store<EntityStore> store, UUID ownerId) {
-      if (ownerId != null) {
-         AmigoPersistence.saveGodMode(ownerId, false);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         if (rec != null) {
-            rec.godMode = false;
-         }
+      if (ownerId == null) {
+         return false;
       }
 
-      return false;
+      boolean newVal = !this.isGodMode(ownerId);
+      this.setGodModeWithStore(store, ownerId, newVal);
+      return true;
    }
 
    public void setGodModeWithStore(Store<EntityStore> store, UUID ownerId, boolean enabled) {
-      if (ownerId != null) {
-         AmigoPersistence.saveGodMode(ownerId, false);
-         AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
-         if (rec != null) {
-            rec.godMode = false;
+      if (ownerId == null) {
+         return;
+      }
+
+      AmigoPersistence.saveGodMode(ownerId, enabled);
+      AmigoNpcManager.NpcRecord rec = this.npcRefPorPlayer.get(ownerId);
+      if (rec != null) {
+         rec.godMode = enabled;
+         if (enabled && store != null && !rec.downed && rec.refObj instanceof Ref) {
+            try {
+               @SuppressWarnings("unchecked")
+               Ref<EntityStore> npcRef = (Ref<EntityStore>)rec.refObj;
+               EntityStatMap stats = (EntityStatMap)store.getComponent(npcRef, EntityStatMap.getComponentType());
+               if (stats != null) {
+                  stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+                  store.putComponent(npcRef, EntityStatMap.getComponentType(), stats);
+               }
+            } catch (Throwable ignored) {
+            }
          }
+
+         rec.regenStartAtMillis = 0L;
+         rec.regenLastApplyMillis = 0L;
       }
    }
 

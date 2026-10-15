@@ -44,6 +44,11 @@ final class AmigoLvlGuiSettingsAdminRenderSupport {
          AmigoText.format("ui.settings.toggle.mod_pvp", AmigoText.onOff(settingsPending.pvp))
       );
       cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminPvpToggle.Disabled", lockedByOther);
+      cmd.set(
+         "#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminGodModeToggle.Text",
+         AmigoText.format("ui.settings.toggle.mod_godmode", AmigoText.onOff(settingsPending.godMode))
+      );
+      cmd.set("#RpgLvlLeaderboardPageContainer #RpgLvlLeaderboardPage #SettingsAdminGodModeToggle.Disabled", lockedByOther);
       boolean dbg = false;
 
       try {

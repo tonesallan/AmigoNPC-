@@ -54,6 +54,11 @@ final class AmigoLvlGuiSettingsFooterSupport {
             mgr.setPvpEnabled(settingsPending.pvp);
             changedAny = true;
          }
+
+         if (settingsPending.godMode != settingsLive.godMode) {
+            mgr.setGodModeWithStore(null, ownerId, settingsPending.godMode);
+            changedAny = true;
+         }
       }
 
       AmigoLvlGuiSettingsSnapshot refreshedLive = AmigoLvlGuiSettingsStateSupport.loadLiveSettings(ownerId);
