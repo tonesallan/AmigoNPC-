@@ -13,7 +13,13 @@ final class AmigoLvlGuiRewardIconMarkupSupport {
       sb.append("Group { LayoutMode: Left; Padding: (Right:").append(itemHGap).append(");");
       sb.append("Group { LayoutMode: Full; Anchor: (Width: 48, Height: 48); Background: #404858; Padding: 1;");
       sb.append("Group { LayoutMode: Full; Anchor: (Full: 0); Background: #252830(0.92);");
-      sb.append("ItemIcon { Anchor: (Left: 3, Top: 3, Width: 40, Height: 40); ItemId: \"").append(itemId).append("\"; }");
+      // Diagnóstico: ItemIcon com ids da config padrão pode derrubar o cliente se o id não existir no 0.7.2.
+      // Troca temporária por um rótulo com o id (sem ícone) para testar a hipótese.
+      String label = itemId == null ? "?" : itemId.replace("\"", "");
+      if (label.length() > 12) {
+         label = label.substring(0, 12);
+      }
+      sb.append("Label { Style: (FontSize: 9, TextColor: #e8e8e8); Anchor: (Left: 2, Top: 4, Width: 42, Height: 40); Text: \"").append(label).append("\"; }");
       int badgeW = badgeWidthForQuantity(quantity);
       int badgeLeft = 46 - badgeW - 2;
       appendQuantityBadge(sb, quantity, badgeLeft, badgeW);
